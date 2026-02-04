@@ -21,7 +21,7 @@ export async function GET(req: Request) {
 
   const res = await fetch(url, {
     headers: {
-      "X-NCP-APIGW-API-KEY-ID": process.env.NAVER_MAPS_KEY_ID!, // client id
+      "X-NCP-APIGW-API-KEY-ID": process.env.NEXT_PUBLIC_NAVER_MAPS_KEY_ID!, // client id
       "X-NCP-APIGW-API-KEY": process.env.NAVER_MAPS_KEY_SECRET!, // client secret
     },
     // 필요하면 캐싱 전략 추가

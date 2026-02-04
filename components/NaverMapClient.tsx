@@ -128,7 +128,7 @@ export default function NaverMapClient() {
     if (bounds) mapRef.current.fitBounds(bounds);
   }, [sdkReady, drawRoute, route]);
 
-  const key = process.env.NAVER_MAPS_KEY_ID;
+  const key = process.env.NEXT_PUBLIC_NAVER_MAPS_KEY_ID;
 
   return (
     <>
