@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
+import Providers from "./providers";
 
 export const metadata: Metadata = {
   title: "어디가개",
@@ -23,7 +24,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="overflow-hidden">
-        <AppShell>{children}</AppShell>;
+        <Providers>
+          <AppShell>{children}</AppShell>;
+        </Providers>
       </body>
     </html>
   );

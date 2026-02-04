@@ -31,7 +31,20 @@ type MapState = {
 
   setDrawRoute: (v: boolean) => void;
   clearRoute: () => void;
+
+  cmd: MapCommand | null;
+  emitCmd: (cmd: MapCommand) => void;
+  clearCmd: () => void;
 };
+
+type MapCommand =
+  | { type: "REQUEST_MY_LOCATION" }
+  | {
+      type: "MOVE_TO";
+      pos: { lat: number; lng: number };
+      zoom?: number;
+      animate?: boolean;
+    };
 
 function extractTmapPedestrian(data: any): RouteResult {
   // TMAP 보행자 경로는 보통 GeoJSON 형태로 features 배열이 오고,
@@ -211,4 +224,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   setDrawRoute: (v) => set({ drawRoute: v }),
 
   clearRoute: () => set({ route: null, routeError: null, drawRoute: false }),
+  cmd: null,
+  emitCmd: (cmd) => set({ cmd }),
+  clearCmd: () => set({ cmd: null }),
 }));

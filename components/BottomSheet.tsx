@@ -212,15 +212,35 @@ export default function BottomSheet({
   return (
     <>
       {/* Backdrop: 바텀내브 영역 제외 */}
+      {/* Backdrop: 바텀내브 영역 제외 */}
       <div
         className={[
+          // ✅ z-index를 확 올려서 지도 오버레이보다 무조건 위로
           "fixed left-0 right-0 top-0 z-100 transition-opacity duration-300",
           isOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none",
         ].join(" ")}
-        style={{ bottom: bottomInset, backgroundColor: "rgba(0,0,0,0.35)" }}
-        onPointerDown={(e) => {
+        style={{
+          bottom: bottomInset,
+          backgroundColor: "rgba(0,0,0,0.35)",
+          // ✅ iOS에서 tap/click 합성/스크롤 제스처 섞이는 것 방지
+          touchAction: "none",
+        }}
+        // ✅ DOWN 단계에서부터 아래로 이벤트가 절대 안 새도록 캡처링
+        onPointerDownCapture={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onPointerMoveCapture={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onPointerUpCapture={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          // backdrop "빈 곳"만 닫기
           if (e.target !== e.currentTarget) return;
           close();
           setVisualTop(closedTop);
