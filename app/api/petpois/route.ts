@@ -2,29 +2,43 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-// 좌표 라운딩: decimals=3이면 대략 0.001도 단위(수백 m 이내 수준)로 묶임
-function roundCoord(n: number, decimals = 3) {
-  const p = 10 ** decimals;
-  return Math.round(n * p) / p;
+function toNum(v: string | null, fallback: number) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
-function toNumber(v: string | null) {
-  if (v == null) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
+function normalizeItems(raw: any) {
+  if (!raw) return [];
+  return Array.isArray(raw) ? raw : [raw];
+}
+
+/**
+ * grid(도 단위)로 라운딩. 예: 0.002 ~= 200m 내외(위도 기준)
+ * - decimals 방식보다 "요청에서 제어하기 쉬움"
+ */
+function roundByGrid(n: number, grid: number) {
+  if (!Number.isFinite(grid) || grid <= 0) return n;
+  return Math.round(n / grid) * grid;
 }
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
 
-  const latRaw = toNumber(sp.get("lat"));
-  const lngRaw = toNumber(sp.get("lng"));
+  const latRaw = toNum(sp.get("lat"), NaN);
+  const lngRaw = toNum(sp.get("lng"), NaN);
 
-  const radius = toNumber(sp.get("radius")) ?? 1000;
-  const pageNo = toNumber(sp.get("pageNo")) ?? 1;
-  const numOfRows = toNumber(sp.get("numOfRows")) ?? 50;
+  const radius = Math.min(Math.max(toNum(sp.get("radius"), 1000), 100), 20000);
+  const pageNo = Math.max(toNum(sp.get("pageNo"), 1), 1);
+  const numOfRows = Math.min(Math.max(toNum(sp.get("numOfRows"), 50), 1), 200);
 
-  if (latRaw == null || lngRaw == null) {
+  // ✅ 우리가 쓰는 파라미터: grid, revalidate
+  const grid = toNum(sp.get("grid"), 0.002);
+  const revalidate = Math.min(
+    Math.max(toNum(sp.get("revalidate"), 600), 60),
+    3600,
+  );
+
+  if (!Number.isFinite(latRaw) || !Number.isFinite(lngRaw)) {
     return NextResponse.json(
       { error: "lat/lng are required (numbers)" },
       { status: 400 },
@@ -38,15 +52,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // ✅ 캐시 키 묶기: 같은 동네 = 같은 lat/lng로 강제
-  // radius=1000m 기준이면 decimals=3 정도가 보통 무난
-  const decimals = 3;
-  const lat = roundCoord(latRaw, decimals);
-  const lng = roundCoord(lngRaw, decimals);
-
-  // 과한 요청 방지
-  const safeRadius = Math.max(100, Math.min(radius, 20000));
-  const safeNumOfRows = Math.max(1, Math.min(numOfRows, 200));
+  // ✅ 캐시 키 묶기: 같은 동네 → 같은 라운딩 좌표
+  const lat = roundByGrid(latRaw, grid);
+  const lng = roundByGrid(lngRaw, grid);
 
   const serviceKey = process.env.KTO_SERVICE_KEY;
   if (!serviceKey) {
@@ -56,23 +64,26 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // ✅ 업스트림 URL은 너 기존 것 유지 (동작 중인 전제)
+  // 필요하면 아래 BASE만 공식 엔드포인트로 바꿔 끼우면 됨.
   const url = new URL(
     "http://apis.data.go.kr/B551011/KorPetTourService2/locationBasedList2",
   );
+
   url.searchParams.set("serviceKey", serviceKey);
   url.searchParams.set("MobileOS", "ETC");
   url.searchParams.set("MobileApp", "eodigagae");
   url.searchParams.set("_type", "json");
   url.searchParams.set("mapX", String(lng)); // mapX=경도
   url.searchParams.set("mapY", String(lat)); // mapY=위도
-  url.searchParams.set("radius", String(safeRadius));
+  url.searchParams.set("radius", String(radius));
   url.searchParams.set("pageNo", String(pageNo));
-  url.searchParams.set("numOfRows", String(safeNumOfRows));
+  url.searchParams.set("numOfRows", String(numOfRows));
 
   try {
     const res = await fetch(url.toString(), {
-      // ✅ 서버 공유 캐시 TTL: 6시간 (원하면 12시간/24시간로 늘려도 됨)
-      next: { revalidate: 60 * 60 * 6 },
+      // ✅ 서버 공유 캐시 TTL (초)
+      next: { revalidate },
     });
 
     const text = await res.text();
@@ -95,22 +106,32 @@ export async function GET(req: NextRequest) {
 
     if (resultCode && resultCode !== "0000") {
       return NextResponse.json(
-        { error: "Upstream error", resultCode, resultMsg, upstream: data },
+        { error: "Upstream error", resultCode, resultMsg },
         { status: 502 },
       );
     }
 
-    // (선택) 디버그용: 라운딩된 좌표를 같이 내려주면 확인이 쉬움
-    data.__cacheKeyHint = {
-      latRounded: lat,
-      lngRounded: lng,
-      decimals,
-      radius: safeRadius,
-      numOfRows: safeNumOfRows,
-      pageNo,
-    };
+    const rawItems = data?.response?.body?.items?.item;
+    const items = normalizeItems(rawItems);
 
-    return NextResponse.json(data, { status: 200 });
+    // ✅ 클라(usePetPoiController)가 기대하는 key/meta/items로 반환
+    const key = `petpoi:${lat.toFixed(6)}:${lng.toFixed(6)}:r${radius}:n${numOfRows}:p${pageNo}`;
+
+    return NextResponse.json(
+      {
+        key,
+        meta: {
+          rounded: { lat, lng, grid },
+          radius,
+          numOfRows,
+          pageNo,
+          revalidate,
+          totalCount: data?.response?.body?.totalCount ?? null,
+        },
+        items,
+      },
+      { status: 200 },
+    );
   } catch (e: any) {
     return NextResponse.json(
       { error: "Failed to fetch upstream", detail: String(e?.message ?? e) },

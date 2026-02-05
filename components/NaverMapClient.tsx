@@ -1,9 +1,10 @@
 "use client";
 
 import { useGeolocation } from "@/hooks/useGeolocation";
-import { useMapStore } from "@/stores/mapStore";
 import Script from "next/script";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEmitMapCmd, useMapCmd } from "@/hooks/useMapCmd";
+import { useMapStore } from "@/stores/mapStore";
 
 type PetPoiItem = {
   contentid: string;
@@ -22,21 +23,29 @@ export default function NaverMapClient(props: {
 
   const elRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<naver.maps.Map>(null);
-  const markerRef = useRef<naver.maps.Marker>(null);
 
-  // ✅ 토글 ON을 눌렀는데 map이 아직 준비 전이면, 준비되는 순간에 1회 그리기
+  // 내 위치 마커
+  const myMarkerRef = useRef<naver.maps.Marker>(null);
+
+  // POI 핀/라벨 마커
+  const petPinMarkersRef = useRef<naver.maps.Marker[]>([]);
+  const petLabelMarkersRef = useRef<naver.maps.Marker[]>([]);
+
+  // "내 위치 변경" 클릭 리스너 (1회용)
+  const moveMyMarkerListenerRef = useRef<naver.maps.MapEventListener | null>(
+    null,
+  );
+
+  // 지도 생성이 늦었는데 토글 ON이면, 지도 생성 직후 1회 그리기
   const pendingDrawRef = useRef(false);
 
-  // ✅ POI 마커/인포윈도우
-  const petMarkersRef = useRef<naver.maps.Marker[]>([]);
-  const petInfoRef = useRef<naver.maps.InfoWindow[]>([]);
+  // 수동 위치 변경을 했으면, geolocation이 덮어쓰지 않게(원하면 제거 가능)
+  const manualPosRef = useRef(false);
 
   const [sdkReady, setSdkReady] = useState(false);
 
   const setMyPos = useMapStore((s) => s.setMyPos);
-  const cmd = useMapStore((s) => s.cmd);
-  const clearCmd = useMapStore((s) => s.clearCmd);
-  const emitCmd = useMapStore((s) => s.emitCmd);
+  const emitCmd = useEmitMapCmd();
 
   const fallback = useMemo(() => ({ lat: 37.5665, lng: 126.978 }), []);
 
@@ -46,32 +55,55 @@ export default function NaverMapClient(props: {
     enableHighAccuracy: true,
   });
 
+  // -----------------------------
+  // POI 마커 유틸
+  // -----------------------------
   const clearPetMarkers = useCallback(() => {
-    for (const inf of petInfoRef.current) inf.close?.();
-    petInfoRef.current = [];
+    for (const m of petLabelMarkersRef.current) m.setMap(null);
+    petLabelMarkersRef.current = [];
 
-    for (const m of petMarkersRef.current) m.setMap(null);
-    petMarkersRef.current = [];
+    for (const m of petPinMarkersRef.current) m.setMap(null);
+    petPinMarkersRef.current = [];
+  }, []);
+
+  const makeLabelHTML = useCallback((title: string) => {
+    const safe = (title ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    return `
+      <div style="
+        transform: translate(-50%, -120%);
+        background: rgba(255,255,255,.92);
+        border: 1px solid rgba(0,0,0,.15);
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 12px;
+        line-height: 1;
+        box-shadow: 0 2px 10px rgba(0,0,0,.12);
+        white-space: nowrap;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
+      ">${safe}</div>
+    `;
   }, []);
 
   const drawPetMarkers = useCallback(() => {
-    // SDK/지도 준비 체크
     if (!sdkReady) return;
     if (!window.naver?.maps) return;
 
-    // 토글 OFF면 "그리지 않는다" + 기존 마커 제거
+    // OFF면 제거
     if (!showPetPoi) {
       clearPetMarkers();
       return;
     }
 
-    // 토글 ON인데 map이 아직 없으면 "나중에" 그리도록 예약
+    // ON인데 map이 아직 없으면 예약
     if (!mapRef.current) {
       pendingDrawRef.current = true;
       return;
     }
 
-    // 여기부터는 map 존재 + showPetPoi ON
     clearPetMarkers();
 
     for (const it of petPois ?? []) {
@@ -81,43 +113,43 @@ export default function NaverMapClient(props: {
 
       const pos = new window.naver.maps.LatLng(lat, lng);
 
-      const marker = new window.naver.maps.Marker({
+      const pin = new window.naver.maps.Marker({
         map: mapRef.current,
         position: pos,
         title: it.title ?? "",
       });
 
-      const info = new window.naver.maps.InfoWindow({
-        content: `
-          <div style="padding:10px;max-width:240px;">
-            <div style="font-weight:700;margin-bottom:6px;">${it.title ?? ""}</div>
-            <div style="font-size:12px;opacity:.85;margin-bottom:6px;">${it.addr1 ?? ""}</div>
-            ${it.tel ? `<div style="font-size:12px;opacity:.85;">☎ ${it.tel}</div>` : ""}
-          </div>
-        `,
-        borderWidth: 0,
-        backgroundColor: "white",
-        anchorSize: new window.naver.maps.Size(12, 12),
+      const label = new window.naver.maps.Marker({
+        map: mapRef.current,
+        position: pos,
+        clickable: false,
+        icon: {
+          content: makeLabelHTML(it.title ?? ""),
+          anchor: new window.naver.maps.Point(0, 0),
+        },
+        zIndex: 1000,
       });
 
-      window.naver.maps.Event.addListener(marker, "click", () => {
-        if (info.getMap()) info.close();
-        else info.open(mapRef.current!, marker);
-      });
-
-      petMarkersRef.current.push(marker);
-      petInfoRef.current.push(info);
+      petPinMarkersRef.current.push(pin);
+      petLabelMarkersRef.current.push(label);
     }
 
-    // 이번에 그렸으니 pending 해제
     pendingDrawRef.current = false;
-  }, [sdkReady, showPetPoi, petPois, clearPetMarkers]);
+  }, [sdkReady, showPetPoi, petPois, clearPetMarkers, makeLabelHTML]);
 
-  // ✅ 지도 생성/내 위치 마커 세팅 (기존 로직 유지)
-  const initOrUpdate = useCallback(() => {
+  useEffect(() => {
+    drawPetMarkers();
+  }, [drawPetMarkers]);
+
+  // -----------------------------
+  // 지도 생성: 1회만
+  //  - 중요: 토글/POI 변경으로 지도/내마커가 coords로 "덮어써지지" 않게
+  // -----------------------------
+  const initMapOnce = useCallback(() => {
     if (!elRef.current) return;
     if (!sdkReady) return;
     if (!window.naver?.maps) return;
+    if (mapRef.current) return; // ✅ 이미 만들었으면 절대 건드리지 않음
 
     const lat =
       typeof coords?.latitude === "number" ? coords.latitude : fallback.lat;
@@ -126,58 +158,98 @@ export default function NaverMapClient(props: {
 
     const center = new window.naver.maps.LatLng(lat, lng);
 
-    if (!mapRef.current) {
-      mapRef.current = new window.naver.maps.Map(elRef.current, {
-        center,
-        zoom: 15,
-        minZoom: 10,
-      });
+    mapRef.current = new window.naver.maps.Map(elRef.current, {
+      center,
+      zoom: 15,
+      minZoom: 10,
+    });
 
-      markerRef.current = new window.naver.maps.Marker({
-        position: center,
-        map: mapRef.current,
-      });
+    myMarkerRef.current = new window.naver.maps.Marker({
+      position: center,
+      map: mapRef.current,
+    });
 
-      // ✅ "토글 ON을 이미 눌러둔 상태"로 지도 생성이 늦게 된 경우에만 그리기
-      if (pendingDrawRef.current) {
-        // 여기서 drawPetMarkers를 직접 deps로 물리지 않기 위해, 다음 tick에서 실행
-        queueMicrotask(() => drawPetMarkers());
-      }
-    } else {
-      markerRef.current?.setPosition(center);
-
-      // (선택) map이 이미 있는데 pending이 남아있다면 그리기 시도
-      if (pendingDrawRef.current) {
-        queueMicrotask(() => drawPetMarkers());
-      }
-    }
-  }, [coords, sdkReady, fallback, drawPetMarkers]);
+    if (pendingDrawRef.current) queueMicrotask(drawPetMarkers);
+  }, [
+    sdkReady,
+    coords?.latitude,
+    coords?.longitude,
+    fallback.lat,
+    fallback.lng,
+    drawPetMarkers,
+  ]);
 
   useEffect(() => {
-    initOrUpdate();
-  }, [initOrUpdate]);
+    initMapOnce();
+  }, [initMapOnce]);
 
-  // ✅ 토글 ON/OFF, petPois 변경 시에만 POI 마커 갱신
-  useEffect(() => {
-    drawPetMarkers();
-  }, [drawPetMarkers]);
-
-  // ✅ (pubsub) REQUEST_MY_LOCATION 구독 → refresh 실행
-  useEffect(() => {
-    if (!cmd) return;
-    if (cmd.type !== "REQUEST_MY_LOCATION") return;
-
+  // -----------------------------
+  // pubsub: REQUEST_MY_LOCATION → refresh
+  // -----------------------------
+  useMapCmd("REQUEST_MY_LOCATION", () => {
+    // 수동 모드 해제하고 다시 GPS로
+    manualPosRef.current = false;
     refresh();
-    clearCmd();
-  }, [cmd, refresh, clearCmd]);
+  });
 
-  // ✅ 위치 결과가 오면: myPos 업데이트 + 지도 이동 커맨드 발행
+  // -----------------------------
+  // 내 위치 변경(수동): 다음 클릭 1회로 MOVE_TO
+  // -----------------------------
+  useMapCmd("MOVE_MY_MARKER_READY", () => {
+    if (!mapRef.current || !myMarkerRef.current) return;
+    if (!window.naver?.maps) return;
+
+    // 이전 리스너가 남아있으면 제거
+    if (moveMyMarkerListenerRef.current) {
+      mapRef.current.removeListener(moveMyMarkerListenerRef.current);
+      moveMyMarkerListenerRef.current = null;
+    }
+
+    const listener = mapRef.current.addListenerOnce(
+      "click",
+      (event: naver.maps.PointerEvent) => {
+        const lng = event.coord.x;
+        const lat = event.coord.y;
+
+        manualPosRef.current = true; // ✅ 이후 geolocation이 덮어쓰지 않게
+        const pos = { lat, lng };
+
+        // 상태/지도 이동은 MOVE_TO에서 통일
+        emitCmd({ type: "MOVE_TO", pos, zoom: 15, animate: true });
+
+        emitCmd({ type: "MY_MARKER_MOVED" });
+      },
+    );
+
+    moveMyMarkerListenerRef.current = listener;
+  });
+
+  useMapCmd("MOVE_MY_MARKER_CANCELLED", () => {
+    if (!mapRef.current) return;
+    const l = moveMyMarkerListenerRef.current;
+    if (!l) return;
+    mapRef.current.removeListener(l);
+    moveMyMarkerListenerRef.current = null;
+  });
+
+  // -----------------------------
+  // geolocation 결과 → MOVE_TO 발행 (중복 방지 + 수동모드면 무시)
+  // -----------------------------
+  const geoLat = coords?.latitude;
+  const geoLng = coords?.longitude;
+  const lastGeoRef = useRef<{ lat: number; lng: number } | null>(null);
+
   useEffect(() => {
-    const lat = coords?.latitude;
-    const lng = coords?.longitude;
+    // 수동 위치 변경 후에는 GPS가 덮어쓰지 않게
+    if (manualPosRef.current) return;
 
-    if (typeof lat === "number" && typeof lng === "number") {
-      const pos = { lat, lng };
+    if (typeof geoLat === "number" && typeof geoLng === "number") {
+      const last = lastGeoRef.current;
+      if (last && last.lat === geoLat && last.lng === geoLng) return;
+
+      lastGeoRef.current = { lat: geoLat, lng: geoLng };
+
+      const pos = { lat: geoLat, lng: geoLng };
       setMyPos(pos);
       emitCmd({ type: "MOVE_TO", pos, zoom: 15, animate: true });
       return;
@@ -187,13 +259,15 @@ export default function NaverMapClient(props: {
       setMyPos(fallback);
       emitCmd({ type: "MOVE_TO", pos: fallback, zoom: 15, animate: true });
     }
-  }, [coords, error, setMyPos, emitCmd, fallback]);
+  }, [geoLat, geoLng, error, setMyPos, emitCmd, fallback]);
 
-  // ✅ MOVE_TO 구독 → 실제 지도 이동 실행
-  useEffect(() => {
-    if (!cmd) return;
-    if (cmd.type !== "MOVE_TO") return;
+  // -----------------------------
+  // pubsub: MOVE_TO → 지도 이동 + 내마커 이동 + myPos 반영
+  // -----------------------------
+  useMapCmd("MOVE_TO", (cmd) => {
     if (!mapRef.current || !window.naver?.maps) return;
+
+    setMyPos(cmd.pos);
 
     const ll = new window.naver.maps.LatLng(cmd.pos.lat, cmd.pos.lng);
 
@@ -204,10 +278,24 @@ export default function NaverMapClient(props: {
       (mapRef.current as any).panTo(ll);
     else mapRef.current.setCenter(ll);
 
-    markerRef.current?.setPosition(ll);
+    myMarkerRef.current?.setPosition(ll);
+  });
 
-    clearCmd();
-  }, [cmd, clearCmd]);
+  // -----------------------------
+  // cleanup: 리스너 남아있으면 제거
+  // -----------------------------
+  useEffect(() => {
+    return () => {
+      try {
+        if (mapRef.current && moveMyMarkerListenerRef.current) {
+          mapRef.current.removeListener(moveMyMarkerListenerRef.current);
+        }
+      } finally {
+        moveMyMarkerListenerRef.current = null;
+        clearPetMarkers();
+      }
+    };
+  }, [clearPetMarkers]);
 
   const key = process.env.NEXT_PUBLIC_NAVER_MAPS_KEY_ID;
 

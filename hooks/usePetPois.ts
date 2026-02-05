@@ -10,7 +10,7 @@ export function usePetPois(opts: {
 
   const key =
     enabled && typeof lat === "number" && typeof lng === "number"
-      ? `/api/petpois?lat=${lat}&lng=${lng}&radius=${radius}&numOfRows=80&pageNo=1`
+      ? `/api/petpois?lat=${lat}&lng=${lng}&radius=${radius}&numOfRows=150&pageNo=1`
       : null;
 
   const swr = useSWR(key); // 전역 fetcher 사용

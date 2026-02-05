@@ -1,10 +1,14 @@
+// stores/mapStore.ts
 import { create } from "zustand";
+import type { LatLng, MapCmd } from "@/types/mapEvents";
+import { extractTmapPedestrian } from "@/lib/extractTmapPedestrian";
 
-export type LatLng = { lat: number; lng: number };
-
+// ================================
+// Types (route)
+// ================================
 export type RouteSummary = {
   distance?: number; // meters
-  duration?: number; // ms (응답 따라 단위 다를 수 있음)
+  duration?: number; // ms or sec (upstream dependent)
 };
 
 export type RouteResult = {
@@ -12,16 +16,31 @@ export type RouteResult = {
   path: [number, number][]; // [[lng,lat], ...]
 };
 
+// ================================
+// Cmd Bus (PUB/SUB) — file-scope listeners
+// ================================
+type CmdListener<T extends MapCmd["type"] = MapCmd["type"]> = (
+  cmd: Extract<MapCmd, { type: T }>,
+) => void;
+
+// ✅ IMPORTANT: file-scope so it doesn't reset on re-renders
+const listeners = new Map<MapCmd["type"], Set<(cmd: any) => void>>();
+
+// ================================
+// Store
+// ================================
 type MapState = {
+  // basic positions
   myPos: LatLng | null;
   pickedPos: LatLng | null;
 
+  // route
   route: RouteResult | null;
   routeLoading: boolean;
   routeError: string | null;
-
   drawRoute: boolean;
 
+  // actions
   setMyPos: (p: LatLng | null) => void;
   setPickedPos: (p: LatLng | null) => void;
   clearPicked: () => void;
@@ -32,90 +51,47 @@ type MapState = {
   setDrawRoute: (v: boolean) => void;
   clearRoute: () => void;
 
-  cmd: MapCommand | null;
-  emitCmd: (cmd: MapCommand) => void;
-  clearCmd: () => void;
+  // ============================
+  // Cmd Queue (transport)
+  // ============================
+  cmdQueue: MapCmd[];
+  emitCmd: (cmd: MapCmd) => void;
+  shiftCmd: () => MapCmd | null;
+  clearCmdQueue: () => void;
+
+  // ============================
+  // Pub/Sub (broadcast)
+  // ============================
+  subscribeCmd: <T extends MapCmd["type"]>(
+    type: T,
+    fn: CmdListener<T>,
+  ) => () => void;
+
+  publishCmd: (cmd: MapCmd) => void;
 };
 
-type MapCommand =
-  | { type: "REQUEST_MY_LOCATION" }
-  | {
-      type: "MOVE_TO";
-      pos: { lat: number; lng: number };
-      zoom?: number;
-      animate?: boolean;
-    };
-
-function extractTmapPedestrian(data: any): RouteResult {
-  // TMAP 보행자 경로는 보통 GeoJSON 형태로 features 배열이 오고,
-  // LineString의 coordinates가 [[lng,lat], ...] 형태로 들어있음.
-  const features: any[] = Array.isArray(data?.features) ? data.features : [];
-
-  const path: [number, number][] = [];
-  let distance: number | undefined;
-  let duration: number | undefined;
-
-  for (const f of features) {
-    const g = f?.geometry;
-    const props = f?.properties;
-
-    // 요약값은 FeatureCollection의 첫 feature(props) 혹은 별도 필드에 있을 수 있어서
-    // 최초로 발견한 값을 채택
-    if (distance == null) {
-      const d =
-        props?.totalDistance ??
-        props?.distance ??
-        data?.totalDistance ??
-        data?.distance;
-      if (typeof d === "number") distance = d;
-    }
-
-    if (duration == null) {
-      const t =
-        props?.totalTime ??
-        props?.duration ??
-        data?.totalTime ??
-        data?.duration;
-      if (typeof t === "number") {
-        // TMAP은 보통 초(sec) 단위로 오는 경우가 많아서,
-        // 여기서는 "초로 오면 ms로 바꿔" 같은 확정 변환을 하지 않고 그대로 둠.
-        // 필요하면 여기서 ms 변환 규칙을 확정해도 됨.
-        duration = t;
-      }
-    }
-
-    if (g?.type === "LineString" && Array.isArray(g?.coordinates)) {
-      for (const c of g.coordinates) {
-        // coordinate: [lng,lat]
-        const lng = c?.[0];
-        const lat = c?.[1];
-        if (typeof lng === "number" && typeof lat === "number") {
-          path.push([lng, lat]);
-        }
-      }
-    }
-  }
-
-  if (path.length === 0) {
-    throw new Error("TMAP 도보 경로 좌표를 파싱하지 못했어요.");
-  }
-
-  return { summary: { distance, duration }, path };
-}
-
 export const useMapStore = create<MapState>((set, get) => ({
+  // ----------------------------
+  // basic positions
+  // ----------------------------
   myPos: null,
   pickedPos: null,
-
-  route: null,
-  routeLoading: false,
-  routeError: null,
-
-  drawRoute: false,
 
   setMyPos: (p) => set({ myPos: p }),
   setPickedPos: (p) => set({ pickedPos: p }),
   clearPicked: () => set({ pickedPos: null }),
+
+  // ----------------------------
+  // route
+  // ----------------------------
+  route: null,
+  routeLoading: false,
+  routeError: null,
+  drawRoute: false,
+
+  setDrawRoute: (v) => set({ drawRoute: v }),
+
+  clearRoute: () => set({ route: null, routeError: null, drawRoute: false }),
 
   requestRoute: async () => {
     const { myPos, pickedPos } = get();
@@ -136,16 +112,15 @@ export const useMapStore = create<MapState>((set, get) => ({
       const goal = `${pickedPos.lng},${pickedPos.lat}`;
 
       const res = await fetch(
-        `/api/directions?start=${encodeURIComponent(start)}&goal=${encodeURIComponent(goal)}&option=traoptimal`,
+        `/api/directions?start=${encodeURIComponent(
+          start,
+        )}&goal=${encodeURIComponent(goal)}&option=traoptimal`,
         { method: "GET" },
       );
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data?.error ?? "경로 요청 실패");
-      }
-
+      if (!res.ok) throw new Error(data?.error ?? "경로 요청 실패");
       if (!Array.isArray(data?.path) || data.path.length === 0) {
         throw new Error("경로 데이터가 비어있어요.");
       }
@@ -154,7 +129,6 @@ export const useMapStore = create<MapState>((set, get) => ({
         route: { summary: data.summary, path: data.path },
         routeLoading: false,
         routeError: null,
-        // 요청만 하고 그리기는 버튼으로!
         drawRoute: false,
       });
     } catch (e: any) {
@@ -182,7 +156,6 @@ export const useMapStore = create<MapState>((set, get) => ({
     set({ routeLoading: true, routeError: null });
 
     try {
-      // 서버 프록시(API Route)로 보냄: AppKey는 서버에서만 처리
       const res = await fetch("/api/tmap/pedestrian", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -191,17 +164,12 @@ export const useMapStore = create<MapState>((set, get) => ({
           startY: myPos.lat,
           endX: pickedPos.lng,
           endY: pickedPos.lat,
-          // 필요하면 옵션 추가:
-          // reqCoordType: "WGS84GEO",
-          // resCoordType: "WGS84GEO",
         }),
       });
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data?.error ?? "TMAP 도보 경로 요청 실패");
-      }
+      if (!res.ok) throw new Error(data?.error ?? "TMAP 도보 경로 요청 실패");
 
       const parsed = extractTmapPedestrian(data);
 
@@ -209,7 +177,7 @@ export const useMapStore = create<MapState>((set, get) => ({
         route: parsed,
         routeLoading: false,
         routeError: null,
-        drawRoute: false, // 요청만 하고 그리기는 버튼으로!
+        drawRoute: false,
       });
     } catch (e: any) {
       set({
@@ -221,10 +189,49 @@ export const useMapStore = create<MapState>((set, get) => ({
     }
   },
 
-  setDrawRoute: (v) => set({ drawRoute: v }),
+  // ----------------------------
+  // Cmd Queue (transport)
+  // ----------------------------
+  cmdQueue: [],
+  emitCmd: (cmd) => set((s) => ({ cmdQueue: [...s.cmdQueue, cmd] })),
+  shiftCmd: () => {
+    const q = get().cmdQueue;
+    if (q.length === 0) return null;
+    const head = q[0];
+    set({ cmdQueue: q.slice(1) });
+    return head;
+  },
+  clearCmdQueue: () => set({ cmdQueue: [] }),
 
-  clearRoute: () => set({ route: null, routeError: null, drawRoute: false }),
-  cmd: null,
-  emitCmd: (cmd) => set({ cmd }),
-  clearCmd: () => set({ cmd: null }),
+  // ----------------------------
+  // Pub/Sub (broadcast)
+  // ----------------------------
+  subscribeCmd: (type, fn) => {
+    let setForType = listeners.get(type);
+    if (!setForType) {
+      setForType = new Set();
+      listeners.set(type, setForType);
+    }
+    setForType.add(fn as any);
+
+    return () => {
+      const s = listeners.get(type);
+      if (!s) return;
+      s.delete(fn as any);
+      if (s.size === 0) listeners.delete(type);
+    };
+  },
+
+  publishCmd: (cmd) => {
+    const s = listeners.get(cmd.type);
+    if (!s || s.size === 0) return;
+
+    for (const fn of Array.from(s)) {
+      try {
+        fn(cmd);
+      } catch (e) {
+        console.error("[cmd listener error]", cmd.type, e);
+      }
+    }
+  },
 }));

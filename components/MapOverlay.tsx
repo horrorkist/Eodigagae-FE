@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMapStore } from "@/stores/mapStore";
+import { useMapCmd } from "@/hooks/useMapCmd";
 
 type ToggleItem = {
   key: string;
@@ -31,6 +32,22 @@ export default function MapOverlay(props: {
   const emitCmd = useMapStore((s) => s.emitCmd);
   const [q, setQ] = useState("");
   const canSubmit = useMemo(() => q.trim().length > 0, [q]);
+
+  const [isMovingMyMarker, setIsMovingMyMarker] = useState<boolean>(false);
+
+  const onToggleMoveMyMarker = () => {
+    if (isMovingMyMarker) {
+      emitCmd({ type: "MOVE_MY_MARKER_CANCELLED" });
+      setIsMovingMyMarker(false);
+    } else {
+      emitCmd({ type: "MOVE_MY_MARKER_READY" });
+      setIsMovingMyMarker(true);
+    }
+  };
+
+  useMapCmd("MY_MARKER_MOVED", () => {
+    setIsMovingMyMarker(false);
+  });
 
   return (
     <div className="pointer-events-none absolute inset-0 z-50">
@@ -126,10 +143,10 @@ export default function MapOverlay(props: {
           <div className="h-px bg-black/10" />
           <button
             type="button"
-            className="block px-3 py-3 text-sm w-full text-left hover:bg-black/5"
-            onClick={() => console.log("TODO: reset map")}
+            className={`block px-3 py-3 text-sm w-full text-left ${isMovingMyMarker ? "bg-blue-500! text-white" : ""}`}
+            onClick={onToggleMoveMyMarker}
           >
-            ♻️ 리셋
+            내 위치 변경
           </button>
         </div>
       </div>
