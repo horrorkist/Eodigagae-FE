@@ -3,17 +3,9 @@
 import { useGeolocation } from "@/hooks/useGeolocation";
 import Script from "next/script";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useEmitMapCmd, useMapCmd } from "@/hooks/useMapCmd";
 import { useMapStore } from "@/stores/mapStore";
-
-type PetPoiItem = {
-  contentid: string;
-  title: string;
-  addr1?: string;
-  tel?: string;
-  mapx: string; // lng
-  mapy: string; // lat
-};
+import { useEmit, useOn } from "@/hooks/useEventBus";
+import { PetPoiItem } from "@/types/mapEvents";
 
 export default function NaverMapClient(props: {
   showPetPoi: boolean;
@@ -45,7 +37,7 @@ export default function NaverMapClient(props: {
   const [sdkReady, setSdkReady] = useState(false);
 
   const setMyPos = useMapStore((s) => s.setMyPos);
-  const emitCmd = useEmitMapCmd();
+  const emit = useEmit();
 
   const fallback = useMemo(() => ({ lat: 37.5665, lng: 126.978 }), []);
 
@@ -184,18 +176,41 @@ export default function NaverMapClient(props: {
   }, [initMapOnce]);
 
   // -----------------------------
+  // geolocation 결과 → MOVE_TO 발행 (중복 방지 + 수동모드면 무시)
+  // -----------------------------
+  const geoLat = coords?.latitude;
+  const geoLng = coords?.longitude;
+  const lastGeoRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  // -----------------------------
   // pubsub: REQUEST_MY_LOCATION → refresh
   // -----------------------------
-  useMapCmd("REQUEST_MY_LOCATION", () => {
-    // 수동 모드 해제하고 다시 GPS로
+
+  useOn("map", "REQUEST_MY_LOCATION", () => {
     manualPosRef.current = false;
+    lastGeoRef.current = null;
+
+    // 즉시 이동(가능하면)
+    if (
+      typeof coords?.latitude === "number" &&
+      typeof coords?.longitude === "number"
+    ) {
+      emit({
+        type: "MOVE_TO",
+        pos: { lat: coords.latitude, lng: coords.longitude },
+        zoom: 15,
+        animate: true,
+        channel: "map",
+      });
+    }
+
     refresh();
   });
 
   // -----------------------------
   // 내 위치 변경(수동): 다음 클릭 1회로 MOVE_TO
   // -----------------------------
-  useMapCmd("MOVE_MY_MARKER_READY", () => {
+  useOn("map", "MOVE_MY_MARKER_READY", () => {
     if (!mapRef.current || !myMarkerRef.current) return;
     if (!window.naver?.maps) return;
 
@@ -215,29 +230,22 @@ export default function NaverMapClient(props: {
         const pos = { lat, lng };
 
         // 상태/지도 이동은 MOVE_TO에서 통일
-        emitCmd({ type: "MOVE_TO", pos, zoom: 15, animate: true });
+        emit({ type: "MOVE_TO", pos, zoom: 15, animate: true, channel: "map" });
 
-        emitCmd({ type: "MY_MARKER_MOVED" });
+        emit({ type: "MY_MARKER_MOVED", channel: "map" });
       },
     );
 
     moveMyMarkerListenerRef.current = listener;
   });
 
-  useMapCmd("MOVE_MY_MARKER_CANCELLED", () => {
+  useOn("map", "MOVE_MY_MARKER_CANCELLED", () => {
     if (!mapRef.current) return;
     const l = moveMyMarkerListenerRef.current;
     if (!l) return;
     mapRef.current.removeListener(l);
     moveMyMarkerListenerRef.current = null;
   });
-
-  // -----------------------------
-  // geolocation 결과 → MOVE_TO 발행 (중복 방지 + 수동모드면 무시)
-  // -----------------------------
-  const geoLat = coords?.latitude;
-  const geoLng = coords?.longitude;
-  const lastGeoRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     // 수동 위치 변경 후에는 GPS가 덮어쓰지 않게
@@ -251,20 +259,26 @@ export default function NaverMapClient(props: {
 
       const pos = { lat: geoLat, lng: geoLng };
       setMyPos(pos);
-      emitCmd({ type: "MOVE_TO", pos, zoom: 15, animate: true });
+      emit({ type: "MOVE_TO", pos, zoom: 15, animate: true, channel: "map" });
       return;
     }
 
     if (error) {
       setMyPos(fallback);
-      emitCmd({ type: "MOVE_TO", pos: fallback, zoom: 15, animate: true });
+      emit({
+        type: "MOVE_TO",
+        pos: fallback,
+        zoom: 15,
+        animate: true,
+        channel: "map",
+      });
     }
-  }, [geoLat, geoLng, error, setMyPos, emitCmd, fallback]);
+  }, [geoLat, geoLng, error, setMyPos, emit, fallback]);
 
   // -----------------------------
   // pubsub: MOVE_TO → 지도 이동 + 내마커 이동 + myPos 반영
   // -----------------------------
-  useMapCmd("MOVE_TO", (cmd) => {
+  useOn("map", "MOVE_TO", (cmd) => {
     if (!mapRef.current || !window.naver?.maps) return;
 
     setMyPos(cmd.pos);

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMapStore } from "@/stores/mapStore";
-import { useMapCmd } from "@/hooks/useMapCmd";
+import { useEmit, useOn } from "@/hooks/useEventBus";
 
 type ToggleItem = {
   key: string;
@@ -29,7 +29,7 @@ export default function MapOverlay(props: {
     toggles = [],
   } = props;
 
-  const emitCmd = useMapStore((s) => s.emitCmd);
+  const emit = useEmit();
   const [q, setQ] = useState("");
   const canSubmit = useMemo(() => q.trim().length > 0, [q]);
 
@@ -37,15 +37,15 @@ export default function MapOverlay(props: {
 
   const onToggleMoveMyMarker = () => {
     if (isMovingMyMarker) {
-      emitCmd({ type: "MOVE_MY_MARKER_CANCELLED" });
+      emit({ type: "MOVE_MY_MARKER_CANCELLED", channel: "map" });
       setIsMovingMyMarker(false);
     } else {
-      emitCmd({ type: "MOVE_MY_MARKER_READY" });
+      emit({ type: "MOVE_MY_MARKER_READY", channel: "map" });
       setIsMovingMyMarker(true);
     }
   };
 
-  useMapCmd("MY_MARKER_MOVED", () => {
+  useOn("map", "MY_MARKER_MOVED", () => {
     setIsMovingMyMarker(false);
   });
 
@@ -136,7 +136,9 @@ export default function MapOverlay(props: {
           <button
             type="button"
             className="block px-3 py-3 text-sm w-full text-left hover:bg-black/5 disabled:opacity-50"
-            onClick={() => emitCmd({ type: "REQUEST_MY_LOCATION" })}
+            onClick={() =>
+              emit({ type: "REQUEST_MY_LOCATION", channel: "map" })
+            }
           >
             📍 {"내 위치"}
           </button>

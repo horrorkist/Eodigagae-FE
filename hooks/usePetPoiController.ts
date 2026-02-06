@@ -3,8 +3,8 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useMapStore } from "@/stores/mapStore";
-import { useEmitMapCmd, useMapCmd } from "@/hooks/useMapCmd";
 import type { PetPoiItem } from "@/types/mapEvents";
+import { useEmit, useOn } from "./useEventBus";
 
 type Options = {
   radius?: number;
@@ -15,7 +15,7 @@ type Options = {
 };
 
 export function usePetPoiController(opts?: Options) {
-  const emit = useEmitMapCmd();
+  const emit = useEmit();
   const myPos = useMapStore((s) => s.myPos);
 
   const radius = opts?.radius ?? 1000;
@@ -84,6 +84,7 @@ export function usePetPoiController(opts?: Options) {
         lastFetchAtRef.current = now;
 
         emit({
+          channel: "pet",
           type: "PETPOI_RESULT",
           items: list,
           key: String(data?.key ?? cacheKey),
@@ -98,6 +99,7 @@ export function usePetPoiController(opts?: Options) {
           message: msg,
           key: String(cacheKey ?? "petpoi:unknown"),
           ts: Date.now(),
+          channel: "pet",
         });
       } finally {
         setLoading(false);
@@ -119,7 +121,7 @@ export function usePetPoiController(opts?: Options) {
   );
 
   // ✅ 토글 이벤트: ON 될 때만 fetch(기본 1회)
-  useMapCmd("PETPOI_TOGGLE", (cmd) => {
+  useOn("pet", "PETPOI_TOGGLE", (cmd) => {
     setOn(cmd.on);
 
     if (!cmd.on) {
@@ -134,19 +136,20 @@ export function usePetPoiController(opts?: Options) {
   });
 
   // ✅ 새로고침 이벤트
-  useMapCmd("PETPOI_REFRESH", () => {
+  useOn("pet", "PETPOI_REFRESH", () => {
     if (!on) return;
     fetchNow(true); // force
   });
 
   // 외부에서 쓰기 좋은 helper
   const setPetPoiOn = useCallback(
-    (next: boolean) => emit({ type: "PETPOI_TOGGLE", on: next }),
+    (next: boolean) =>
+      emit({ type: "PETPOI_TOGGLE", on: next, channel: "pet" }),
     [emit],
   );
 
   const refreshPetPoi = useCallback(
-    () => emit({ type: "PETPOI_REFRESH" }),
+    () => emit({ type: "PETPOI_REFRESH", channel: "pet" }),
     [emit],
   );
 

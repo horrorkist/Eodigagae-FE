@@ -50,24 +50,6 @@ type MapState = {
 
   setDrawRoute: (v: boolean) => void;
   clearRoute: () => void;
-
-  // ============================
-  // Cmd Queue (transport)
-  // ============================
-  cmdQueue: MapCmd[];
-  emitCmd: (cmd: MapCmd) => void;
-  shiftCmd: () => MapCmd | null;
-  clearCmdQueue: () => void;
-
-  // ============================
-  // Pub/Sub (broadcast)
-  // ============================
-  subscribeCmd: <T extends MapCmd["type"]>(
-    type: T,
-    fn: CmdListener<T>,
-  ) => () => void;
-
-  publishCmd: (cmd: MapCmd) => void;
 };
 
 export const useMapStore = create<MapState>((set, get) => ({
@@ -186,52 +168,6 @@ export const useMapStore = create<MapState>((set, get) => ({
         routeError: e?.message ?? "알 수 없는 오류",
         drawRoute: false,
       });
-    }
-  },
-
-  // ----------------------------
-  // Cmd Queue (transport)
-  // ----------------------------
-  cmdQueue: [],
-  emitCmd: (cmd) => set((s) => ({ cmdQueue: [...s.cmdQueue, cmd] })),
-  shiftCmd: () => {
-    const q = get().cmdQueue;
-    if (q.length === 0) return null;
-    const head = q[0];
-    set({ cmdQueue: q.slice(1) });
-    return head;
-  },
-  clearCmdQueue: () => set({ cmdQueue: [] }),
-
-  // ----------------------------
-  // Pub/Sub (broadcast)
-  // ----------------------------
-  subscribeCmd: (type, fn) => {
-    let setForType = listeners.get(type);
-    if (!setForType) {
-      setForType = new Set();
-      listeners.set(type, setForType);
-    }
-    setForType.add(fn as any);
-
-    return () => {
-      const s = listeners.get(type);
-      if (!s) return;
-      s.delete(fn as any);
-      if (s.size === 0) listeners.delete(type);
-    };
-  },
-
-  publishCmd: (cmd) => {
-    const s = listeners.get(cmd.type);
-    if (!s || s.size === 0) return;
-
-    for (const fn of Array.from(s)) {
-      try {
-        fn(cmd);
-      } catch (e) {
-        console.error("[cmd listener error]", cmd.type, e);
-      }
     }
   },
 }));

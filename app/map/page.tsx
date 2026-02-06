@@ -10,13 +10,14 @@ import { useRouteActions } from "@/hooks/useRouteActions";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
 import { useCmdBus } from "@/hooks/useCmdBus";
 import CoordRow from "@/components/CoordRow";
+import { useBusDispatcher } from "@/hooks/useEventBus";
 
 const NaverMapClient = dynamic(() => import("@/components/NaverMapClient"), {
   ssr: false,
 });
 
 export default function MapPage() {
-  useCmdBus();
+  useBusDispatcher(true);
   const {
     myPos,
     pickedPos,
