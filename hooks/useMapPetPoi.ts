@@ -2,6 +2,7 @@
 
 import { MutableRefObject, useCallback, useEffect, useRef } from "react";
 import { PetPoiItem } from "@/types/mapEvents";
+import { buildPinMarkerHTML, buildLabelMarkerHTML } from "@/lib/poiMarker";
 
 export function useMapPetPoi(
   mapRef: MutableRefObject<naver.maps.Map | null>,
@@ -11,36 +12,39 @@ export function useMapPetPoi(
 ) {
   const petPinMarkersRef = useRef<naver.maps.Marker[]>([]);
   const petLabelMarkersRef = useRef<naver.maps.Marker[]>([]);
+  const pinListenersRef = useRef<naver.maps.MapEventListener[]>([]);
+  const mapListenerRef = useRef<naver.maps.MapEventListener | null>(null);
+  const activeLabelIdxRef = useRef<number | null>(null);
   const pendingDrawRef = useRef(false);
 
+  const hideActiveLabel = useCallback(() => {
+    const idx = activeLabelIdxRef.current;
+    if (idx !== null && petLabelMarkersRef.current[idx]) {
+      petLabelMarkersRef.current[idx].setMap(null);
+      activeLabelIdxRef.current = null;
+    }
+  }, []);
+
   const clearPetMarkers = useCallback(() => {
+    // Remove pin click listeners
+    for (const l of pinListenersRef.current) {
+      naver.maps.Event.removeListener(l);
+    }
+    pinListenersRef.current = [];
+
+    // Remove map click listener
+    if (mapListenerRef.current) {
+      naver.maps.Event.removeListener(mapListenerRef.current);
+      mapListenerRef.current = null;
+    }
+
+    activeLabelIdxRef.current = null;
+
     for (const m of petLabelMarkersRef.current) m.setMap(null);
     petLabelMarkersRef.current = [];
 
     for (const m of petPinMarkersRef.current) m.setMap(null);
     petPinMarkersRef.current = [];
-  }, []);
-
-  const makeLabelHTML = useCallback((title: string) => {
-    const safe = (title ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-    return `
-      <div style="
-        transform: translate(-50%, -120%);
-        background: rgba(255,255,255,.92);
-        border: 1px solid rgba(0,0,0,.15);
-        border-radius: 999px;
-        padding: 4px 8px;
-        font-size: 12px;
-        line-height: 1;
-        box-shadow: 0 2px 10px rgba(0,0,0,.12);
-        white-space: nowrap;
-        max-width: 180px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        pointer-events: none;
-      ">${safe}</div>
-    `;
   }, []);
 
   const drawPetMarkers = useCallback(() => {
@@ -59,36 +63,71 @@ export function useMapPetPoi(
 
     clearPetMarkers();
 
-    for (const it of petPois ?? []) {
+    const map = mapRef.current;
+
+    for (let i = 0; i < (petPois ?? []).length; i++) {
+      const it = petPois[i];
       const lng = Number(it.mapx);
       const lat = Number(it.mapy);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
 
       const pos = new window.naver.maps.LatLng(lat, lng);
 
+      // Custom icon pin marker
       const pin = new window.naver.maps.Marker({
-        map: mapRef.current,
+        map,
         position: pos,
         title: it.title ?? "",
+        icon: {
+          content: buildPinMarkerHTML(it.contenttypeid),
+          anchor: new window.naver.maps.Point(0, 0),
+        },
       });
 
+      // Label marker — created but NOT placed on map yet
       const label = new window.naver.maps.Marker({
-        map: mapRef.current,
+        map: undefined, // hidden initially
         position: pos,
         clickable: false,
         icon: {
-          content: makeLabelHTML(it.title ?? ""),
+          content: buildLabelMarkerHTML(it.title ?? "", it.contenttypeid),
           anchor: new window.naver.maps.Point(0, 0),
         },
         zIndex: 1000,
       });
 
+      // Tap pin → toggle its label
+      const idx = petPinMarkersRef.current.length; // capture index
+      const listener = naver.maps.Event.addListener(pin, "click", () => {
+        if (activeLabelIdxRef.current === idx) {
+          // Tapping the same pin hides the label
+          label.setMap(null);
+          activeLabelIdxRef.current = null;
+        } else {
+          // Hide previous label
+          hideActiveLabel();
+          // Show this label
+          label.setMap(map);
+          activeLabelIdxRef.current = idx;
+        }
+      });
+
+      pinListenersRef.current.push(listener);
       petPinMarkersRef.current.push(pin);
       petLabelMarkersRef.current.push(label);
     }
 
+    // Tap the map background → dismiss active label
+    mapListenerRef.current = naver.maps.Event.addListener(
+      map,
+      "click",
+      () => {
+        hideActiveLabel();
+      },
+    );
+
     pendingDrawRef.current = false;
-  }, [sdkReady, showPetPoi, petPois, mapRef, clearPetMarkers, makeLabelHTML]);
+  }, [sdkReady, showPetPoi, petPois, mapRef, clearPetMarkers, hideActiveLabel]);
 
   useEffect(() => {
     drawPetMarkers();
