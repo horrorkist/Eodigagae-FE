@@ -66,7 +66,7 @@ export default function FloatingFABMenu({ items }: { items: FABMenuItem[] }) {
         onClick={toggle}
         className={[
           "relative z-50 flex items-center justify-center",
-          "w-14 h-14 rounded-full",
+          "w-10 h-10 rounded-full",
           "shadow-lg shadow-black/15",
           "transition-[box-shadow,transform]",
           open
@@ -77,15 +77,20 @@ export default function FloatingFABMenu({ items }: { items: FABMenuItem[] }) {
         aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
         whileTap={{ scale: 0.95 }}
       >
-        {/* Plus / Close icon (two bars that rotate) */}
+        {/* Burger / Close icon (two bars that rotate) */}
         <motion.span
-          className="absolute w-5 h-0.5 rounded-full bg-white"
-          animate={{ rotate: open ? 45 : 0 }}
+          className="absolute w-3 h-0.5 rounded-full bg-white"
+          animate={{ y: open ? 0 : 5, rotate: open ? 45 : 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 22 }}
         />
         <motion.span
-          className="absolute w-5 h-0.5 rounded-full bg-white"
-          animate={{ rotate: open ? -45 : 90 }}
+          className="absolute w-3 h-0.5 rounded-full bg-white"
+          animate={{ opacity: open ? 0 : 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 22 }}
+        />
+        <motion.span
+          className="absolute w-3 h-0.5 rounded-full bg-white"
+          animate={{ y: open ? 0 : -5, rotate: open ? -45 : 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 22 }}
         />
       </motion.button>

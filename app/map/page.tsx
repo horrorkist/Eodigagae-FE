@@ -67,14 +67,20 @@ export default function MapPage() {
 
   const { requestRoute, requestTmapWalkRoute } = useRouteActions();
 
-  const { petPoiOn, petPois, petPoiLoading, petPoiError, setPetPoiOn } =
-    usePetPoiController({
-      radius: 10000,
-      numOfRows: 80,
-      grid: 0.002,
-      revalidate: 600, // 서버 캐시 10분
-      cooldownMs: 10 * 60 * 1000, // 클라 쿨다운 10분
-    });
+  const {
+    petPoiOn,
+    petPois,
+    petPoiTotalCount,
+    petPoiLoading,
+    petPoiError,
+    setPetPoiOn,
+  } = usePetPoiController({
+    radius: 10000,
+    numOfRows: 80,
+    grid: 0.002,
+    revalidate: 600, // 서버 캐시 10분
+    cooldownMs: 10 * 60 * 1000, // 클라 쿨다운 10분
+  });
 
   const canRequest = !!myPos && !!pickedPos && !routeLoading;
   const canDraw = !!route?.path?.length;
@@ -109,6 +115,24 @@ export default function MapPage() {
 
       <BottomSheet peekHeight={30}>
         <div className="space-y-4">
+          {petPoiOn && (
+            <div className="border border-amber-200 bg-amber-50 rounded-md p-3 flex items-center gap-2 text-sm">
+              <FontAwesomeIcon
+                icon={faPaw}
+                className="w-3.5 h-3.5 text-amber-600 shrink-0"
+              />
+              <span className="font-semibold text-amber-800">
+                반려동물 동반 시설
+              </span>
+              <span className="ml-auto text-amber-700 font-bold">
+                {petPoiLoading
+                  ? "..."
+                  : petPoiTotalCount != null
+                    ? `${petPoiTotalCount}곳`
+                    : "-"}
+              </span>
+            </div>
+          )}
           {!dog ? (
             <div className="border rounded-md p-3 space-y-2">
               <div className="flex items-center gap-2 text-sm font-semibold">
