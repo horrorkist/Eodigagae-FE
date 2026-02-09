@@ -9,7 +9,7 @@ type BottomSheetState = {
   setSnapPoints: (points: number[]) => void;
   open: (toIndex?: number) => void;
   snapTo: (toIndex: number) => void;
-  close: (BottomSheetRef: RefObject<HTMLDivElement | null>) => void;
+  close: (bottomSheetRef: RefObject<HTMLDivElement | null>) => void;
 };
 
 const DEFAULT_SNAP_POINTS = [120, 360, 620];
@@ -45,9 +45,9 @@ export const useBottomSheetStore = create<BottomSheetState>((set, get) => ({
   close: (bottomSheetRef) => {
     set({ isOpen: false });
     if (bottomSheetRef.current) {
-      const elements = bottomSheetRef.current.querySelectorAll(
-        "input, textarea",
-      ) as (HTMLInputElement | HTMLTextAreaElement)[];
+      const elements = bottomSheetRef.current.querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement
+      >("input, textarea");
       elements.forEach((element) => {
         element.blur();
       });
