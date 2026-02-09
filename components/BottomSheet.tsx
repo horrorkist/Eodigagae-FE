@@ -1,6 +1,7 @@
 "use client";
 
 import React, {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -63,27 +64,40 @@ export default function BottomSheet({
 
   const bottomInset = bottomNavHeight + safeBottom;
 
-  // ✅ 닫힌 상태의 top (핸들만 보이게 + 바텀내브 만큼 위로)
   const closedTop = useMemo(
     () => Math.max(0, vh - bottomInset - peekHeight),
     [vh, bottomInset, peekHeight],
   );
 
-  // ✅ 시각 top (항상 존재)
-  const [visualTop, setVisualTop] = useState<number>(() =>
-    isOpen ? (snapPoints[index] ?? minSnap) : closedTop,
+  // ── DOM refs (직접 DOM 조작용) ──
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // 드래그 중 source-of-truth (setState 대신 ref → 리렌더 0회)
+  const topRef = useRef<number>(closedTop);
+  const overDragRef = useRef(0);
+  const rafRef = useRef(0);
+
+  /** DOM에 직접 position + opacity 반영 (리렌더 없음) */
+  const applyTop = useCallback(
+    (px: number) => {
+      topRef.current = px;
+      if (sheetRef.current) sheetRef.current.style.top = `${px}px`;
+      if (contentRef.current)
+        contentRef.current.style.opacity = px <= closedTop - 8 ? "1" : "0";
+    },
+    [closedTop],
   );
 
-  // ✅ “더 아래로 당긴 정도” (화면에선 내려가지 않게 하고, 닫기 판정에만 씀)
-  const [overDrag, setOverDrag] = useState(0);
-
+  // ── Store 상태 변경 → DOM 동기화 (CSS transition 포함) ──
   useLayoutEffect(() => {
-    if (isOpen) setVisualTop(snapPoints[index] ?? minSnap);
-    else setVisualTop(closedTop);
-    setOverDrag(0);
-  }, [isOpen, index, snapPoints, minSnap, closedTop]);
+    const target = isOpen ? (snapPoints[index] ?? minSnap) : closedTop;
+    if (sheetRef.current)
+      sheetRef.current.style.transition = "top 280ms ease-in-out";
+    applyTop(target);
+  }, [isOpen, index, snapPoints, minSnap, closedTop, applyTop]);
 
-  // ---------- Drag / fling ----------
+  // ── Drag / fling (전부 ref — 리렌더 0회) ──
   const draggingRef = useRef(false);
   const startYRef = useRef(0);
   const startTopRef = useRef(0);
@@ -92,130 +106,172 @@ export default function BottomSheet({
   const lastTRef = useRef(0);
   const velocityRef = useRef(0);
 
-  const FLING_V = 1.0;
-  const FLING_MIN_DT = 12;
+  const FLING_V = 1.0; // px/ms
+  const FLING_MIN_DT = 12; // ms
 
-  const nearestSnapIndex = (topPx: number) => {
-    let best = 0;
-    let bestDist = Infinity;
-    for (let i = 0; i < snapPoints.length; i++) {
-      const d = Math.abs(snapPoints[i] - topPx);
-      if (d < bestDist) {
-        bestDist = d;
-        best = i;
+  const nearestSnapIndex = useCallback(
+    (topPx: number) => {
+      let best = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < snapPoints.length; i++) {
+        const d = Math.abs(snapPoints[i] - topPx);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
       }
-    }
-    return best;
-  };
+      return best;
+    },
+    [snapPoints],
+  );
 
-  // ✅ top은 절대 closedTop 아래로 내려가지 않게(최소 높이 보장)
-  const clampTop = (t: number) => Math.min(Math.max(t, minSnap), closedTop);
+  const clampTop = useCallback(
+    (t: number) => Math.min(Math.max(t, minSnap), closedTop),
+    [minSnap, closedTop],
+  );
 
-  const settleAfterDrag = (topPx: number, extraDown: number) => {
-    // 1) 아래로 “더” 당긴 값이 충분하면 닫기 유지
-    if (extraDown >= closeThreshold) {
-      const lowest = nearestSnapIndex(maxSnap);
-      snapTo(lowest);
-      close();
-      setVisualTop(closedTop);
-      setOverDrag(0);
-      return;
-    }
+  const settleAfterDrag = useCallback(
+    (topPx: number, extraDown: number) => {
+      if (sheetRef.current)
+        sheetRef.current.style.transition = "top 280ms ease-in-out";
 
-    // 2) 아직 닫힘 근처면 닫힘으로 복귀
-    if (topPx > closedTop - openThreshold) {
-      close();
-      setVisualTop(closedTop);
-      setOverDrag(0);
-      return;
-    }
-
-    // 3) 아니면 가장 가까운 스냅으로 열기 확정
-    const near = nearestSnapIndex(topPx);
-    snapTo(near);
-    open(near);
-    setVisualTop(snapPoints[near]);
-    setOverDrag(0);
-  };
-
-  const onHandlePointerDown = (e: React.PointerEvent) => {
-    draggingRef.current = true;
-    startYRef.current = e.clientY;
-    startTopRef.current = visualTop;
-
-    const now = performance.now();
-    lastYRef.current = e.clientY;
-    lastTRef.current = now;
-    velocityRef.current = 0;
-    setOverDrag(0);
-
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onHandlePointerMove = (e: React.PointerEvent) => {
-    if (!draggingRef.current) return;
-
-    const now = performance.now();
-    const dy = e.clientY - startYRef.current;
-    const proposedTop = startTopRef.current + dy;
-
-    // ✅ closedTop 아래로 내려가려는 움직임은 “overDrag”로만 기록
-    const nextTop = clampTop(proposedTop);
-    const extraDown = Math.max(0, proposedTop - closedTop);
-
-    const dt = now - lastTRef.current;
-    if (dt >= FLING_MIN_DT) {
-      const dyStep = e.clientY - lastYRef.current;
-      velocityRef.current = dyStep / dt;
-      lastYRef.current = e.clientY;
-      lastTRef.current = now;
-    }
-
-    setVisualTop(nextTop);
-    setOverDrag(extraDown);
-  };
-
-  const onHandlePointerUp = () => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
-
-    const v = velocityRef.current;
-
-    // ✅ 플링
-    if (Math.abs(v) >= FLING_V) {
-      if (v < 0) {
-        // 위로 플링 => 1단(최대)
-        snapTo(0);
-        open(0);
-        setVisualTop(minSnap);
-        setOverDrag(0);
-        return;
-      } else {
-        // 아래로 플링 => 닫기(핸들만 남김)
+      // 아래로 충분히 당김 → 닫기
+      if (extraDown >= closeThreshold) {
         const lowest = nearestSnapIndex(maxSnap);
         snapTo(lowest);
         close();
-        setVisualTop(closedTop);
-        setOverDrag(0);
+        applyTop(closedTop);
         return;
       }
+
+      // 닫힘 근처 → 닫힘 복귀
+      if (topPx > closedTop - openThreshold) {
+        close();
+        applyTop(closedTop);
+        return;
+      }
+
+      // 가장 가까운 스냅으로 열기 확정
+      const near = nearestSnapIndex(topPx);
+      snapTo(near);
+      open(near);
+      applyTop(snapPoints[near]);
+    },
+    [
+      closeThreshold,
+      openThreshold,
+      closedTop,
+      maxSnap,
+      snapPoints,
+      nearestSnapIndex,
+      snapTo,
+      close,
+      open,
+      applyTop,
+    ],
+  );
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    draggingRef.current = true;
+    startYRef.current = e.clientY;
+    startTopRef.current = topRef.current;
+    overDragRef.current = 0;
+
+    lastYRef.current = e.clientY;
+    lastTRef.current = performance.now();
+    velocityRef.current = 0;
+
+    // 드래그 중 transition 끄기 → 즉각 반응
+    if (sheetRef.current) sheetRef.current.style.transition = "none";
+
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!draggingRef.current) return;
+
+      const now = performance.now();
+      const clientY = e.clientY;
+
+      // 속도 추적 (모든 샘플, throttle 아님)
+      const dt = now - lastTRef.current;
+      if (dt >= FLING_MIN_DT) {
+        velocityRef.current = (clientY - lastYRef.current) / dt;
+        lastYRef.current = clientY;
+        lastTRef.current = now;
+      }
+
+      // DOM 업데이트는 rAF로 throttle
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const dy = clientY - startYRef.current;
+        const proposed = startTopRef.current + dy;
+        overDragRef.current = Math.max(0, proposed - closedTop);
+        applyTop(clampTop(proposed));
+      });
+    },
+    [closedTop, clampTop, applyTop],
+  );
+
+  const onPointerUp = useCallback(() => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+
+    const v = velocityRef.current;
+
+    if (sheetRef.current)
+      sheetRef.current.style.transition = "top 280ms ease-in-out";
+
+    // 플링 처리
+    if (Math.abs(v) >= FLING_V) {
+      if (v < 0) {
+        // 위로 플링 → 최대 확장
+        snapTo(0);
+        open(0);
+        applyTop(minSnap);
+      } else {
+        // 아래로 플링 → 닫기
+        const lowest = nearestSnapIndex(maxSnap);
+        snapTo(lowest);
+        close();
+        applyTop(closedTop);
+      }
+      return;
     }
 
     // 플링 아니면 위치 + overDrag 기반 정착
-    settleAfterDrag(visualTop, overDrag);
-  };
+    settleAfterDrag(topRef.current, overDragRef.current);
+  }, [
+    minSnap,
+    closedTop,
+    maxSnap,
+    nearestSnapIndex,
+    snapTo,
+    open,
+    close,
+    applyTop,
+    settleAfterDrag,
+  ]);
 
-  // 컨텐츠는 “완전 open”일 때만 터치 허용(깜빡임/충돌 방지)
-  const contentVisible = visualTop <= closedTop - 8;
-  const contentInteractive = isOpen;
+  // rAF cleanup on unmount
+  useEffect(
+    () => () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
 
   return (
     <>
       {/* Backdrop: 바텀내브 영역 제외 */}
-      {/* Backdrop: 바텀내브 영역 제외 */}
       <div
         className={[
-          // ✅ z-index를 확 올려서 지도 오버레이보다 무조건 위로
           "fixed left-0 right-0 top-0 z-100 transition-opacity duration-300",
           isOpen
             ? "opacity-100 pointer-events-auto"
@@ -224,10 +280,8 @@ export default function BottomSheet({
         style={{
           bottom: bottomInset,
           backgroundColor: "rgba(0,0,0,0.35)",
-          // ✅ iOS에서 tap/click 합성/스크롤 제스처 섞이는 것 방지
           touchAction: "none",
         }}
-        // ✅ DOWN 단계에서부터 아래로 이벤트가 절대 안 새도록 캡처링
         onPointerDownCapture={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -239,38 +293,31 @@ export default function BottomSheet({
         onPointerUpCapture={(e) => {
           e.preventDefault();
           e.stopPropagation();
-
-          // backdrop "빈 곳"만 닫기
           if (e.target !== e.currentTarget) return;
           close();
-          setVisualTop(closedTop);
-          setOverDrag(0);
         }}
         aria-hidden="true"
       />
 
-      {/* Sheet: bottomInset만큼 띄워서 바텀내브 안 가림 */}
+      {/* Sheet */}
       <div
+        ref={sheetRef}
         role="dialog"
         aria-modal={isOpen ? "true" : "false"}
         aria-label={title ?? "bottom sheet"}
-        className={[
-          "fixed left-0 right-0 z-101 bg-white rounded-t-2xl will-change-[top]",
-          // ✅ 아래로 퍼지는 shadow가 내비를 “침범”해 보이는 걸 막기 위해 위로만 shadow
-          "shadow-[0_-12px_24px_rgba(0,0,0,0.1)]",
-        ].join(" ")}
+        className="fixed left-0 right-0 z-101 bg-white rounded-t-2xl shadow-[0_-12px_24px_rgba(0,0,0,0.1)]"
         style={{
-          top: visualTop,
+          top: topRef.current,
           bottom: bottomInset,
-          transition: draggingRef.current ? "none" : "top 280ms ease-in-out",
+          willChange: "top",
         }}
       >
         {/* Handle */}
         <div
           className="px-4 pt-3 pb-2 select-none touch-none"
-          onPointerDown={onHandlePointerDown}
-          onPointerMove={onHandlePointerMove}
-          onPointerUp={onHandlePointerUp}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
         >
           <div className="mx-auto h-1 w-10 rounded-full bg-gray-300" />
           {title ? (
@@ -280,10 +327,12 @@ export default function BottomSheet({
 
         {/* Content */}
         <div
-          className="px-4 pb-6 overflow-auto h-[calc(100%-48px)] transition-opacity duration-150"
+          ref={contentRef}
+          className="px-4 pb-6 overflow-auto h-[calc(100%-48px)]"
           style={{
-            opacity: contentVisible ? 1 : 0,
-            pointerEvents: contentInteractive ? "auto" : "none",
+            opacity: 0,
+            pointerEvents: isOpen ? "auto" : "none",
+            transition: "opacity 150ms",
           }}
         >
           {children}
