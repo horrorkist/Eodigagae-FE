@@ -33,6 +33,7 @@ export function useNaverMap() {
       center,
       zoom: 15,
       minZoom: 10,
+      disableKineticPan: false,
     });
   }, [sdkReady, coords]);
 
