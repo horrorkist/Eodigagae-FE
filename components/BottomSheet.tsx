@@ -64,7 +64,6 @@ export default function BottomSheet({
 
   const bottomInset = bottomNavHeight + safeBottom;
 
-  // closedTop = translateY 값 (닫힌 상태에서 시트 상단 위치)
   const closedTop = useMemo(
     () => Math.max(0, vh - bottomInset - peekHeight),
     [vh, bottomInset, peekHeight],
@@ -74,12 +73,11 @@ export default function BottomSheet({
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // 드래그 중 source-of-truth (리렌더 0회)
   const topRef = useRef<number>(closedTop);
   const overDragRef = useRef(0);
   const rafRef = useRef(0);
 
-  /** DOM에 직접 transform + opacity 반영 — Layout/Paint 스킵 */
+  /** transform + opacity 만 변경 (Layout/Paint 0회) */
   const applyTop = useCallback(
     (px: number) => {
       topRef.current = px;
@@ -91,15 +89,25 @@ export default function BottomSheet({
     [closedTop],
   );
 
-  // ── Store 상태 → DOM 동기화 (CSS transition 포함) ──
+  /** clip 경계 아래 잘리는 영역만큼 paddingBottom 보상 — settle 시에만 호출 */
+  const applyClipPadding = useCallback(
+    (snapPx: number) => {
+      if (contentRef.current)
+        contentRef.current.style.paddingBottom = `${snapPx + 24}px`;
+    },
+    [],
+  );
+
+  // ── Store → DOM 동기화 ──
   useLayoutEffect(() => {
     const target = isOpen ? (snapPoints[index] ?? minSnap) : closedTop;
     if (sheetRef.current)
       sheetRef.current.style.transition = "transform 280ms ease-in-out";
     applyTop(target);
-  }, [isOpen, index, snapPoints, minSnap, closedTop, applyTop]);
+    applyClipPadding(target);
+  }, [isOpen, index, snapPoints, minSnap, closedTop, applyTop, applyClipPadding]);
 
-  // ── Drag / fling (전부 ref) ──
+  // ── Drag / fling ──
   const draggingRef = useRef(false);
   const startYRef = useRef(0);
   const startTopRef = useRef(0);
@@ -142,12 +150,14 @@ export default function BottomSheet({
         snapTo(lowest);
         close();
         applyTop(closedTop);
+        applyClipPadding(closedTop);
         return;
       }
 
       if (topPx > closedTop - openThreshold) {
         close();
         applyTop(closedTop);
+        applyClipPadding(closedTop);
         return;
       }
 
@@ -155,6 +165,7 @@ export default function BottomSheet({
       snapTo(near);
       open(near);
       applyTop(snapPoints[near]);
+      applyClipPadding(snapPoints[near]);
     },
     [
       closeThreshold,
@@ -167,6 +178,7 @@ export default function BottomSheet({
       close,
       open,
       applyTop,
+      applyClipPadding,
     ],
   );
 
@@ -290,12 +302,12 @@ export default function BottomSheet({
         aria-hidden="true"
       />
 
-      {/* Clip boundary — 바텀내브 위로만 시트가 보이도록 클리핑 */}
+      {/* Clip boundary */}
       <div
         className="fixed inset-0 z-101 overflow-hidden pointer-events-none"
-        style={{ bottom: bottomInset, contain: "strict" }}
+        style={{ bottom: bottomInset }}
       >
-        {/* Sheet — transform으로만 이동 (Layout/Paint 0회) */}
+        {/* Sheet — h-full 고정, transform으로만 이동 */}
         <div
           ref={sheetRef}
           role="dialog"
@@ -305,7 +317,6 @@ export default function BottomSheet({
           style={{
             transform: `translateY(${topRef.current}px)`,
             willChange: "transform",
-            contain: "layout style",
           }}
         >
           {/* Handle */}
@@ -321,7 +332,7 @@ export default function BottomSheet({
             ) : null}
           </div>
 
-          {/* Content */}
+          {/* Content — 항상 고정 높이, clip container가 가시 영역 처리 */}
           <div
             ref={contentRef}
             className="px-4 pb-6 overflow-auto h-[calc(100%-48px)]"
