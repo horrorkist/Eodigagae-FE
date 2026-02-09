@@ -9,7 +9,7 @@ type BottomSheetState = {
   setSnapPoints: (points: number[]) => void;
   open: (toIndex?: number) => void;
   snapTo: (toIndex: number) => void;
-  close: (BottomSheetRef: RefObject<HTMLDivElement>) => void;
+  close: (BottomSheetRef: RefObject<HTMLDivElement | null>) => void;
 };
 
 const DEFAULT_SNAP_POINTS = [120, 360, 620];

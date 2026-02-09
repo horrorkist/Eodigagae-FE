@@ -90,13 +90,10 @@ export default function BottomSheet({
   );
 
   /** clip 경계 아래 잘리는 영역만큼 paddingBottom 보상 — settle 시에만 호출 */
-  const applyClipPadding = useCallback(
-    (snapPx: number) => {
-      if (contentRef.current)
-        contentRef.current.style.paddingBottom = `${snapPx + 24}px`;
-    },
-    [],
-  );
+  const applyClipPadding = useCallback((snapPx: number) => {
+    if (contentRef.current)
+      contentRef.current.style.paddingBottom = `${snapPx + 24}px`;
+  }, []);
 
   // ── Store → DOM 동기화 ──
   useLayoutEffect(() => {
@@ -105,7 +102,15 @@ export default function BottomSheet({
       sheetRef.current.style.transition = "transform 280ms ease-in-out";
     applyTop(target);
     applyClipPadding(target);
-  }, [isOpen, index, snapPoints, minSnap, closedTop, applyTop, applyClipPadding]);
+  }, [
+    isOpen,
+    index,
+    snapPoints,
+    minSnap,
+    closedTop,
+    applyTop,
+    applyClipPadding,
+  ]);
 
   // ── Drag / fling ──
   const draggingRef = useRef(false);
@@ -148,14 +153,14 @@ export default function BottomSheet({
       if (extraDown >= closeThreshold) {
         const lowest = nearestSnapIndex(maxSnap);
         snapTo(lowest);
-        close();
+        close(sheetRef);
         applyTop(closedTop);
         applyClipPadding(closedTop);
         return;
       }
 
       if (topPx > closedTop - openThreshold) {
-        close();
+        close(sheetRef);
         applyTop(closedTop);
         applyClipPadding(closedTop);
         return;
@@ -244,7 +249,7 @@ export default function BottomSheet({
       } else {
         const lowest = nearestSnapIndex(maxSnap);
         snapTo(lowest);
-        close();
+        close(sheetRef);
         applyTop(closedTop);
       }
       return;
@@ -297,7 +302,7 @@ export default function BottomSheet({
           e.preventDefault();
           e.stopPropagation();
           if (e.target !== e.currentTarget) return;
-          close();
+          close(sheetRef);
         }}
         aria-hidden="true"
       />
