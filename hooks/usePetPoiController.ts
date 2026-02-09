@@ -1,20 +1,36 @@
 // hooks/usePetPoiController.ts
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import useSWR from "swr";
 import { useMapStore } from "@/stores/mapStore";
 import type { PetPoiItem } from "@/types/mapEvents";
 import { useEmit, useOn } from "./useEventBus";
 
-type Options = {
+type PetPoiControllerProps = {
   radius?: number;
   numOfRows?: number;
   grid?: number; // 라운딩 격자
   revalidate?: number; // 서버 캐시 TTL(초)
-  cooldownMs?: number; // 클라 재요청 쿨다운
+  cooldownMs?: number; // 클라 재요청 쿨다운(= SWR dedupingInterval)
 };
 
-export function usePetPoiController(opts?: Options) {
+type PetPoiResponse = {
+  key: string;
+  items: PetPoiItem[];
+};
+
+const petPoiFetcher = async (url: string): Promise<PetPoiResponse> => {
+  const res = await fetch(url);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
+  return {
+    key: data?.key ?? "",
+    items: Array.isArray(data?.items) ? data.items : [],
+  };
+};
+
+export function usePetPoiController(opts?: PetPoiControllerProps) {
   const emit = useEmit();
   const myPos = useMapStore((s) => s.myPos);
 
@@ -25,13 +41,6 @@ export function usePetPoiController(opts?: Options) {
   const cooldownMs = opts?.cooldownMs ?? 10 * 60 * 1000;
 
   const [on, setOn] = useState(false);
-  const [items, setItems] = useState<PetPoiItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // ✅ 최근 fetch 상태(쿨다운/중복 방지)
-  const lastKeyRef = useRef<string | null>(null);
-  const lastFetchAtRef = useRef<number>(0);
 
   const rounded = useMemo(() => {
     if (!myPos) return null;
@@ -45,100 +54,51 @@ export function usePetPoiController(opts?: Options) {
     return `petpoi:${rounded.lat.toFixed(6)}:${rounded.lng.toFixed(6)}:r${radius}:n${numOfRows}`;
   }, [rounded, radius, numOfRows]);
 
-  const fetchNow = useCallback(
-    async (force?: boolean) => {
-      if (!myPos || !rounded || !cacheKey) {
-        setError("내 위치가 필요해요.");
-        return;
-      }
-      if (loading) return;
+  // SWR key: null disables fetching when toggled off or position unknown
+  const swrKey = useMemo(() => {
+    if (!on || !rounded) return null;
+    return (
+      `/api/petpois?lat=${rounded.lat}&lng=${rounded.lng}` +
+      `&radius=${radius}&numOfRows=${numOfRows}&pageNo=1` +
+      `&grid=${grid}&revalidate=${revalidate}`
+    );
+  }, [on, rounded, radius, numOfRows, grid, revalidate]);
 
-      const now = Date.now();
-      const isSameKey = lastKeyRef.current === cacheKey;
-      const inCooldown = now - lastFetchAtRef.current < cooldownMs;
-
-      if (!force && isSameKey && inCooldown && items.length > 0) {
-        // 굳이 다시 안 쏨
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const url =
-          `/api/petpois?lat=${rounded.lat}&lng=${rounded.lng}` +
-          `&radius=${radius}&numOfRows=${numOfRows}&pageNo=1` +
-          `&grid=${grid}&revalidate=${revalidate}`;
-
-        const res = await fetch(url, { method: "GET" });
-        const data = await res.json();
-
-        if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
-
-        const list: PetPoiItem[] = Array.isArray(data?.items) ? data.items : [];
-
-        setItems(list);
-
-        lastKeyRef.current = data?.key ?? cacheKey;
-        lastFetchAtRef.current = now;
-
+  const { data, error, isValidating, mutate } = useSWR<PetPoiResponse>(
+    swrKey,
+    petPoiFetcher,
+    {
+      dedupingInterval: cooldownMs,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      onSuccess(res) {
         emit({
           channel: "pet",
           type: "PETPOI_RESULT",
-          items: list,
-          key: String(data?.key ?? cacheKey),
-          ts: now,
+          items: res.items,
+          key: res.key || String(cacheKey ?? ""),
+          ts: Date.now(),
         });
-      } catch (e: any) {
-        const msg = e?.message ?? "알 수 없는 오류";
-        setError(msg);
-
+      },
+      onError(err) {
         emit({
           type: "PETPOI_ERROR",
-          message: msg,
+          message: err?.message ?? "알 수 없는 오류",
           key: String(cacheKey ?? "petpoi:unknown"),
           ts: Date.now(),
           channel: "pet",
         });
-      } finally {
-        setLoading(false);
-      }
+      },
     },
-    [
-      myPos,
-      rounded,
-      cacheKey,
-      radius,
-      numOfRows,
-      grid,
-      revalidate,
-      cooldownMs,
-      items.length,
-      loading,
-      emit,
-    ],
   );
 
-  // ✅ 토글 이벤트: ON 될 때만 fetch(기본 1회)
-  useOn("pet", "PETPOI_TOGGLE", (cmd) => {
-    setOn(cmd.on);
+  // 토글 이벤트: on/off만 반영, 나머지는 swrKey 변화로 SWR가 처리
+  useOn("pet", "PETPOI_TOGGLE", (cmd) => setOn(cmd.on));
 
-    if (!cmd.on) {
-      setItems([]);
-      setError(null);
-      setLoading(false);
-      return;
-    }
-
-    // ON
-    fetchNow(false);
-  });
-
-  // ✅ 새로고침 이벤트
+  // 새로고침 이벤트: bound mutate로 강제 revalidate
   useOn("pet", "PETPOI_REFRESH", () => {
     if (!on) return;
-    fetchNow(true); // force
+    mutate();
   });
 
   // 외부에서 쓰기 좋은 helper
@@ -155,9 +115,9 @@ export function usePetPoiController(opts?: Options) {
 
   return {
     petPoiOn: on,
-    petPois: items,
-    petPoiLoading: loading,
-    petPoiError: error,
+    petPois: data?.items ?? [],
+    petPoiLoading: isValidating,
+    petPoiError: error?.message ?? null,
     petPoiCacheKey: cacheKey,
     setPetPoiOn,
     refreshPetPoi,
