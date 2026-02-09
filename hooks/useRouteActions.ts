@@ -28,17 +28,20 @@ export function useRouteActions() {
 
     try {
       const result = await fetchNaverRoute({ start: myPos, goal: pickedPos });
+
       setRouteState({
         route: result,
         routeLoading: false,
         routeError: null,
-        drawRoute: false, // 요청만 하고 그리기는 버튼으로
+        drawRoute: false,
       });
     } catch (e: any) {
+      const msg = e?.message ?? "알 수 없는 오류";
+
       setRouteState({
         route: null,
         routeLoading: false,
-        routeError: e?.message ?? "알 수 없는 오류",
+        routeError: msg,
         drawRoute: false,
       });
     }
@@ -61,6 +64,7 @@ export function useRouteActions() {
         start: myPos,
         goal: pickedPos,
       });
+
       setRouteState({
         route: result,
         routeLoading: false,
@@ -68,10 +72,12 @@ export function useRouteActions() {
         drawRoute: false,
       });
     } catch (e: any) {
+      const msg = e?.message ?? "알 수 없는 오류";
+
       setRouteState({
         route: null,
         routeLoading: false,
-        routeError: e?.message ?? "알 수 없는 오류",
+        routeError: msg,
         drawRoute: false,
       });
     }
