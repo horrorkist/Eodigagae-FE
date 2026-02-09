@@ -1,8 +1,12 @@
 "use client";
 
-import { MutableRefObject, useEffect, useRef } from "react";
+import { MutableRefObject, createElement, useEffect, useRef } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faLocationDot } from "@fortawesome/free-solid-svg-icons";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useMapStore } from "@/stores/mapStore";
+import { useModalStore } from "@/stores/modal";
+import { getGeoErrorInfo } from "@/lib/geolocationErrors";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 
 const FALLBACK = { lat: 37.5665, lng: 126.978 };
@@ -28,6 +32,33 @@ export function useMapMyLocation(
     immediate: true,
     enableHighAccuracy: true,
   });
+
+  const openModal = useModalStore((s) => s.open);
+
+  // geolocation 오류 → 모달 표시
+  useEffect(() => {
+    if (!error) return;
+
+    const info = getGeoErrorInfo(error);
+
+    openModal({
+      title: info.title,
+      icon: createElement(FontAwesomeIcon, {
+        icon: faLocationDot,
+        className: "w-8 h-8 text-red-400",
+      }),
+      body: createElement(
+        "div",
+        { className: "space-y-1" },
+        createElement("p", null, info.description),
+        createElement(
+          "p",
+          { className: "text-xs text-gray-400" },
+          info.suggestion,
+        ),
+      ),
+    });
+  }, [error, openModal]);
 
   // 지도 생성 시 내 마커 초기화
   useEffect(() => {

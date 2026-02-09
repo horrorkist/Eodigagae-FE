@@ -1,4 +1,5 @@
 import BottomNav from "./BottomNav";
+import Modal from "./Modal";
 import TopBar from "./TopBar";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         >
           <BottomNav />
         </div>
+
+        <Modal />
       </div>
     </div>
   );
