@@ -257,7 +257,7 @@ export default function BottomSheet({
         className={[
           "fixed left-0 right-0 z-101 bg-white rounded-t-2xl will-change-[top]",
           // ✅ 아래로 퍼지는 shadow가 내비를 “침범”해 보이는 걸 막기 위해 위로만 shadow
-          "shadow-[0_-12px_24px_rgba(0,0,0,0.18)]",
+          "shadow-[0_-12px_24px_rgba(0,0,0,0.1)]",
         ].join(" ")}
         style={{
           top: visualTop,

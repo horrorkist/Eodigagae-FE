@@ -2,11 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faHouse,
+  faMagnifyingGlass,
+  faUser,
+} from "@fortawesome/free-solid-svg-icons";
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 
-const tabs = [
-  { href: "/", label: "홈" },
-  { href: "/search", label: "검색" },
-  { href: "/my", label: "마이" },
+type Tab = {
+  href: string;
+  label: string;
+  icon: IconDefinition;
+};
+
+const tabs: Tab[] = [
+  { href: "/", label: "홈", icon: faHouse },
+  { href: "/search", label: "검색", icon: faMagnifyingGlass },
+  { href: "/my", label: "마이", icon: faUser },
 ];
 
 export default function BottomNav() {
@@ -21,11 +34,20 @@ export default function BottomNav() {
             key={t.href}
             href={t.href}
             className={[
-              "flex h-14 items-center justify-center text-sm",
-              active ? "font-semibold text-black" : "text-neutral-500",
+              "flex flex-col h-14 items-center justify-center gap-1",
+              active ? "text-blue-500" : "text-neutral-400",
             ].join(" ")}
           >
-            {t.label}
+            <FontAwesomeIcon
+              icon={t.icon}
+              className="w-5 h-5"
+            />
+            <span className={[
+              "text-[10px]",
+              active ? "font-semibold" : "font-medium",
+            ].join(" ")}>
+              {t.label}
+            </span>
           </Link>
         );
       })}
