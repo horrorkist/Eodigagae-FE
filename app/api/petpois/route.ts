@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PETPOI_DEFAULTS } from "@/lib/petPoiDefaults";
 
 export const runtime = "nodejs";
 
@@ -27,14 +28,13 @@ export async function GET(req: NextRequest) {
   const latRaw = toNum(sp.get("lat"), NaN);
   const lngRaw = toNum(sp.get("lng"), NaN);
 
-  const radius = Math.min(Math.max(toNum(sp.get("radius"), 1000), 100), 20000);
+  const radius = Math.min(Math.max(toNum(sp.get("radius"), PETPOI_DEFAULTS.radius), 100), 20000);
   const pageNo = Math.max(toNum(sp.get("pageNo"), 1), 1);
-  const numOfRows = Math.min(Math.max(toNum(sp.get("numOfRows"), 50), 1), 200);
+  const numOfRows = Math.min(Math.max(toNum(sp.get("numOfRows"), PETPOI_DEFAULTS.numOfRows), 1), 200);
 
-  // ✅ 우리가 쓰는 파라미터: grid, revalidate
-  const grid = toNum(sp.get("grid"), 0.002);
+  const grid = toNum(sp.get("grid"), PETPOI_DEFAULTS.grid);
   const revalidate = Math.min(
-    Math.max(toNum(sp.get("revalidate"), 600), 60),
+    Math.max(toNum(sp.get("revalidate"), PETPOI_DEFAULTS.revalidate), 60),
     3600,
   );
 
@@ -64,8 +64,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // ✅ 업스트림 URL은 너 기존 것 유지 (동작 중인 전제)
-  // 필요하면 아래 BASE만 공식 엔드포인트로 바꿔 끼우면 됨.
   const url = new URL(
     "http://apis.data.go.kr/B551011/KorPetTourService2/locationBasedList2",
   );

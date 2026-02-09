@@ -4,20 +4,16 @@
 import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import { useMapStore } from "@/stores/mapStore";
-import type { PetPoiItem } from "@/types/mapEvents";
+import type { PetPoiResponse } from "@/types/mapEvents";
 import { useEmit, useOn } from "./useEventBus";
+import { PETPOI_DEFAULTS } from "@/lib/petPoiDefaults";
 
 type PetPoiControllerProps = {
   radius?: number;
   numOfRows?: number;
-  grid?: number; // 라운딩 격자
+  grid?: number; // 서버 라운딩 격자 (서버에서 실제 라운딩 수행)
   revalidate?: number; // 서버 캐시 TTL(초)
   cooldownMs?: number; // 클라 재요청 쿨다운(= SWR dedupingInterval)
-};
-
-type PetPoiResponse = {
-  key: string;
-  items: PetPoiItem[];
 };
 
 const petPoiFetcher = async (url: string): Promise<PetPoiResponse> => {
@@ -26,6 +22,7 @@ const petPoiFetcher = async (url: string): Promise<PetPoiResponse> => {
   if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`);
   return {
     key: data?.key ?? "",
+    meta: data?.meta ?? null,
     items: Array.isArray(data?.items) ? data.items : [],
   };
 };
@@ -34,35 +31,24 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
   const emit = useEmit();
   const myPos = useMapStore((s) => s.myPos);
 
-  const radius = opts?.radius ?? 1000;
-  const numOfRows = opts?.numOfRows ?? 80;
-  const grid = opts?.grid ?? 0.002;
-  const revalidate = opts?.revalidate ?? 600;
+  const radius = opts?.radius ?? PETPOI_DEFAULTS.radius;
+  const numOfRows = opts?.numOfRows ?? PETPOI_DEFAULTS.numOfRows;
+  const grid = opts?.grid ?? PETPOI_DEFAULTS.grid;
+  const revalidate = opts?.revalidate ?? PETPOI_DEFAULTS.revalidate;
   const cooldownMs = opts?.cooldownMs ?? 10 * 60 * 1000;
 
   const [on, setOn] = useState(false);
 
-  const rounded = useMemo(() => {
-    if (!myPos) return null;
-    const rLat = Math.round(myPos.lat / grid) * grid;
-    const rLng = Math.round(myPos.lng / grid) * grid;
-    return { lat: rLat, lng: rLng };
-  }, [myPos, grid]);
-
-  const cacheKey = useMemo(() => {
-    if (!rounded) return null;
-    return `petpoi:${rounded.lat.toFixed(6)}:${rounded.lng.toFixed(6)}:r${radius}:n${numOfRows}`;
-  }, [rounded, radius, numOfRows]);
-
   // SWR key: null disables fetching when toggled off or position unknown
+  // 라운딩은 서버가 담당 — 클라이언트는 raw 좌표 + grid 파라미터만 전달
   const swrKey = useMemo(() => {
-    if (!on || !rounded) return null;
+    if (!on || !myPos) return null;
     return (
-      `/api/petpois?lat=${rounded.lat}&lng=${rounded.lng}` +
+      `/api/petpois?lat=${myPos.lat}&lng=${myPos.lng}` +
       `&radius=${radius}&numOfRows=${numOfRows}&pageNo=1` +
       `&grid=${grid}&revalidate=${revalidate}`
     );
-  }, [on, rounded, radius, numOfRows, grid, revalidate]);
+  }, [on, myPos, radius, numOfRows, grid, revalidate]);
 
   const { data, error, isValidating, mutate } = useSWR<PetPoiResponse>(
     swrKey,
@@ -76,7 +62,7 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
           channel: "pet",
           type: "PETPOI_RESULT",
           items: res.items,
-          key: res.key || String(cacheKey ?? ""),
+          key: res.key,
           ts: Date.now(),
         });
       },
@@ -84,7 +70,7 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
         emit({
           type: "PETPOI_ERROR",
           message: err?.message ?? "알 수 없는 오류",
-          key: String(cacheKey ?? "petpoi:unknown"),
+          key: swrKey ?? "petpoi:unknown",
           ts: Date.now(),
           channel: "pet",
         });
@@ -116,9 +102,9 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
   return {
     petPoiOn: on,
     petPois: data?.items ?? [],
+    petPoiTotalCount: data?.meta?.totalCount ?? null,
     petPoiLoading: isValidating,
     petPoiError: error?.message ?? null,
-    petPoiCacheKey: cacheKey,
     setPetPoiOn,
     refreshPetPoi,
   };
