@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { bus, type AppEvent, type MapChannel } from "@/lib/eventBus";
+import { bus } from "@/lib/eventBus";
+import { AppEvent, MapChannel } from "@/types/mapEvents";
 
 /** 타입 안전 emit */
 export function useEmit() {

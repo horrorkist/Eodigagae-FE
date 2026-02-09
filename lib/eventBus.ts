@@ -1,48 +1,13 @@
 "use client";
 
-import { PetPoiItem } from "@/types/mapEvents";
-
-export type MapChannel = "map" | "pet";
-
-export type BaseEvent<C extends MapChannel, T extends string> = {
-  channel: C;
-  type: T;
-  ts?: number;
-};
-
-/** MAP domain events */
-export type MapEvents =
-  | (BaseEvent<"map", "MOVE_TO"> & {
-      pos: { lat: number; lng: number };
-      zoom?: number;
-      animate?: boolean;
-    })
-  | BaseEvent<"map", "REQUEST_MY_LOCATION">
-  | BaseEvent<"map", "MOVE_MY_MARKER_READY">
-  | BaseEvent<"map", "MOVE_MY_MARKER_CANCELLED">
-  | BaseEvent<"map", "MY_MARKER_MOVED">;
-
-/** PET domain events */
-export type PetEvents =
-  | (BaseEvent<"pet", "PETPOI_TOGGLE"> & { on: boolean })
-  | BaseEvent<"pet", "PETPOI_REFRESH">
-  | (BaseEvent<"pet", "PETPOI_RESULT"> & {
-      items: PetPoiItem[];
-      key: string;
-    })
-  | (BaseEvent<"pet", "PETPOI_ERROR"> & {
-      message: string;
-      key: string;
-    });
-
-export type AppEvent = MapEvents | PetEvents;
-
-type Listener<E extends AppEvent = AppEvent> = (e: E) => void;
-type Key = `${MapChannel}:${string}`;
+import { AppEvent, MapChannel } from "@/types/mapEvents";
 
 function keyOf(e: Pick<AppEvent, "channel" | "type">): Key {
   return `${e.channel}:${e.type}`;
 }
+
+type Listener<E extends AppEvent = AppEvent> = (e: E) => void;
+type Key = `${MapChannel}:${string}`;
 
 class BufferedBus {
   private queue: AppEvent[] = [];
