@@ -1,4 +1,5 @@
 // stores/bottomSheet.ts
+import { RefObject } from "react";
 import { create } from "zustand";
 
 type BottomSheetState = {
@@ -8,7 +9,7 @@ type BottomSheetState = {
   setSnapPoints: (points: number[]) => void;
   open: (toIndex?: number) => void;
   snapTo: (toIndex: number) => void;
-  close: () => void;
+  close: (BottomSheetRef: RefObject<HTMLDivElement>) => void;
 };
 
 const DEFAULT_SNAP_POINTS = [120, 360, 620];
@@ -41,5 +42,15 @@ export const useBottomSheetStore = create<BottomSheetState>((set, get) => ({
     set({ index: next }); // 열려있을 때 단계만 변경
   },
 
-  close: () => set({ isOpen: false }), // index는 그대로 둔다!
+  close: (bottomSheetRef) => {
+    set({ isOpen: false });
+    if (bottomSheetRef.current) {
+      const elements = bottomSheetRef.current.querySelectorAll(
+        "input, textarea",
+      ) as (HTMLInputElement | HTMLTextAreaElement)[];
+      elements.forEach((element) => {
+        element.blur();
+      });
+    }
+  }, // index는 그대로 둔다!
 }));
