@@ -23,20 +23,20 @@ library.add(
   faPaw,
 );
 
-type PoiStyle = {
+export type PoiStyle = {
   icon: IconDefinition;
-  bg: string;       // marker circle background
-  label: string;    // Korean category label
+  bg: string; // marker circle background
+  label: string; // Korean category label
 };
 
-const POI_STYLES: Record<string, PoiStyle> = {
-  "12": { icon: faMountainSun,   bg: "#22c55e", label: "관광지" },
-  "14": { icon: faLandmark,      bg: "#8b5cf6", label: "문화시설" },
-  "15": { icon: faTicket,        bg: "#ec4899", label: "축제·행사" },
+export const POI_STYLES: Record<string, PoiStyle> = {
+  "12": { icon: faMountainSun, bg: "#22c55e", label: "관광지" },
+  "14": { icon: faLandmark, bg: "#8b5cf6", label: "문화시설" },
+  "15": { icon: faTicket, bg: "#ec4899", label: "축제·행사" },
   "28": { icon: faPersonRunning, bg: "#f97316", label: "레포츠" },
-  "32": { icon: faBed,           bg: "#3b82f6", label: "숙박" },
-  "38": { icon: faBagShopping,   bg: "#eab308", label: "쇼핑" },
-  "39": { icon: faUtensils,      bg: "#ef4444", label: "음식점" },
+  "32": { icon: faBed, bg: "#3b82f6", label: "숙박" },
+  "38": { icon: faBagShopping, bg: "#eab308", label: "쇼핑" },
+  "39": { icon: faUtensils, bg: "#ef4444", label: "음식점" },
 };
 
 const DEFAULT_STYLE: PoiStyle = {
@@ -50,14 +50,19 @@ export function getPoiStyle(contenttypeid: string): PoiStyle {
 }
 
 /** Render an FA icon to an SVG string (no React needed) */
-function renderIconSvg(def: IconDefinition, fill: string, size: number): string {
+function renderIconSvg(
+  def: IconDefinition,
+  fill: string,
+  size: number,
+): string {
   const result = faIcon(def);
   if (!result) return "";
   // result.html returns ['<svg ...>...</svg>']
   // We need to inject fill color and size
   const [w, h] = result.icon;
   const svgPath = result.icon[4]; // the 'd' path string (could be string or string[])
-  const pathData = typeof svgPath === "string" ? svgPath : (svgPath as string[]).join(" ");
+  const pathData =
+    typeof svgPath === "string" ? svgPath : (svgPath as string[]).join(" ");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${size}" height="${size}" fill="${fill}"><path d="${pathData}"/></svg>`;
 }

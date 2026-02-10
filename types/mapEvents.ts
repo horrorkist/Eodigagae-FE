@@ -63,6 +63,11 @@ export type MapEvents =
       zoom?: number;
       animate?: boolean;
     })
+  | (BaseEvent<"map", "MOVE_MAP_CENTER"> & {
+      pos: { lat: number; lng: number };
+      zoom?: number;
+      animate?: boolean;
+    })
   | BaseEvent<"map", "REQUEST_MY_LOCATION">
   | BaseEvent<"map", "MOVE_MY_MARKER_READY">
   | BaseEvent<"map", "MOVE_MY_MARKER_CANCELLED">

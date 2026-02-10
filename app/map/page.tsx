@@ -31,6 +31,8 @@ import {
   faRulerHorizontal,
   faClock,
 } from "@fortawesome/free-solid-svg-icons";
+import { POI_STYLES } from "@/lib/poiMarker";
+import PoiCard from "@/components/PoiCard";
 
 const NaverMapClient = dynamic(() => import("@/components/NaverMapClient"), {
   ssr: false,
@@ -169,6 +171,7 @@ export default function MapPage() {
             </div>
           )}
 
+          {/* 추천 산책 거리 */}
           {walkRec && (
             <div className="border border-blue-200 bg-blue-50 rounded-md p-3 text-sm">
               <div className="flex items-center gap-2 font-semibold">
@@ -256,7 +259,7 @@ export default function MapPage() {
               <span>{routeError}</span>
             </div>
           )}
-
+          {/* 경로 정보 */}
           {route && (
             <div className="text-sm border rounded p-3 space-y-2">
               <div className="flex items-center gap-2 font-semibold">
@@ -326,6 +329,11 @@ export default function MapPage() {
               </div>
             </div>
           )}
+          {petPois.map((poi) => {
+            const style = POI_STYLES[poi.contenttypeid];
+
+            return <PoiCard key={poi.contentid} poi={poi} style={style} />;
+          })}
         </div>
       </BottomSheet>
     </div>

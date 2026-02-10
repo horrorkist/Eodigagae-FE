@@ -1,6 +1,6 @@
 "use client";
 
-import { MutableRefObject, createElement, useEffect, useRef } from "react";
+import { RefObject, createElement, useEffect, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationDot } from "@fortawesome/free-solid-svg-icons";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -12,7 +12,7 @@ import { useEmit, useOn } from "@/hooks/useEventBus";
 const FALLBACK = { lat: 37.5665, lng: 126.978 };
 
 export function useMapMyLocation(
-  mapRef: MutableRefObject<naver.maps.Map | null>,
+  mapRef: RefObject<naver.maps.Map | null>,
   sdkReady: boolean,
 ) {
   const myMarkerRef = useRef<naver.maps.Marker>(null);
@@ -84,12 +84,24 @@ export function useMapMyLocation(
 
       lastGeoRef.current = { lat: geoLat, lng: geoLng };
 
-      emit({ type: "MOVE_TO", pos: { lat: geoLat, lng: geoLng }, zoom: 15, animate: true, channel: "map" });
+      emit({
+        type: "MOVE_TO",
+        pos: { lat: geoLat, lng: geoLng },
+        zoom: 15,
+        animate: true,
+        channel: "map",
+      });
       return;
     }
 
     if (error) {
-      emit({ type: "MOVE_TO", pos: FALLBACK, zoom: 15, animate: true, channel: "map" });
+      emit({
+        type: "MOVE_TO",
+        pos: FALLBACK,
+        zoom: 15,
+        animate: true,
+        channel: "map",
+      });
     }
   }, [geoLat, geoLng, error, emit]);
 

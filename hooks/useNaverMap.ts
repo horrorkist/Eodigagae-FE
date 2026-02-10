@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useOn } from "./useEventBus";
 
 const FALLBACK = { lat: 37.5665, lng: 126.978 };
 
@@ -36,6 +37,19 @@ export function useNaverMap() {
       disableKineticPan: false,
     });
   }, [sdkReady, coords]);
+
+  useOn("map", "MOVE_MAP_CENTER", (cmd) => {
+    if (!mapRef.current || !window.naver?.maps) return;
+
+    const ll = new window.naver.maps.LatLng(cmd.pos.lat, cmd.pos.lng);
+
+    if (typeof cmd.zoom === "number") mapRef.current.setZoom(cmd.zoom);
+
+    const animate = cmd.animate ?? true;
+    if (animate && (mapRef.current as any).panTo)
+      (mapRef.current as any).panTo(ll);
+    else mapRef.current.setCenter(ll);
+  });
 
   useEffect(() => {
     initMapOnce();
