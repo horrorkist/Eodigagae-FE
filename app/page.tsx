@@ -6,18 +6,18 @@ export default function HomePage() {
       href: "/map",
       label: "지도",
     },
-    {
-      href: "/geo",
-      label: "위치",
-    },
-    {
-      href: "/input",
-      label: "인풋",
-    },
-    {
-      href: "/bottomSheet",
-      label: "바텀시트",
-    },
+    // {
+    //   href: "/geo",
+    //   label: "위치",
+    // },
+    // {
+    //   href: "/input",
+    //   label: "인풋",
+    // },
+    // {
+    //   href: "/bottomSheet",
+    //   label: "바텀시트",
+    // },
   ];
   return (
     <div className="space-y-3">

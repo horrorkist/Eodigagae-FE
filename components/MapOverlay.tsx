@@ -94,7 +94,7 @@ export default function MapOverlay(props: {
 
             <div className="pointer-events-auto flex-1 max-w-140">
               <form
-                className="flex items-center gap-2 rounded-2xl border bg-white/90 backdrop-blur shadow px-3 py-2"
+                className="flex items-center gap-2 rounded-lg border bg-white/90 backdrop-blur shadow px-3 py-2"
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (!canSubmit) return;
@@ -108,36 +108,17 @@ export default function MapOverlay(props: {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="장소 검색 (예: 애견카페, 공원)"
+                  placeholder="어디로 산책할까요?"
                   className="w-full bg-transparent outline-none text-sm"
                   inputMode="search"
                 />
-                {q.length > 0 && (
-                  <button
-                    type="button"
-                    className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 shrink-0"
-                    onClick={() => setQ("")}
-                    aria-label="검색어 지우기"
-                  >
-                    <FontAwesomeIcon icon={faXmark} className="w-2.5 h-2.5" />
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  className="text-xs px-3 py-1 rounded-full border bg-white disabled:opacity-40 shrink-0"
-                  disabled={!canSubmit}
-                >
-                  검색
-                </button>
               </form>
 
               {toggles.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {toggles.map((t) => {
                     const on = t.value;
-                    const label = on
-                      ? t.labelOn
-                      : (t.labelOff ?? t.labelOn);
+                    const label = on ? t.labelOn : (t.labelOff ?? t.labelOn);
 
                     return (
                       <button
@@ -153,10 +134,7 @@ export default function MapOverlay(props: {
                           t.disabled ? "opacity-40" : "",
                         ].join(" ")}
                       >
-                        <FontAwesomeIcon
-                          icon={faDog}
-                          className="w-3.5 h-3.5"
-                        />
+                        <FontAwesomeIcon icon={faDog} className="w-3.5 h-3.5" />
                         <span>{label}</span>
                       </button>
                     );
