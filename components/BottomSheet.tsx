@@ -123,6 +123,7 @@ export default function BottomSheet({
 
   const FLING_V = 1.0;
   const FLING_MIN_DT = 12;
+  const FULLY_OPEN_EPSILON = 1;
 
   const nearestSnapIndex = useCallback(
     (topPx: number) => {
@@ -187,28 +188,24 @@ export default function BottomSheet({
     ],
   );
 
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
+  const beginDrag = useCallback((clientY: number) => {
     draggingRef.current = true;
-    startYRef.current = e.clientY;
+    startYRef.current = clientY;
     startTopRef.current = topRef.current;
     overDragRef.current = 0;
 
-    lastYRef.current = e.clientY;
+    lastYRef.current = clientY;
     lastTRef.current = performance.now();
     velocityRef.current = 0;
 
     if (sheetRef.current) sheetRef.current.style.transition = "none";
-
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }, []);
 
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent) => {
+  const updateDrag = useCallback(
+    (clientY: number) => {
       if (!draggingRef.current) return;
 
       const now = performance.now();
-      const clientY = e.clientY;
-
       const dt = now - lastTRef.current;
       if (dt >= FLING_MIN_DT) {
         velocityRef.current = (clientY - lastYRef.current) / dt;
@@ -227,7 +224,7 @@ export default function BottomSheet({
     [closedTop, clampTop, applyTop],
   );
 
-  const onPointerUp = useCallback(() => {
+  const endDrag = useCallback(() => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
 
@@ -266,6 +263,159 @@ export default function BottomSheet({
     close,
     applyTop,
     settleAfterDrag,
+  ]);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    beginDrag(e.clientY);
+
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [beginDrag]);
+
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!draggingRef.current) return;
+      updateDrag(e.clientY);
+    },
+    [updateDrag],
+  );
+
+  const onPointerUp = useCallback(() => {
+    endDrag();
+  }, [endDrag]);
+
+  type ContentGestureMode = "idle" | "pending" | "scroll" | "sheet";
+  type ContentMoveHooks = {
+    onEnterSheet?: () => void;
+    onSheetMove?: () => void;
+  };
+  const contentGestureModeRef = useRef<ContentGestureMode>("idle");
+  const contentStartYRef = useRef(0);
+  const contentForceSheetRef = useRef(false);
+  const CONTENT_TOP_EPSILON = 1;
+
+  const startContentGesture = useCallback(
+    (clientY: number) => {
+      contentStartYRef.current = clientY;
+      contentGestureModeRef.current = "pending";
+
+      const isFullyOpen = topRef.current <= minSnap + FULLY_OPEN_EPSILON;
+      contentForceSheetRef.current = !isFullyOpen;
+    },
+    [minSnap],
+  );
+
+  const finishContentGesture = useCallback(() => {
+    if (contentGestureModeRef.current === "sheet") endDrag();
+    contentGestureModeRef.current = "idle";
+    contentForceSheetRef.current = false;
+  }, [endDrag]);
+
+  const processContentMove = useCallback(
+    (clientY: number, hooks?: ContentMoveHooks) => {
+      const mode = contentGestureModeRef.current;
+      if (mode === "idle" || mode === "scroll") return;
+
+      if (mode === "pending") {
+        const dy = clientY - contentStartYRef.current;
+        if (Math.abs(dy) < 4) return;
+
+        const contentTop = contentRef.current?.scrollTop ?? 0;
+        const shouldControlSheet =
+          contentForceSheetRef.current ||
+          (dy > 0 && contentTop <= CONTENT_TOP_EPSILON);
+
+        if (shouldControlSheet) {
+          contentGestureModeRef.current = "sheet";
+          beginDrag(contentStartYRef.current);
+          hooks?.onEnterSheet?.();
+          updateDrag(clientY);
+          return;
+        }
+
+        contentGestureModeRef.current = "scroll";
+        return;
+      }
+
+      if (contentGestureModeRef.current === "sheet") {
+        hooks?.onSheetMove?.();
+        updateDrag(clientY);
+      }
+    },
+    [beginDrag, updateDrag],
+  );
+
+  const onContentPointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === "touch") return;
+    startContentGesture(e.clientY);
+  }, [startContentGesture]);
+
+  const onContentPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      processContentMove(e.clientY, {
+        onEnterSheet: () => {
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          e.preventDefault();
+        },
+        onSheetMove: () => {
+          e.preventDefault();
+        },
+      });
+    },
+    [processContentMove],
+  );
+
+  const onContentPointerUp = useCallback((e?: React.PointerEvent) => {
+    if (e?.pointerType === "touch") return;
+    finishContentGesture();
+  }, [finishContentGesture]);
+
+  const onContentTouchStartNative = useCallback((e: TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    startContentGesture(touch.clientY);
+  }, [startContentGesture]);
+
+  const onContentTouchMoveNative = useCallback(
+    (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      processContentMove(touch.clientY);
+    },
+    [processContentMove],
+  );
+
+  const onContentTouchEndNative = useCallback(() => {
+    finishContentGesture();
+  }, [finishContentGesture]);
+
+  useEffect(() => {
+    const contentEl = contentRef.current;
+    if (!contentEl) return;
+
+    contentEl.addEventListener("touchstart", onContentTouchStartNative, {
+      passive: true,
+    });
+    contentEl.addEventListener("touchmove", onContentTouchMoveNative, {
+      passive: true,
+    });
+    contentEl.addEventListener("touchend", onContentTouchEndNative, {
+      passive: true,
+    });
+    contentEl.addEventListener("touchcancel", onContentTouchEndNative, {
+      passive: true,
+    });
+
+    return () => {
+      contentEl.removeEventListener("touchstart", onContentTouchStartNative);
+      contentEl.removeEventListener("touchmove", onContentTouchMoveNative);
+      contentEl.removeEventListener("touchend", onContentTouchEndNative);
+      contentEl.removeEventListener("touchcancel", onContentTouchEndNative);
+    };
+  }, [
+    onContentTouchStartNative,
+    onContentTouchMoveNative,
+    onContentTouchEndNative,
   ]);
 
   useEffect(
@@ -320,7 +470,6 @@ export default function BottomSheet({
           aria-label={title ?? "bottom sheet"}
           className="absolute inset-x-0 top-0 h-full bg-white rounded-t-2xl shadow-[0_-12px_24px_rgba(0,0,0,0.1)] pointer-events-auto"
           style={{
-            transform: `translateY(${topRef.current}px)`,
             willChange: "transform",
           }}
         >
@@ -330,6 +479,7 @@ export default function BottomSheet({
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
           >
             <div className="mx-auto h-1 w-10 rounded-full bg-gray-300" />
             {title ? (
@@ -340,12 +490,20 @@ export default function BottomSheet({
           {/* Content — 항상 고정 높이, clip container가 가시 영역 처리 */}
           <div
             ref={contentRef}
-            className="px-4 pb-6 overflow-auto h-[calc(100%-48px)]"
+            className={[
+              "px-4 pb-6 h-[calc(100%-48px)]",
+              isOpen && index === 0 ? "overflow-auto" : "overflow-hidden",
+            ].join(" ")}
             style={{
               opacity: 0,
               pointerEvents: isOpen ? "auto" : "none",
               transition: "opacity 150ms",
+              touchAction: isOpen && index === 0 ? "pan-y" : "none",
             }}
+            onPointerDown={onContentPointerDown}
+            onPointerMove={onContentPointerMove}
+            onPointerUp={onContentPointerUp}
+            onPointerCancel={onContentPointerUp}
           >
             {children}
           </div>
