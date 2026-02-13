@@ -30,6 +30,7 @@ export default function BottomSheet({
   const snapPoints = useBottomSheetStore((s) => s.snapPoints);
   const index = useBottomSheetStore((s) => s.index);
   const isOpen = useBottomSheetStore((s) => s.isOpen);
+  const setSnapPoints = useBottomSheetStore((s) => s.setSnapPoints);
   const open = useBottomSheetStore((s) => s.open);
   const close = useBottomSheetStore((s) => s.close);
   const snapTo = useBottomSheetStore((s) => s.snapTo);
@@ -69,6 +70,29 @@ export default function BottomSheet({
     [vh, bottomInset, peekHeight],
   );
 
+  const dynamicSnapPoints = useMemo(() => {
+    if (vh <= 0) return [];
+
+    const maxOpenTop = Math.max(0, closedTop - 1);
+    if (maxOpenTop <= 0) return [0];
+
+    const fullyOpenTop = Math.min(Math.round(vh * 0.08), maxOpenTop);
+    const range = Math.max(0, maxOpenTop - fullyOpenTop);
+
+    if (range < 96) return [fullyOpenTop];
+
+    const points = [0, 0.5, 0.8].map((fraction) =>
+      Math.round(fullyOpenTop + range * fraction),
+    );
+
+    return Array.from(new Set(points)).sort((a, b) => a - b);
+  }, [vh, closedTop]);
+
+  useEffect(() => {
+    if (dynamicSnapPoints.length === 0) return;
+    setSnapPoints(dynamicSnapPoints);
+  }, [dynamicSnapPoints, setSnapPoints]);
+
   // ── DOM refs ──
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -76,6 +100,7 @@ export default function BottomSheet({
   const topRef = useRef<number>(closedTop);
   const overDragRef = useRef(0);
   const rafRef = useRef(0);
+  const fastOpenFlingRef = useRef(false);
 
   /** transform + opacity 만 변경 (Layout/Paint 0회) */
   const applyTop = useCallback(
@@ -98,8 +123,14 @@ export default function BottomSheet({
   // ── Store → DOM 동기화 ──
   useLayoutEffect(() => {
     const target = isOpen ? (snapPoints[index] ?? minSnap) : closedTop;
-    if (sheetRef.current)
-      sheetRef.current.style.transition = "transform 280ms ease-in-out";
+    if (sheetRef.current) {
+      if (fastOpenFlingRef.current) {
+        sheetRef.current.style.transition = "transform 80ms ease-out";
+        fastOpenFlingRef.current = false;
+      } else {
+        sheetRef.current.style.transition = "transform 280ms ease-in-out";
+      }
+    }
     applyTop(target);
     applyClipPadding(target);
   }, [
@@ -240,6 +271,9 @@ export default function BottomSheet({
 
     if (Math.abs(v) >= FLING_V) {
       if (v < 0) {
+        fastOpenFlingRef.current = true;
+        if (sheetRef.current)
+          sheetRef.current.style.transition = "transform 80ms ease-out";
         snapTo(0);
         open(0);
         applyTop(minSnap);
