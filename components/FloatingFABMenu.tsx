@@ -10,6 +10,7 @@ export type FABMenuItem = {
   label: string;
   icon?: IconDefinition;
   active?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 };
 
@@ -17,6 +18,10 @@ export default function FloatingFABMenu({ items }: { items: FABMenuItem[] }) {
   const [open, setOpen] = useState(false);
 
   const toggle = useCallback(() => setOpen((p) => !p), []);
+  const onItemClick = useCallback((item: FABMenuItem) => {
+    if (item.disabled) return;
+    item.onClick();
+  }, []);
 
   return (
     <div className="pointer-events-auto relative flex flex-col items-end">
@@ -28,16 +33,17 @@ export default function FloatingFABMenu({ items }: { items: FABMenuItem[] }) {
               <motion.button
                 key={item.key}
                 type="button"
-                onClick={() => {
-                  item.onClick();
-                }}
+                disabled={item.disabled}
+                onClick={() => onItemClick(item)}
                 className={[
                   "flex items-center gap-2.5 rounded-2xl px-4 py-2.5",
                   "text-sm font-medium whitespace-nowrap",
                   "shadow-lg shadow-black/10",
                   "backdrop-blur-xl",
                   "transition-[background-color,transform]",
-                  item.active
+                  item.disabled
+                    ? "bg-gray-100 text-gray-400 shadow-none cursor-not-allowed"
+                    : item.active
                     ? "bg-blue-500 text-white shadow-blue-500/25"
                     : "bg-white/90 text-gray-800 hover:bg-white",
                 ].join(" ")}

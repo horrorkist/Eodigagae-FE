@@ -1,15 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEmit, useOn } from "@/hooks/useEventBus";
+import { useMapStore } from "@/stores/mapStore";
 import FloatingFABMenu from "./FloatingFABMenu";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faClock,
   faMagnifyingGlass,
-  faXmark,
   faLocationCrosshairs,
   faMapLocationDot,
   faFlagCheckered,
+  faPause,
+  faPlay,
+  faPersonWalking,
+  faStop,
   faDog,
 } from "@fortawesome/free-solid-svg-icons";
 
@@ -22,6 +27,41 @@ type ToggleItem = {
   onChange: (next: boolean) => void;
   disabled?: boolean;
 };
+
+type DeviceOrientationPermissionCtor = {
+  requestPermission?: () => Promise<"granted" | "denied">;
+};
+
+function requestOrientationPermissionIfNeeded() {
+  if (typeof window === "undefined") return;
+
+  const Ctor = (
+    window as typeof window & {
+      DeviceOrientationEvent?: DeviceOrientationPermissionCtor;
+    }
+  ).DeviceOrientationEvent;
+  if (!Ctor || typeof Ctor.requestPermission !== "function") return;
+
+  Ctor.requestPermission().catch(() => null);
+}
+
+function formatElapsed(totalSec: number) {
+  const sec = Math.max(0, Math.floor(totalSec));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+
+  if (h > 0) {
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function formatDistance(meter: number) {
+  if (meter >= 1000) return `${(meter / 1000).toFixed(2)} km`;
+  return `${Math.round(meter)} m`;
+}
 
 export default function MapOverlay(props: {
   topOffsetPx?: number;
@@ -39,39 +79,76 @@ export default function MapOverlay(props: {
   } = props;
 
   const emit = useEmit();
+  const walking = useMapStore((s) => s.walking);
+  const route = useMapStore((s) => s.route);
+  const walkingPaused = useMapStore((s) => s.walkingPaused);
+  const walkingStartedAt = useMapStore((s) => s.walkingStartedAt);
+  const walkingPausedAt = useMapStore((s) => s.walkingPausedAt);
+  const walkingPausedTotalMs = useMapStore((s) => s.walkingPausedTotalMs);
+  const walkedDistanceM = useMapStore((s) => s.walkedDistanceM);
   const [q, setQ] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const canSubmit = useMemo(() => q.trim().length > 0, [q]);
+  const canStartWalking = useMemo(
+    () => !!route?.path && route.path.length > 1,
+    [route],
+  );
+  const elapsedSec = useMemo(() => {
+    if (!walkingStartedAt) return 0;
+    const effectiveNow = walkingPaused && walkingPausedAt ? walkingPausedAt : nowMs;
+    const elapsedMs = Math.max(
+      0,
+      effectiveNow - walkingStartedAt - walkingPausedTotalMs,
+    );
+    return elapsedMs / 1000;
+  }, [
+    walkingStartedAt,
+    walkingPaused,
+    walkingPausedAt,
+    walkingPausedTotalMs,
+    nowMs,
+  ]);
 
   const [isMovingMyMarker, setIsMovingMyMarker] = useState<boolean>(false);
   const [isSettingDest, setIsSettingDest] = useState<boolean>(false);
 
-  const onToggleMoveMyMarker = () => {
-    if (isSettingDest) {
-      emit({ type: "MOVE_DEST_CANCELLED", channel: "map" });
-      setIsSettingDest(false);
-    }
-    if (isMovingMyMarker) {
-      emit({ type: "MOVE_MY_MARKER_CANCELLED", channel: "map" });
-      setIsMovingMyMarker(false);
-    } else {
-      emit({ type: "MOVE_MY_MARKER_READY", channel: "map" });
-      setIsMovingMyMarker(true);
-    }
-  };
+  const cancelMoveMyMarker = useCallback(() => {
+    emit({ type: "MOVE_MY_MARKER_CANCELLED", channel: "map" });
+    setIsMovingMyMarker(false);
+  }, [emit]);
 
-  const onToggleMoveDest = () => {
-    if (isMovingMyMarker) {
-      emit({ type: "MOVE_MY_MARKER_CANCELLED", channel: "map" });
-      setIsMovingMyMarker(false);
-    }
+  const cancelMoveDest = useCallback(() => {
+    emit({ type: "MOVE_DEST_CANCELLED", channel: "map" });
+    setIsSettingDest(false);
+  }, [emit]);
+
+  const onToggleMoveMyMarker = useCallback(() => {
     if (isSettingDest) {
-      emit({ type: "MOVE_DEST_CANCELLED", channel: "map" });
-      setIsSettingDest(false);
-    } else {
-      emit({ type: "MOVE_DEST_READY", channel: "map" });
-      setIsSettingDest(true);
+      cancelMoveDest();
     }
-  };
+
+    if (isMovingMyMarker) {
+      cancelMoveMyMarker();
+      return;
+    }
+
+    emit({ type: "MOVE_MY_MARKER_READY", channel: "map" });
+    setIsMovingMyMarker(true);
+  }, [cancelMoveDest, cancelMoveMyMarker, emit, isMovingMyMarker, isSettingDest]);
+
+  const onToggleMoveDest = useCallback(() => {
+    if (isMovingMyMarker) {
+      cancelMoveMyMarker();
+    }
+
+    if (isSettingDest) {
+      cancelMoveDest();
+      return;
+    }
+
+    emit({ type: "MOVE_DEST_READY", channel: "map" });
+    setIsSettingDest(true);
+  }, [cancelMoveDest, cancelMoveMyMarker, emit, isMovingMyMarker, isSettingDest]);
 
   useOn("map", "MY_MARKER_MOVED", () => {
     setIsMovingMyMarker(false);
@@ -80,6 +157,125 @@ export default function MapOverlay(props: {
   useOn("map", "DEST_MOVED", () => {
     setIsSettingDest(false);
   });
+
+  const fabItems = useMemo(
+    () => [
+      {
+        key: "my-location",
+        icon: faLocationCrosshairs,
+        label: "내 위치",
+        onClick: () => emit({ type: "REQUEST_MY_LOCATION", channel: "map" }),
+      },
+      {
+        key: "move-marker",
+        icon: faMapLocationDot,
+        label: "내 위치 변경",
+        active: isMovingMyMarker,
+        onClick: onToggleMoveMyMarker,
+      },
+      {
+        key: "set-dest",
+        icon: faFlagCheckered,
+        label: "도착지 설정",
+        active: isSettingDest,
+        onClick: onToggleMoveDest,
+      },
+      {
+        key: "start-walking",
+        icon: faPersonWalking,
+        label: walking ? "산책 종료" : "산책 시작",
+        active: walking,
+        disabled: !canStartWalking,
+        onClick: () => {
+          if (!canStartWalking) return;
+          if (!walking) requestOrientationPermissionIfNeeded();
+
+          emit({
+            type: walking ? "STOP_WALKING" : "START_WALKING",
+            channel: "map",
+          });
+        },
+      },
+    ],
+    [
+      emit,
+      isMovingMyMarker,
+      isSettingDest,
+      onToggleMoveMyMarker,
+      onToggleMoveDest,
+      walking,
+      canStartWalking,
+    ],
+  );
+
+  useEffect(() => {
+    if (!walking || walkingPaused || !walkingStartedAt) return;
+
+    const id = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [walking, walkingPaused, walkingStartedAt]);
+
+  if (walking) {
+    return (
+      <div className="pointer-events-none absolute inset-0 z-50">
+        <div className="pointer-events-none absolute left-0 right-0 top-3 flex justify-center px-3">
+          <div className="pointer-events-auto w-full max-w-sm rounded-2xl bg-black/80 text-white shadow-lg backdrop-blur px-4 py-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-white/10 px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-white/80">
+                  <FontAwesomeIcon icon={faClock} className="w-3 h-3" />
+                  <span>Elapsed</span>
+                </div>
+                <div className="mt-1 text-base font-semibold tabular-nums">
+                  {formatElapsed(elapsedSec)}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/10 px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] text-white/80">
+                  <FontAwesomeIcon icon={faPersonWalking} className="w-3 h-3" />
+                  <span>Distance</span>
+                </div>
+                <div className="mt-1 text-base font-semibold tabular-nums">
+                  {formatDistance(walkedDistanceM)}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  emit({
+                    type: walkingPaused ? "RESUME_WALKING" : "PAUSE_WALKING",
+                    channel: "map",
+                  })
+                }
+                className="rounded-xl bg-white/15 hover:bg-white/20 transition-colors px-3 py-2 text-sm font-medium"
+              >
+                <FontAwesomeIcon
+                  icon={walkingPaused ? faPlay : faPause}
+                  className="w-3.5 h-3.5 mr-1.5"
+                />
+                {walkingPaused ? "Resume" : "Pause"}
+              </button>
+              <button
+                type="button"
+                onClick={() => emit({ type: "STOP_WALKING", channel: "map" })}
+                className="rounded-xl bg-red-500/85 hover:bg-red-500 transition-colors px-3 py-2 text-sm font-semibold"
+              >
+                <FontAwesomeIcon icon={faStop} className="w-3.5 h-3.5 mr-1.5" />
+                Stop
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none absolute inset-0 z-50">
@@ -150,31 +346,7 @@ export default function MapOverlay(props: {
 
       {/* 우측 플로팅 버튼 영역 */}
       <div className="pointer-events-none absolute right-3 bottom-28">
-        <FloatingFABMenu
-          items={[
-            {
-              key: "my-location",
-              icon: faLocationCrosshairs,
-              label: "내 위치",
-              onClick: () =>
-                emit({ type: "REQUEST_MY_LOCATION", channel: "map" }),
-            },
-            {
-              key: "move-marker",
-              icon: faMapLocationDot,
-              label: "내 위치 변경",
-              active: isMovingMyMarker,
-              onClick: onToggleMoveMyMarker,
-            },
-            {
-              key: "set-dest",
-              icon: faFlagCheckered,
-              label: "도착지 설정",
-              active: isSettingDest,
-              onClick: onToggleMoveDest,
-            },
-          ]}
-        />
+        <FloatingFABMenu items={fabItems} />
       </div>
     </div>
   );

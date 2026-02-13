@@ -56,6 +56,12 @@ export type BaseEvent<C extends MapChannel, T extends string> = {
   ts?: number;
 };
 
+type WalkingControlEventType =
+  | "START_WALKING"
+  | "PAUSE_WALKING"
+  | "RESUME_WALKING"
+  | "STOP_WALKING";
+
 /** MAP domain events */
 export type MapEvents =
   | (BaseEvent<"map", "MOVE_TO"> & {
@@ -74,7 +80,8 @@ export type MapEvents =
   | BaseEvent<"map", "MY_MARKER_MOVED">
   | BaseEvent<"map", "MOVE_DEST_READY">
   | BaseEvent<"map", "MOVE_DEST_CANCELLED">
-  | BaseEvent<"map", "DEST_MOVED">;
+  | BaseEvent<"map", "DEST_MOVED">
+  | BaseEvent<"map", WalkingControlEventType>;
 
 /** PET domain events */
 export type PetEvents =

@@ -1,6 +1,5 @@
 import BottomNav from "./BottomNav";
 import Modal from "./Modal";
-import TopBar from "./TopBar";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -8,12 +7,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* 가운데 정렬 + 모바일 폭 제한 */}
       <div className="mx-auto h-dvh w-full max-w-[430px] bg-white shadow-sm flex flex-col overflow-hidden">
         {/* 상단바 */}
-        <div
+        {/* <div
           className="shrink-0 border-b bg-white"
           style={{ paddingTop: "var(--safe-top)" }}
         >
           <TopBar />
-        </div>
+        </div> */}
 
         {/* ✅ 여기만 스크롤 */}
         <main className="flex-1 overflow-y-auto min-h-0 relative">
