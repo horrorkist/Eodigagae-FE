@@ -21,8 +21,13 @@ const HEADING_UPDATE_MIN_DEG = 4;
 const HEADING_UPDATE_MIN_INTERVAL_MS = 120;
 const HEADING_ORIENTATION_RECENT_MS = 3500;
 const HEADING_FALLBACK_MOVE_MIN_M = 6;
-const HEADING_ORIENTATION_NOISE_DEG = 10;
-const HEADING_ORIENTATION_SMOOTHING = 0.22;
+const HEADING_ORIENTATION_NOISE_DEG = 16;
+const HEADING_ORIENTATION_SMOOTHING = 0.14;
+const HEADING_ORIENTATION_MIN_INTERVAL_MS = 220;
+const WALK_MOVE_FROM_ACCURACY_RATIO = 0.35;
+const WALK_MOVE_FROM_ACCURACY_MAX_M = 7;
+const WALK_LOW_SPEED_MPS = 0.8;
+const WALK_LOW_SPEED_MIN_MOVE_M = 5;
 
 type OrientationWithCompass = DeviceOrientationEvent & {
   webkitCompassHeading?: number;
@@ -49,6 +54,24 @@ function smoothHeading(fromDeg: number, toDeg: number, factor: number) {
   const clamped = Math.max(0, Math.min(1, factor));
   const delta = signedHeadingDelta(fromDeg, toDeg);
   return normalizeHeading(fromDeg + delta * clamped);
+}
+
+function tiltCompensatedHeadingDeg(alpha: number, beta: number, gamma: number) {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const x = toRad(beta);
+  const y = toRad(gamma);
+  const z = toRad(alpha);
+  const cY = Math.cos(y);
+  const cZ = Math.cos(z);
+  const sX = Math.sin(x);
+  const sY = Math.sin(y);
+  const sZ = Math.sin(z);
+
+  const vX = -cZ * sY - sZ * sX * cY;
+  const vY = -sZ * sY + cZ * sX * cY;
+  const headingRad = Math.atan2(vX, vY);
+
+  return normalizeHeading((headingRad * 180) / Math.PI);
 }
 
 function buildUserMarkerHTML(headingDeg: number | null, walking: boolean) {
@@ -144,6 +167,17 @@ function extractHeadingFromOrientation(e: OrientationWithCompass) {
   const compass = (e as OrientationWithCompass).webkitCompassHeading;
   if (typeof compass === "number" && Number.isFinite(compass)) {
     return normalizeHeading(compass);
+  }
+
+  if (
+    typeof e.alpha === "number" &&
+    Number.isFinite(e.alpha) &&
+    typeof e.beta === "number" &&
+    Number.isFinite(e.beta) &&
+    typeof e.gamma === "number" &&
+    Number.isFinite(e.gamma)
+  ) {
+    return tiltCompensatedHeadingDeg(e.alpha, e.beta, e.gamma);
   }
 
   if (typeof e.alpha === "number" && Number.isFinite(e.alpha)) {
@@ -254,7 +288,15 @@ export function useMapMyLocation(
             ? HEADING_ORIENTATION_NOISE_DEG
             : HEADING_UPDATE_MIN_DEG;
         if (headingDelta(next, last) < minDelta) return;
-        if (now - lastHeadingAtRef.current < HEADING_UPDATE_MIN_INTERVAL_MS) return;
+
+        const minInterval =
+          source === "orientation"
+            ? Math.max(
+                HEADING_UPDATE_MIN_INTERVAL_MS,
+                HEADING_ORIENTATION_MIN_INTERVAL_MS,
+              )
+            : HEADING_UPDATE_MIN_INTERVAL_MS;
+        if (now - lastHeadingAtRef.current < minInterval) return;
 
         if (source === "orientation") {
           next = smoothHeading(last, next, HEADING_ORIENTATION_SMOOTHING);
@@ -502,8 +544,24 @@ export function useMapMyLocation(
         const nextPos = { lat: c.latitude, lng: c.longitude };
         const last = lastWalkPosRef.current;
         const movedM = last ? haversineMeters(last, nextPos) : 0;
+        const speedMps =
+          typeof c.speed === "number" && Number.isFinite(c.speed) ? c.speed : null;
+        const accuracyMoveThresholdM = Math.min(
+          WALK_MOVE_FROM_ACCURACY_MAX_M,
+          Math.max(0, (c.accuracy ?? 0) * WALK_MOVE_FROM_ACCURACY_RATIO),
+        );
+        const moveThresholdM = Math.max(MIN_WALK_MOVE_M, accuracyMoveThresholdM);
 
-        if (last && movedM < MIN_WALK_MOVE_M) {
+        if (last && movedM < moveThresholdM) {
+          return;
+        }
+
+        if (
+          last &&
+          speedMps != null &&
+          speedMps < WALK_LOW_SPEED_MPS &&
+          movedM < WALK_LOW_SPEED_MIN_MOVE_M
+        ) {
           return;
         }
 
