@@ -4,6 +4,10 @@ import { RefObject, createElement, useCallback, useEffect, useRef } from "react"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationDot } from "@fortawesome/free-solid-svg-icons";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import {
+  requestOrientationPermissionIfNeeded,
+  useWalkHeading,
+} from "@/hooks/useWalkHeading";
 import { useMapStore } from "@/stores/mapStore";
 import { useModalStore } from "@/stores/modal";
 import { getGeoErrorInfo } from "@/lib/geolocationErrors";
@@ -17,62 +21,10 @@ const MAX_WALK_ACCURACY_M = 50;
 const MIN_WALK_MOVE_M = 1.5;
 const HEADING_LINE_METERS = 20;
 const USER_MARKER_SIZE_PX = 26;
-const HEADING_UPDATE_MIN_DEG = 4;
-const HEADING_UPDATE_MIN_INTERVAL_MS = 120;
-const HEADING_ORIENTATION_RECENT_MS = 3500;
-const HEADING_FALLBACK_MOVE_MIN_M = 6;
-const HEADING_ORIENTATION_NOISE_DEG = 16;
-const HEADING_ORIENTATION_SMOOTHING = 0.14;
-const HEADING_ORIENTATION_MIN_INTERVAL_MS = 220;
 const WALK_MOVE_FROM_ACCURACY_RATIO = 0.35;
 const WALK_MOVE_FROM_ACCURACY_MAX_M = 7;
 const WALK_LOW_SPEED_MPS = 0.8;
 const WALK_LOW_SPEED_MIN_MOVE_M = 5;
-
-type OrientationWithCompass = DeviceOrientationEvent & {
-  webkitCompassHeading?: number;
-};
-type DeviceOrientationPermissionCtor = {
-  requestPermission?: () => Promise<"granted" | "denied">;
-};
-type HeadingSource = "orientation" | "gps" | "movement" | "route";
-
-function normalizeHeading(deg: number) {
-  return ((deg % 360) + 360) % 360;
-}
-
-function headingDelta(a: number, b: number) {
-  const d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
-}
-
-function signedHeadingDelta(fromDeg: number, toDeg: number) {
-  return ((toDeg - fromDeg + 540) % 360) - 180;
-}
-
-function smoothHeading(fromDeg: number, toDeg: number, factor: number) {
-  const clamped = Math.max(0, Math.min(1, factor));
-  const delta = signedHeadingDelta(fromDeg, toDeg);
-  return normalizeHeading(fromDeg + delta * clamped);
-}
-
-function tiltCompensatedHeadingDeg(alpha: number, beta: number, gamma: number) {
-  const toRad = (v: number) => (v * Math.PI) / 180;
-  const x = toRad(beta);
-  const y = toRad(gamma);
-  const z = toRad(alpha);
-  const cY = Math.cos(y);
-  const cZ = Math.cos(z);
-  const sX = Math.sin(x);
-  const sY = Math.sin(y);
-  const sZ = Math.sin(z);
-
-  const vX = -cZ * sY - sZ * sX * cY;
-  const vY = -sZ * sY + cZ * sX * cY;
-  const headingRad = Math.atan2(vX, vY);
-
-  return normalizeHeading((headingRad * 180) / Math.PI);
-}
 
 function buildUserMarkerHTML(headingDeg: number | null, walking: boolean) {
   const coreColor = "#2563eb";
@@ -110,21 +62,6 @@ function haversineMeters(a: LatLng, b: LatLng) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function bearingDeg(from: LatLng, to: LatLng) {
-  const toRad = (v: number) => (v * Math.PI) / 180;
-  const toDeg = (v: number) => (v * 180) / Math.PI;
-  const lat1 = toRad(from.lat);
-  const lat2 = toRad(to.lat);
-  const dLng = toRad(to.lng - from.lng);
-
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-
-  return (toDeg(Math.atan2(y, x)) + 360) % 360;
-}
-
 function projectByBearing(start: LatLng, bearingDeg: number, distanceM: number) {
   const R = 6371000;
   const br = (bearingDeg * Math.PI) / 180;
@@ -149,58 +86,6 @@ function projectByBearing(start: LatLng, bearingDeg: number, distanceM: number) 
   };
 }
 
-function getScreenOrientationAngleDeg() {
-  if (typeof window === "undefined") return 0;
-
-  const angle = window.screen?.orientation?.angle;
-  if (typeof angle === "number" && Number.isFinite(angle)) return angle;
-
-  const legacyAngle = (window as Window & { orientation?: number }).orientation;
-  if (typeof legacyAngle === "number" && Number.isFinite(legacyAngle)) {
-    return legacyAngle;
-  }
-
-  return 0;
-}
-
-function extractHeadingFromOrientation(e: OrientationWithCompass) {
-  const compass = (e as OrientationWithCompass).webkitCompassHeading;
-  if (typeof compass === "number" && Number.isFinite(compass)) {
-    return normalizeHeading(compass);
-  }
-
-  if (
-    typeof e.alpha === "number" &&
-    Number.isFinite(e.alpha) &&
-    typeof e.beta === "number" &&
-    Number.isFinite(e.beta) &&
-    typeof e.gamma === "number" &&
-    Number.isFinite(e.gamma)
-  ) {
-    return tiltCompensatedHeadingDeg(e.alpha, e.beta, e.gamma);
-  }
-
-  if (typeof e.alpha === "number" && Number.isFinite(e.alpha)) {
-    const screenAngle = getScreenOrientationAngleDeg();
-    return normalizeHeading(360 - e.alpha + screenAngle);
-  }
-
-  return null;
-}
-
-function requestOrientationPermissionIfNeeded() {
-  if (typeof window === "undefined") return;
-
-  const Ctor = (
-    window as typeof window & {
-      DeviceOrientationEvent?: DeviceOrientationPermissionCtor;
-    }
-  ).DeviceOrientationEvent;
-  if (!Ctor || typeof Ctor.requestPermission !== "function") return;
-
-  Ctor.requestPermission().catch(() => null);
-}
-
 export function useMapMyLocation(
   mapRef: RefObject<naver.maps.Map | null>,
   sdkReady: boolean,
@@ -218,9 +103,6 @@ export function useMapMyLocation(
   const lastWalkAtRef = useRef(0);
   const lastWalkPosRef = useRef<LatLng | null>(null);
   const lastFollowPanAtRef = useRef(0);
-  const lastHeadingRef = useRef<number | null>(null);
-  const lastHeadingAtRef = useRef(0);
-  const lastOrientationAtRef = useRef(0);
 
   const myPos = useMapStore((s) => s.myPos);
   const route = useMapStore((s) => s.route);
@@ -276,40 +158,12 @@ export function useMapMyLocation(
     [openModal],
   );
 
-  const maybeSetHeading = useCallback(
-    (rawDeg: number, source: HeadingSource = "orientation") => {
-      let next = normalizeHeading(rawDeg);
-      const now = Date.now();
-      const last = lastHeadingRef.current;
-
-      if (last != null) {
-        const minDelta =
-          source === "orientation"
-            ? HEADING_ORIENTATION_NOISE_DEG
-            : HEADING_UPDATE_MIN_DEG;
-        if (headingDelta(next, last) < minDelta) return;
-
-        const minInterval =
-          source === "orientation"
-            ? Math.max(
-                HEADING_UPDATE_MIN_INTERVAL_MS,
-                HEADING_ORIENTATION_MIN_INTERVAL_MS,
-              )
-            : HEADING_UPDATE_MIN_INTERVAL_MS;
-        if (now - lastHeadingAtRef.current < minInterval) return;
-
-        if (source === "orientation") {
-          next = smoothHeading(last, next, HEADING_ORIENTATION_SMOOTHING);
-          if (headingDelta(next, last) < HEADING_UPDATE_MIN_DEG) return;
-        }
-      }
-
-      lastHeadingRef.current = next;
-      lastHeadingAtRef.current = now;
-      setHeading(next);
-    },
-    [setHeading],
-  );
+  const { resetHeadingTracking, seedHeadingFromRoute, updateHeadingFromPosition } =
+    useWalkHeading({
+      walking,
+      walkingPaused,
+      setHeading,
+    });
 
   const clearMoveMarkerListener = useCallback(
     (map: naver.maps.Map | null = mapRef.current) => {
@@ -334,10 +188,8 @@ export function useMapMyLocation(
   const resetWalkingRefs = useCallback(() => {
     lastWalkAtRef.current = 0;
     lastWalkPosRef.current = null;
-    lastHeadingRef.current = null;
-    lastHeadingAtRef.current = 0;
-    lastOrientationAtRef.current = 0;
-  }, []);
+    resetHeadingTracking();
+  }, [resetHeadingTracking]);
 
   const resetWalkingIntervalRefs = useCallback(() => {
     lastWalkPosRef.current = null;
@@ -467,17 +319,7 @@ export function useMapMyLocation(
 
     if (route?.path?.length) {
       setDrawRoute(true);
-      if (route.path.length > 1) {
-        const from: LatLng = {
-          lat: route.path[0][1],
-          lng: route.path[0][0],
-        };
-        const to: LatLng = {
-          lat: route.path[1][1],
-          lng: route.path[1][0],
-        };
-        maybeSetHeading(bearingDeg(from, to), "route");
-      }
+      seedHeadingFromRoute(route.path);
     }
 
     requestOrientationPermissionIfNeeded();
@@ -574,24 +416,18 @@ export function useMapMyLocation(
 
         updateMyPosition(nextPos, true);
 
-        const gpsHeading = c.heading;
-        const hasRecentOrientation =
-          now - lastOrientationAtRef.current <= HEADING_ORIENTATION_RECENT_MS;
-
-        if (
-          typeof gpsHeading === "number" &&
-          Number.isFinite(gpsHeading) &&
-          gpsHeading >= 0 &&
-          (c.speed ?? 0) > 0.4 &&
-          !hasRecentOrientation
-        ) {
-          maybeSetHeading(gpsHeading, "gps");
-          return;
-        }
-
-        if (last && movedM >= HEADING_FALLBACK_MOVE_MIN_M && !hasRecentOrientation) {
-          maybeSetHeading(bearingDeg(last, nextPos), "movement");
-        }
+        const gpsHeading =
+          typeof c.heading === "number" && Number.isFinite(c.heading)
+            ? c.heading
+            : null;
+        updateHeadingFromPosition({
+          now,
+          gpsHeading,
+          speedMps,
+          movedM,
+          lastPos: last,
+          nextPos,
+        });
       },
       (geoErr) => {
         showGeoErrorModal(geoErr);
@@ -611,32 +447,12 @@ export function useMapMyLocation(
   }, [
     walking,
     walkingPaused,
-    maybeSetHeading,
+    updateHeadingFromPosition,
     showGeoErrorModal,
     updateMyPosition,
     addWalkedDistanceM,
     clearWalkWatch,
   ]);
-
-  // walking 중 기기 방향 업데이트 (나침반)
-  useEffect(() => {
-    if (!walking || walkingPaused || typeof window === "undefined") return;
-
-    const onOrientation = (evt: Event) => {
-      const h = extractHeadingFromOrientation(evt as OrientationWithCompass);
-      if (h == null) return;
-      lastOrientationAtRef.current = Date.now();
-      maybeSetHeading(h, "orientation");
-    };
-
-    window.addEventListener("deviceorientation", onOrientation, true);
-    window.addEventListener("deviceorientationabsolute", onOrientation, true);
-
-    return () => {
-      window.removeEventListener("deviceorientation", onOrientation, true);
-      window.removeEventListener("deviceorientationabsolute", onOrientation, true);
-    };
-  }, [walking, walkingPaused, maybeSetHeading]);
 
   // 현재 heading을 지도 위 선분으로 표시
   useEffect(() => {

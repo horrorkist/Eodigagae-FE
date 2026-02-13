@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEmit, useOn } from "@/hooks/useEventBus";
+import { requestOrientationPermissionIfNeeded } from "@/hooks/useWalkHeading";
 import { useMapStore } from "@/stores/mapStore";
 import FloatingFABMenu from "./FloatingFABMenu";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -27,23 +28,6 @@ type ToggleItem = {
   onChange: (next: boolean) => void;
   disabled?: boolean;
 };
-
-type DeviceOrientationPermissionCtor = {
-  requestPermission?: () => Promise<"granted" | "denied">;
-};
-
-function requestOrientationPermissionIfNeeded() {
-  if (typeof window === "undefined") return;
-
-  const Ctor = (
-    window as typeof window & {
-      DeviceOrientationEvent?: DeviceOrientationPermissionCtor;
-    }
-  ).DeviceOrientationEvent;
-  if (!Ctor || typeof Ctor.requestPermission !== "function") return;
-
-  Ctor.requestPermission().catch(() => null);
-}
 
 function formatElapsed(totalSec: number) {
   const sec = Math.max(0, Math.floor(totalSec));
