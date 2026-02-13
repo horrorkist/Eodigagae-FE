@@ -36,11 +36,11 @@ function headingDelta(a: number, b: number) {
   return d > 180 ? 360 - d : d;
 }
 
-function buildUserMarkerHTML(headingDeg: number, walking: boolean) {
+function buildUserMarkerHTML(headingDeg: number | null, walking: boolean) {
   const coreColor = "#2563eb";
   const haloColor = "rgba(37, 99, 235, 0.28)";
   const borderColor = "rgba(191, 219, 254, 0.95)";
-  const directionLayer = walking
+  const directionLayer = walking && headingDeg != null
     ? `<div style="position:absolute;inset:-2px;transform:rotate(${headingDeg.toFixed(1)}deg);transform-origin:50% 50%;">
         <div style="position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:14px solid rgba(37, 99, 235, 0.28);filter:drop-shadow(0 1px 1px rgba(15, 23, 42, 0.3));"></div>
         <div style="position:absolute;left:50%;top:3px;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:8px solid #fff;"></div>
@@ -281,7 +281,7 @@ export function useMapMyLocation(
       position: mapRef.current.getCenter(),
       map: mapRef.current,
       icon: {
-        content: buildUserMarkerHTML(0, false),
+        content: buildUserMarkerHTML(null, false),
         anchor: new window.naver.maps.Point(
           USER_MARKER_SIZE_PX / 2,
           USER_MARKER_SIZE_PX / 2,
@@ -295,7 +295,7 @@ export function useMapMyLocation(
     if (!myMarkerRef.current || !window.naver?.maps) return;
 
     myMarkerRef.current.setIcon({
-      content: buildUserMarkerHTML(heading ?? 0, walking),
+      content: buildUserMarkerHTML(heading, walking),
       anchor: new window.naver.maps.Point(
         USER_MARKER_SIZE_PX / 2,
         USER_MARKER_SIZE_PX / 2,

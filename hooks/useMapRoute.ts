@@ -192,6 +192,10 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
   const chevronMarkersRef = useRef<naver.maps.Marker[]>([]);
   const lastDrawnPathRef = useRef<[number, number][] | null>(null);
   const lastProgressSegIdxRef = useRef<number | null>(null);
+  const route = useMapStore((s) => s.route);
+  const drawRoute = useMapStore((s) => s.drawRoute);
+  const myPos = useMapStore((s) => s.myPos);
+  const walking = useMapStore((s) => s.walking);
 
   const clearChevronMarkers = useCallback(() => {
     for (const marker of chevronMarkersRef.current) {
@@ -270,7 +274,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
   }, [clearChevronMarkers]);
 
   const drawRouteLine = useCallback(
-    (path: [number, number][]) => {
+    (path: [number, number][], showChevrons: boolean) => {
       if (!mapRef.current || !window.naver?.maps) return;
       if (!path?.length) return;
 
@@ -293,7 +297,6 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
         });
       } else {
         routeBorderRef.current.setPath(pts);
-        routeBorderRef.current.setMap(mapRef.current);
       }
 
       if (!routeLineRef.current) {
@@ -309,12 +312,15 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
         });
       } else {
         routeLineRef.current.setPath(pts);
-        routeLineRef.current.setMap(mapRef.current);
       }
 
-      drawRouteChevrons(path);
+      if (showChevrons) {
+        drawRouteChevrons(path);
+      } else {
+        clearChevronMarkers();
+      }
     },
-    [drawRouteChevrons, mapRef],
+    [drawRouteChevrons, clearChevronMarkers, mapRef],
   );
 
   useEffect(() => {
@@ -322,6 +328,11 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
 
     const map = mapRef.current;
     const listener = naver.maps.Event.addListener(map, "zoom_changed", () => {
+      if (walking) {
+        clearChevronMarkers();
+        return;
+      }
+
       const path = lastDrawnPathRef.current;
       if (!path?.length) {
         clearChevronMarkers();
@@ -333,12 +344,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     return () => {
       naver.maps.Event.removeListener(listener);
     };
-  }, [mapRef, drawRouteChevrons, clearChevronMarkers]);
-
-  const route = useMapStore((s) => s.route);
-  const drawRoute = useMapStore((s) => s.drawRoute);
-  const myPos = useMapStore((s) => s.myPos);
-  const walking = useMapStore((s) => s.walking);
+  }, [mapRef, drawRouteChevrons, clearChevronMarkers, walking]);
 
   useEffect(() => {
     lastProgressSegIdxRef.current = null;
@@ -350,8 +356,10 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       return;
     }
 
+    const showChevrons = !walking;
+
     if (!walking || !myPos || route.path.length < 2) {
-      drawRouteLine(route.path);
+      drawRouteLine(route.path, showChevrons);
       return;
     }
 
@@ -361,7 +369,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       lastProgressSegIdxRef.current,
     );
     if (!snap) {
-      drawRouteLine(route.path);
+      drawRouteLine(route.path, showChevrons);
       return;
     }
 
@@ -387,7 +395,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       ...route.path.slice(progressedSegIdx + 1),
     ];
 
-    drawRouteLine(remainingPath);
+    drawRouteLine(remainingPath, showChevrons);
   }, [route, drawRoute, myPos, walking, drawRouteLine, clearRouteVisuals]);
 
   useEffect(() => {
