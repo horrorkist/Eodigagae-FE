@@ -7,9 +7,13 @@ const HEADING_UPDATE_MIN_DEG = 4;
 const HEADING_UPDATE_MIN_INTERVAL_MS = 120;
 const HEADING_ORIENTATION_RECENT_MS = 3500;
 const HEADING_FALLBACK_MOVE_MIN_M = 6;
-const HEADING_ORIENTATION_NOISE_DEG = 16;
-const HEADING_ORIENTATION_SMOOTHING = 0.14;
-const HEADING_ORIENTATION_MIN_INTERVAL_MS = 220;
+const HEADING_ORIENTATION_NOISE_DEG = 8;
+const HEADING_ORIENTATION_MIN_INTERVAL_MS = 90;
+const HEADING_ORIENTATION_MEDIUM_TURN_DEG = 18;
+const HEADING_ORIENTATION_FAST_TURN_DEG = 36;
+const HEADING_ORIENTATION_SMOOTHING_SLOW = 0.3;
+const HEADING_ORIENTATION_SMOOTHING_MEDIUM = 0.5;
+const HEADING_ORIENTATION_SMOOTHING_FAST = 0.75;
 
 type OrientationWithCompass = DeviceOrientationEvent & {
   webkitCompassHeading?: number;
@@ -156,11 +160,12 @@ export function useWalkHeading({
       const last = lastHeadingRef.current;
 
       if (last != null) {
+        const rawDelta = headingDelta(next, last);
         const minDelta =
           source === "orientation"
             ? HEADING_ORIENTATION_NOISE_DEG
             : HEADING_UPDATE_MIN_DEG;
-        if (headingDelta(next, last) < minDelta) return;
+        if (rawDelta < minDelta) return;
 
         const minInterval =
           source === "orientation"
@@ -169,10 +174,20 @@ export function useWalkHeading({
                 HEADING_ORIENTATION_MIN_INTERVAL_MS,
               )
             : HEADING_UPDATE_MIN_INTERVAL_MS;
-        if (now - lastHeadingAtRef.current < minInterval) return;
+        const isLargeOrientationTurn =
+          source === "orientation" && rawDelta >= HEADING_ORIENTATION_FAST_TURN_DEG;
+        if (!isLargeOrientationTurn && now - lastHeadingAtRef.current < minInterval) {
+          return;
+        }
 
         if (source === "orientation") {
-          next = smoothHeading(last, next, HEADING_ORIENTATION_SMOOTHING);
+          const smoothing =
+            rawDelta >= HEADING_ORIENTATION_FAST_TURN_DEG
+              ? HEADING_ORIENTATION_SMOOTHING_FAST
+              : rawDelta >= HEADING_ORIENTATION_MEDIUM_TURN_DEG
+                ? HEADING_ORIENTATION_SMOOTHING_MEDIUM
+                : HEADING_ORIENTATION_SMOOTHING_SLOW;
+          next = smoothHeading(last, next, smoothing);
           if (headingDelta(next, last) < HEADING_UPDATE_MIN_DEG) return;
         }
       }
