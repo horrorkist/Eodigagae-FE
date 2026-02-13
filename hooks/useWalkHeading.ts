@@ -7,16 +7,23 @@ const HEADING_UPDATE_MIN_DEG = 4;
 const HEADING_UPDATE_MIN_INTERVAL_MS = 120;
 const HEADING_ORIENTATION_RECENT_MS = 3500;
 const HEADING_FALLBACK_MOVE_MIN_M = 6;
-const HEADING_ORIENTATION_NOISE_DEG = 8;
-const HEADING_ORIENTATION_MIN_INTERVAL_MS = 90;
+const HEADING_ORIENTATION_NOISE_DEG = 9;
+const HEADING_ORIENTATION_STATIONARY_NOISE_DEG = 15;
+const HEADING_ORIENTATION_MIN_INTERVAL_MS = 120;
+const HEADING_ORIENTATION_STATIONARY_MIN_INTERVAL_MS = 240;
 const HEADING_ORIENTATION_MEDIUM_TURN_DEG = 18;
 const HEADING_ORIENTATION_FAST_TURN_DEG = 36;
 const HEADING_ORIENTATION_SMOOTHING_SLOW = 0.3;
 const HEADING_ORIENTATION_SMOOTHING_MEDIUM = 0.5;
 const HEADING_ORIENTATION_SMOOTHING_FAST = 0.75;
+const HEADING_STATIONARY_AFTER_MS = 1800;
+const HEADING_MOVEMENT_SIGNAL_SPEED_MPS = 0.8;
+const HEADING_MOVEMENT_MAX_ACCURACY_M = 15;
+const HEADING_ABSOLUTE_PRIORITY_WINDOW_MS = 1800;
 
 type OrientationWithCompass = DeviceOrientationEvent & {
   webkitCompassHeading?: number;
+  absolute?: boolean;
 };
 
 type DeviceOrientationPermissionCtor = {
@@ -35,6 +42,7 @@ type UpdateHeadingFromPositionInput = {
   now: number;
   gpsHeading: number | null;
   speedMps: number | null;
+  accuracyM: number | null;
   movedM: number;
   lastPos: LatLng | null;
   nextPos: LatLng;
@@ -74,24 +82,6 @@ function bearingDeg(from: LatLng, to: LatLng) {
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
-function tiltCompensatedHeadingDeg(alpha: number, beta: number, gamma: number) {
-  const toRad = (v: number) => (v * Math.PI) / 180;
-  const x = toRad(beta);
-  const y = toRad(gamma);
-  const z = toRad(alpha);
-  const cY = Math.cos(y);
-  const cZ = Math.cos(z);
-  const sX = Math.sin(x);
-  const sY = Math.sin(y);
-  const sZ = Math.sin(z);
-
-  const vX = -cZ * sY - sZ * sX * cY;
-  const vY = -sZ * sY + cZ * sX * cY;
-  const headingRad = Math.atan2(vX, vY);
-
-  return normalizeHeading((headingRad * 180) / Math.PI);
-}
-
 function getScreenOrientationAngleDeg() {
   if (typeof window === "undefined") return 0;
 
@@ -110,17 +100,6 @@ function extractHeadingFromOrientation(e: OrientationWithCompass) {
   const compass = (e as OrientationWithCompass).webkitCompassHeading;
   if (typeof compass === "number" && Number.isFinite(compass)) {
     return normalizeHeading(compass);
-  }
-
-  if (
-    typeof e.alpha === "number" &&
-    Number.isFinite(e.alpha) &&
-    typeof e.beta === "number" &&
-    Number.isFinite(e.beta) &&
-    typeof e.gamma === "number" &&
-    Number.isFinite(e.gamma)
-  ) {
-    return tiltCompensatedHeadingDeg(e.alpha, e.beta, e.gamma);
   }
 
   if (typeof e.alpha === "number" && Number.isFinite(e.alpha)) {
@@ -152,18 +131,25 @@ export function useWalkHeading({
   const lastHeadingRef = useRef<number | null>(null);
   const lastHeadingAtRef = useRef(0);
   const lastOrientationAtRef = useRef(0);
+  const lastAbsoluteOrientationAtRef = useRef(0);
+  const lastMotionAtRef = useRef(0);
 
   const maybeSetHeading = useCallback(
     (rawDeg: number, source: HeadingSource = "orientation") => {
       let next = normalizeHeading(rawDeg);
       const now = Date.now();
       const last = lastHeadingRef.current;
+      const isStationaryOrientation =
+        source === "orientation" &&
+        now - lastMotionAtRef.current > HEADING_STATIONARY_AFTER_MS;
 
       if (last != null) {
         const rawDelta = headingDelta(next, last);
         const minDelta =
           source === "orientation"
-            ? HEADING_ORIENTATION_NOISE_DEG
+            ? isStationaryOrientation
+              ? HEADING_ORIENTATION_STATIONARY_NOISE_DEG
+              : HEADING_ORIENTATION_NOISE_DEG
             : HEADING_UPDATE_MIN_DEG;
         if (rawDelta < minDelta) return;
 
@@ -171,14 +157,18 @@ export function useWalkHeading({
           source === "orientation"
             ? Math.max(
                 HEADING_UPDATE_MIN_INTERVAL_MS,
-                HEADING_ORIENTATION_MIN_INTERVAL_MS,
+                isStationaryOrientation
+                  ? HEADING_ORIENTATION_STATIONARY_MIN_INTERVAL_MS
+                  : HEADING_ORIENTATION_MIN_INTERVAL_MS,
               )
             : HEADING_UPDATE_MIN_INTERVAL_MS;
         const isLargeOrientationTurn =
-          source === "orientation" && rawDelta >= HEADING_ORIENTATION_FAST_TURN_DEG;
-        if (!isLargeOrientationTurn && now - lastHeadingAtRef.current < minInterval) {
-          return;
-        }
+          source === "orientation" &&
+          rawDelta >= HEADING_ORIENTATION_FAST_TURN_DEG;
+        if (
+          !isLargeOrientationTurn &&
+          now - lastHeadingAtRef.current < minInterval
+        ) return;
 
         if (source === "orientation") {
           const smoothing =
@@ -188,7 +178,8 @@ export function useWalkHeading({
                 ? HEADING_ORIENTATION_SMOOTHING_MEDIUM
                 : HEADING_ORIENTATION_SMOOTHING_SLOW;
           next = smoothHeading(last, next, smoothing);
-          if (headingDelta(next, last) < HEADING_UPDATE_MIN_DEG) return;
+          const smoothedDelta = headingDelta(next, last);
+          if (smoothedDelta < HEADING_UPDATE_MIN_DEG) return;
         }
       }
 
@@ -203,6 +194,8 @@ export function useWalkHeading({
     lastHeadingRef.current = null;
     lastHeadingAtRef.current = 0;
     lastOrientationAtRef.current = 0;
+    lastAbsoluteOrientationAtRef.current = 0;
+    lastMotionAtRef.current = 0;
   }, []);
 
   const seedHeadingFromRoute = useCallback(
@@ -220,10 +213,22 @@ export function useWalkHeading({
       now,
       gpsHeading,
       speedMps,
+      accuracyM,
       movedM,
       lastPos,
       nextPos,
     }: UpdateHeadingFromPositionInput) => {
+      const accuracyTrustedForMotion =
+        accuracyM == null || accuracyM <= HEADING_MOVEMENT_MAX_ACCURACY_M;
+
+      if (
+        accuracyTrustedForMotion &&
+        (speedMps ?? 0) >= HEADING_MOVEMENT_SIGNAL_SPEED_MPS ||
+        (accuracyTrustedForMotion && movedM >= HEADING_FALLBACK_MOVE_MIN_M)
+      ) {
+        lastMotionAtRef.current = now;
+      }
+
       const hasRecentOrientation =
         now - lastOrientationAtRef.current <= HEADING_ORIENTATION_RECENT_MS;
 
@@ -232,14 +237,21 @@ export function useWalkHeading({
         Number.isFinite(gpsHeading) &&
         gpsHeading >= 0 &&
         (speedMps ?? 0) > 0.4 &&
+        accuracyTrustedForMotion &&
         !hasRecentOrientation
       ) {
         maybeSetHeading(gpsHeading, "gps");
         return;
       }
 
-      if (lastPos && movedM >= HEADING_FALLBACK_MOVE_MIN_M && !hasRecentOrientation) {
+      if (
+        lastPos &&
+        movedM >= HEADING_FALLBACK_MOVE_MIN_M &&
+        accuracyTrustedForMotion &&
+        !hasRecentOrientation
+      ) {
         maybeSetHeading(bearingDeg(lastPos, nextPos), "movement");
+        return;
       }
     },
     [maybeSetHeading],
@@ -249,7 +261,20 @@ export function useWalkHeading({
     if (!walking || walkingPaused || typeof window === "undefined") return;
 
     const onOrientation = (evt: Event) => {
-      const h = extractHeadingFromOrientation(evt as OrientationWithCompass);
+      const orientationEvt = evt as OrientationWithCompass;
+      const now = Date.now();
+      const isAbsoluteLike =
+        evt.type === "deviceorientationabsolute" || orientationEvt.absolute === true;
+      if (isAbsoluteLike) {
+        lastAbsoluteOrientationAtRef.current = now;
+      } else if (
+        now - lastAbsoluteOrientationAtRef.current <=
+        HEADING_ABSOLUTE_PRIORITY_WINDOW_MS
+      ) {
+        return;
+      }
+
+      const h = extractHeadingFromOrientation(orientationEvt);
       if (h == null) return;
       lastOrientationAtRef.current = Date.now();
       maybeSetHeading(h, "orientation");
@@ -260,7 +285,11 @@ export function useWalkHeading({
 
     return () => {
       window.removeEventListener("deviceorientation", onOrientation, true);
-      window.removeEventListener("deviceorientationabsolute", onOrientation, true);
+      window.removeEventListener(
+        "deviceorientationabsolute",
+        onOrientation,
+        true,
+      );
     };
   }, [walking, walkingPaused, maybeSetHeading]);
 

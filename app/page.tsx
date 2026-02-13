@@ -404,6 +404,7 @@ export default function MapPage() {
               )}
             </>
           )}
+
         </div>
       </BottomSheet>
     </div>
