@@ -19,6 +19,8 @@ const HEADING_LINE_METERS = 20;
 const USER_MARKER_SIZE_PX = 26;
 const HEADING_UPDATE_MIN_DEG = 4;
 const HEADING_UPDATE_MIN_INTERVAL_MS = 120;
+const HEADING_ORIENTATION_RECENT_MS = 3500;
+const HEADING_FALLBACK_MOVE_MIN_M = 2.5;
 
 type OrientationWithCompass = DeviceOrientationEvent & {
   webkitCompassHeading?: number;
@@ -72,6 +74,21 @@ function haversineMeters(a: LatLng, b: LatLng) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+function bearingDeg(from: LatLng, to: LatLng) {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const toDeg = (v: number) => (v * 180) / Math.PI;
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const dLng = toRad(to.lng - from.lng);
+
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
 function projectByBearing(start: LatLng, bearingDeg: number, distanceM: number) {
   const R = 6371000;
   const br = (bearingDeg * Math.PI) / 180;
@@ -96,14 +113,29 @@ function projectByBearing(start: LatLng, bearingDeg: number, distanceM: number) 
   };
 }
 
-function extractHeadingFromOrientation(e: DeviceOrientationEvent) {
+function getScreenOrientationAngleDeg() {
+  if (typeof window === "undefined") return 0;
+
+  const angle = window.screen?.orientation?.angle;
+  if (typeof angle === "number" && Number.isFinite(angle)) return angle;
+
+  const legacyAngle = (window as Window & { orientation?: number }).orientation;
+  if (typeof legacyAngle === "number" && Number.isFinite(legacyAngle)) {
+    return legacyAngle;
+  }
+
+  return 0;
+}
+
+function extractHeadingFromOrientation(e: OrientationWithCompass) {
   const compass = (e as OrientationWithCompass).webkitCompassHeading;
   if (typeof compass === "number" && Number.isFinite(compass)) {
     return normalizeHeading(compass);
   }
 
   if (typeof e.alpha === "number" && Number.isFinite(e.alpha)) {
-    return normalizeHeading(360 - e.alpha);
+    const screenAngle = getScreenOrientationAngleDeg();
+    return normalizeHeading(360 - e.alpha + screenAngle);
   }
 
   return null;
@@ -141,6 +173,7 @@ export function useMapMyLocation(
   const lastFollowPanAtRef = useRef(0);
   const lastHeadingRef = useRef<number | null>(null);
   const lastHeadingAtRef = useRef(0);
+  const lastOrientationAtRef = useRef(0);
 
   const myPos = useMapStore((s) => s.myPos);
   const route = useMapStore((s) => s.route);
@@ -239,6 +272,7 @@ export function useMapMyLocation(
     lastWalkPosRef.current = null;
     lastHeadingRef.current = null;
     lastHeadingAtRef.current = 0;
+    lastOrientationAtRef.current = 0;
   }, []);
 
   const resetWalkingIntervalRefs = useCallback(() => {
@@ -369,6 +403,17 @@ export function useMapMyLocation(
 
     if (route?.path?.length) {
       setDrawRoute(true);
+      if (route.path.length > 1) {
+        const from: LatLng = {
+          lat: route.path[0][1],
+          lng: route.path[0][0],
+        };
+        const to: LatLng = {
+          lat: route.path[1][1],
+          lng: route.path[1][0],
+        };
+        maybeSetHeading(bearingDeg(from, to));
+      }
     }
 
     requestOrientationPermissionIfNeeded();
@@ -450,13 +495,22 @@ export function useMapMyLocation(
         updateMyPosition(nextPos, true);
 
         const gpsHeading = c.heading;
+        const hasRecentOrientation =
+          now - lastOrientationAtRef.current <= HEADING_ORIENTATION_RECENT_MS;
+
         if (
           typeof gpsHeading === "number" &&
           Number.isFinite(gpsHeading) &&
           gpsHeading >= 0 &&
-          (c.speed ?? 0) > 0.4
+          (c.speed ?? 0) > 0.4 &&
+          !hasRecentOrientation
         ) {
           maybeSetHeading(gpsHeading);
+          return;
+        }
+
+        if (last && movedM >= HEADING_FALLBACK_MOVE_MIN_M && !hasRecentOrientation) {
+          maybeSetHeading(bearingDeg(last, nextPos));
         }
       },
       (geoErr) => {
@@ -489,15 +543,18 @@ export function useMapMyLocation(
     if (!walking || walkingPaused || typeof window === "undefined") return;
 
     const onOrientation = (evt: Event) => {
-      const h = extractHeadingFromOrientation(evt as DeviceOrientationEvent);
+      const h = extractHeadingFromOrientation(evt as OrientationWithCompass);
       if (h == null) return;
+      lastOrientationAtRef.current = Date.now();
       maybeSetHeading(h);
     };
 
     window.addEventListener("deviceorientation", onOrientation, true);
+    window.addEventListener("deviceorientationabsolute", onOrientation, true);
 
     return () => {
       window.removeEventListener("deviceorientation", onOrientation, true);
+      window.removeEventListener("deviceorientationabsolute", onOrientation, true);
     };
   }, [walking, walkingPaused, maybeSetHeading]);
 
