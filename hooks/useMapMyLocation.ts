@@ -20,7 +20,9 @@ const USER_MARKER_SIZE_PX = 26;
 const HEADING_UPDATE_MIN_DEG = 4;
 const HEADING_UPDATE_MIN_INTERVAL_MS = 120;
 const HEADING_ORIENTATION_RECENT_MS = 3500;
-const HEADING_FALLBACK_MOVE_MIN_M = 2.5;
+const HEADING_FALLBACK_MOVE_MIN_M = 6;
+const HEADING_ORIENTATION_NOISE_DEG = 10;
+const HEADING_ORIENTATION_SMOOTHING = 0.22;
 
 type OrientationWithCompass = DeviceOrientationEvent & {
   webkitCompassHeading?: number;
@@ -28,6 +30,7 @@ type OrientationWithCompass = DeviceOrientationEvent & {
 type DeviceOrientationPermissionCtor = {
   requestPermission?: () => Promise<"granted" | "denied">;
 };
+type HeadingSource = "orientation" | "gps" | "movement" | "route";
 
 function normalizeHeading(deg: number) {
   return ((deg % 360) + 360) % 360;
@@ -36,6 +39,16 @@ function normalizeHeading(deg: number) {
 function headingDelta(a: number, b: number) {
   const d = Math.abs(a - b) % 360;
   return d > 180 ? 360 - d : d;
+}
+
+function signedHeadingDelta(fromDeg: number, toDeg: number) {
+  return ((toDeg - fromDeg + 540) % 360) - 180;
+}
+
+function smoothHeading(fromDeg: number, toDeg: number, factor: number) {
+  const clamped = Math.max(0, Math.min(1, factor));
+  const delta = signedHeadingDelta(fromDeg, toDeg);
+  return normalizeHeading(fromDeg + delta * clamped);
 }
 
 function buildUserMarkerHTML(headingDeg: number | null, walking: boolean) {
@@ -230,14 +243,23 @@ export function useMapMyLocation(
   );
 
   const maybeSetHeading = useCallback(
-    (rawDeg: number) => {
-      const next = normalizeHeading(rawDeg);
+    (rawDeg: number, source: HeadingSource = "orientation") => {
+      let next = normalizeHeading(rawDeg);
       const now = Date.now();
       const last = lastHeadingRef.current;
 
       if (last != null) {
-        if (headingDelta(next, last) < HEADING_UPDATE_MIN_DEG) return;
+        const minDelta =
+          source === "orientation"
+            ? HEADING_ORIENTATION_NOISE_DEG
+            : HEADING_UPDATE_MIN_DEG;
+        if (headingDelta(next, last) < minDelta) return;
         if (now - lastHeadingAtRef.current < HEADING_UPDATE_MIN_INTERVAL_MS) return;
+
+        if (source === "orientation") {
+          next = smoothHeading(last, next, HEADING_ORIENTATION_SMOOTHING);
+          if (headingDelta(next, last) < HEADING_UPDATE_MIN_DEG) return;
+        }
       }
 
       lastHeadingRef.current = next;
@@ -412,7 +434,7 @@ export function useMapMyLocation(
           lat: route.path[1][1],
           lng: route.path[1][0],
         };
-        maybeSetHeading(bearingDeg(from, to));
+        maybeSetHeading(bearingDeg(from, to), "route");
       }
     }
 
@@ -505,12 +527,12 @@ export function useMapMyLocation(
           (c.speed ?? 0) > 0.4 &&
           !hasRecentOrientation
         ) {
-          maybeSetHeading(gpsHeading);
+          maybeSetHeading(gpsHeading, "gps");
           return;
         }
 
         if (last && movedM >= HEADING_FALLBACK_MOVE_MIN_M && !hasRecentOrientation) {
-          maybeSetHeading(bearingDeg(last, nextPos));
+          maybeSetHeading(bearingDeg(last, nextPos), "movement");
         }
       },
       (geoErr) => {
@@ -546,7 +568,7 @@ export function useMapMyLocation(
       const h = extractHeadingFromOrientation(evt as OrientationWithCompass);
       if (h == null) return;
       lastOrientationAtRef.current = Date.now();
-      maybeSetHeading(h);
+      maybeSetHeading(h, "orientation");
     };
 
     window.addEventListener("deviceorientation", onOrientation, true);

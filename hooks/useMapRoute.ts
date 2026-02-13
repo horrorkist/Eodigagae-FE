@@ -17,6 +17,7 @@ const CHEVRON_MAX_COUNT = 120;
 const SNAP_LOCAL_BACKWARD_SEGMENTS = 30;
 const SNAP_LOCAL_FORWARD_SEGMENTS = 120;
 const SNAP_FALLBACK_DISTANCE_M = 35;
+const ROUTE_REDRAW_MIN_MOVE_M = 3;
 
 type SnapResult = {
   segIdx: number;
@@ -192,6 +193,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
   const chevronMarkersRef = useRef<naver.maps.Marker[]>([]);
   const lastDrawnPathRef = useRef<[number, number][] | null>(null);
   const lastProgressSegIdxRef = useRef<number | null>(null);
+  const lastProjectedHeadRef = useRef<LatLng | null>(null);
   const route = useMapStore((s) => s.route);
   const drawRoute = useMapStore((s) => s.drawRoute);
   const myPos = useMapStore((s) => s.myPos);
@@ -271,6 +273,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     }
     clearChevronMarkers();
     lastDrawnPathRef.current = null;
+    lastProjectedHeadRef.current = null;
   }, [clearChevronMarkers]);
 
   const drawRouteLine = useCallback(
@@ -348,6 +351,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
 
   useEffect(() => {
     lastProgressSegIdxRef.current = null;
+    lastProjectedHeadRef.current = null;
   }, [route?.path]);
 
   useEffect(() => {
@@ -359,6 +363,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     const showChevrons = !walking;
 
     if (!walking || !myPos || route.path.length < 2) {
+      lastProjectedHeadRef.current = null;
       drawRouteLine(route.path, showChevrons);
       return;
     }
@@ -369,6 +374,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       lastProgressSegIdxRef.current,
     );
     if (!snap) {
+      lastProjectedHeadRef.current = null;
       drawRouteLine(route.path, showChevrons);
       return;
     }
@@ -377,6 +383,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       snap.segIdx,
       lastProgressSegIdxRef.current ?? 0,
     );
+    const prevProgressSegIdx = lastProgressSegIdxRef.current;
     lastProgressSegIdxRef.current = progressedSegIdx;
 
     const segA: LatLng = {
@@ -389,6 +396,20 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     };
 
     const projected = projectPointToSegmentMeters(myPos, segA, segB).point;
+    const prevProjected = lastProjectedHeadRef.current;
+
+    if (
+      prevProjected &&
+      prevProgressSegIdx != null &&
+      progressedSegIdx === prevProgressSegIdx
+    ) {
+      const movedOnPathM = haversineMeters(prevProjected, projected);
+      if (movedOnPathM < ROUTE_REDRAW_MIN_MOVE_M) {
+        return;
+      }
+    }
+
+    lastProjectedHeadRef.current = projected;
 
     const remainingPath: [number, number][] = [
       [projected.lng, projected.lat],
