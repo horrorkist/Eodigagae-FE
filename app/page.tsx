@@ -37,6 +37,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { POI_STYLES } from "@/lib/poiMarker";
 import PoiCard from "@/components/PoiCard";
+import WalkDebugPanel from "@/components/WalkDebugPanel";
 
 const NaverMapClient = dynamic(() => import("@/components/NaverMapClient"), {
   ssr: false,
@@ -404,6 +405,8 @@ export default function MapPage() {
               )}
             </>
           )}
+
+          <WalkDebugPanel />
 
         </div>
       </BottomSheet>

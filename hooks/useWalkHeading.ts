@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import type { LatLng } from "@/types/mapEvents";
+import { classifyCardinalJump, walkDebug } from "@/lib/walkDebug";
+import { projectPointToSegmentMeters } from "@/lib/geo";
 
 const HEADING_UPDATE_MIN_DEG = 4;
 const HEADING_UPDATE_MIN_INTERVAL_MS = 120;
@@ -16,6 +18,7 @@ const HEADING_ORIENTATION_FAST_TURN_DEG = 36;
 const HEADING_ORIENTATION_SMOOTHING_SLOW = 0.3;
 const HEADING_ORIENTATION_SMOOTHING_MEDIUM = 0.5;
 const HEADING_ORIENTATION_SMOOTHING_FAST = 0.75;
+const HEADING_INITIAL_ORIENTATION_CONFIRM_WINDOW_MS = 900;
 const HEADING_STATIONARY_AFTER_MS = 1800;
 const HEADING_MOVEMENT_SIGNAL_SPEED_MPS = 0.8;
 const HEADING_MOVEMENT_MAX_ACCURACY_M = 15;
@@ -133,15 +136,64 @@ export function useWalkHeading({
   const lastOrientationAtRef = useRef(0);
   const lastAbsoluteOrientationAtRef = useRef(0);
   const lastMotionAtRef = useRef(0);
+  const lastOrientationSampleRef = useRef<number | null>(null);
+  const initialOrientationCandidateRef = useRef<number | null>(null);
+  const initialOrientationCandidateAtRef = useRef(0);
 
   const maybeSetHeading = useCallback(
     (rawDeg: number, source: HeadingSource = "orientation") => {
+      walkDebug("heading:input", {
+        source,
+        rawDeg,
+        lastHeading: lastHeadingRef.current,
+      });
+
       let next = normalizeHeading(rawDeg);
       const now = Date.now();
       const last = lastHeadingRef.current;
       const isStationaryOrientation =
         source === "orientation" &&
         now - lastMotionAtRef.current > HEADING_STATIONARY_AFTER_MS;
+
+      if (source === "orientation" && last == null) {
+        const candidate = initialOrientationCandidateRef.current;
+        if (candidate == null) {
+          initialOrientationCandidateRef.current = next;
+          initialOrientationCandidateAtRef.current = now;
+          walkDebug("heading:orientation-candidate:set", {
+            candidate: next,
+          });
+          return;
+        }
+
+        const unstableJump =
+          now - initialOrientationCandidateAtRef.current <=
+            HEADING_INITIAL_ORIENTATION_CONFIRM_WINDOW_MS &&
+          headingDelta(candidate, next) >= HEADING_ORIENTATION_FAST_TURN_DEG;
+        if (unstableJump) {
+          const candidateDelta = signedHeadingDelta(candidate, next);
+          initialOrientationCandidateRef.current = next;
+          initialOrientationCandidateAtRef.current = now;
+          walkDebug("heading:orientation-candidate:unstable", {
+            candidate,
+            next,
+            candidateDelta,
+            cardinalJump: classifyCardinalJump(candidateDelta),
+          });
+          return;
+        }
+
+        initialOrientationCandidateRef.current = null;
+        initialOrientationCandidateAtRef.current = 0;
+        walkDebug("heading:orientation-candidate:accepted", {
+          candidate,
+          next,
+          candidateDelta: signedHeadingDelta(candidate, next),
+        });
+      } else if (source !== "orientation" && last == null) {
+        initialOrientationCandidateRef.current = null;
+        initialOrientationCandidateAtRef.current = 0;
+      }
 
       if (last != null) {
         const rawDelta = headingDelta(next, last);
@@ -151,7 +203,16 @@ export function useWalkHeading({
               ? HEADING_ORIENTATION_STATIONARY_NOISE_DEG
               : HEADING_ORIENTATION_NOISE_DEG
             : HEADING_UPDATE_MIN_DEG;
-        if (rawDelta < minDelta) return;
+        if (rawDelta < minDelta) {
+          walkDebug("heading:skip-small-delta", {
+            source,
+            last,
+            next,
+            rawDelta,
+            minDelta,
+          });
+          return;
+        }
 
         const minInterval =
           source === "orientation"
@@ -168,9 +229,20 @@ export function useWalkHeading({
         if (
           !isLargeOrientationTurn &&
           now - lastHeadingAtRef.current < minInterval
-        ) return;
+        ) {
+          walkDebug("heading:skip-interval", {
+            source,
+            last,
+            next,
+            rawDelta,
+            minInterval,
+            sinceLastMs: now - lastHeadingAtRef.current,
+          });
+          return;
+        }
 
         if (source === "orientation") {
+          const beforeSmoothing = next;
           const smoothing =
             rawDelta >= HEADING_ORIENTATION_FAST_TURN_DEG
               ? HEADING_ORIENTATION_SMOOTHING_FAST
@@ -179,12 +251,32 @@ export function useWalkHeading({
                 : HEADING_ORIENTATION_SMOOTHING_SLOW;
           next = smoothHeading(last, next, smoothing);
           const smoothedDelta = headingDelta(next, last);
-          if (smoothedDelta < HEADING_UPDATE_MIN_DEG) return;
+          walkDebug("heading:orientation-smoothing", {
+            last,
+            input: beforeSmoothing,
+            output: next,
+            rawDelta,
+            smoothedDelta,
+            smoothing,
+          });
+          if (smoothedDelta < HEADING_UPDATE_MIN_DEG) {
+            walkDebug("heading:skip-smoothed-small-delta", {
+              last,
+              next,
+              smoothedDelta,
+              minDelta: HEADING_UPDATE_MIN_DEG,
+            });
+            return;
+          }
         }
       }
 
       lastHeadingRef.current = next;
       lastHeadingAtRef.current = now;
+      walkDebug("heading:set", {
+        source,
+        heading: next,
+      });
       setHeading(next);
     },
     [setHeading],
@@ -196,14 +288,81 @@ export function useWalkHeading({
     lastOrientationAtRef.current = 0;
     lastAbsoluteOrientationAtRef.current = 0;
     lastMotionAtRef.current = 0;
+    lastOrientationSampleRef.current = null;
+    initialOrientationCandidateRef.current = null;
+    initialOrientationCandidateAtRef.current = 0;
   }, []);
 
   const seedHeadingFromRoute = useCallback(
-    (path: [number, number][] | null | undefined) => {
-      if (!path || path.length < 2) return;
-      const from: LatLng = { lat: path[0][1], lng: path[0][0] };
-      const to: LatLng = { lat: path[1][1], lng: path[1][0] };
-      maybeSetHeading(bearingDeg(from, to), "route");
+    (path: [number, number][] | null | undefined, myPos: LatLng | null) => {
+      if (!path || path.length < 2) {
+        walkDebug("heading:route-seed-skipped", {
+          reason: "path-too-short",
+          pathLength: path?.length ?? 0,
+        });
+        return;
+      }
+
+      const toLatLng = (idx: number): LatLng => ({
+        lat: path[idx][1],
+        lng: path[idx][0],
+      });
+
+      if (!myPos) {
+        walkDebug("heading:route-seed-skipped", {
+          reason: "no-my-pos",
+          pathLength: path.length,
+        });
+        return;
+      }
+
+      let bestIdx = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      let bestT = 0;
+      let bestPoint = toLatLng(0);
+
+      for (let i = 0; i < path.length - 1; i++) {
+        const a = toLatLng(i);
+        const b = toLatLng(i + 1);
+        const proj = projectPointToSegmentMeters(myPos, a, b);
+        if (proj.distM < bestDist) {
+          bestDist = proj.distM;
+          bestIdx = i;
+          bestT = proj.t;
+          bestPoint = proj.point;
+        }
+      }
+
+      const nearSegmentEnd = bestT >= 0.98;
+      const nextIdx =
+        nearSegmentEnd && bestIdx + 2 < path.length ? bestIdx + 2 : bestIdx + 1;
+      const nextPoint = toLatLng(nextIdx);
+      const isZeroVector =
+        Math.abs(bestPoint.lat - nextPoint.lat) <= 1e-8 &&
+        Math.abs(bestPoint.lng - nextPoint.lng) <= 1e-8;
+
+      if (isZeroVector) {
+        const fallbackHeading = bearingDeg(toLatLng(bestIdx), toLatLng(bestIdx + 1));
+        walkDebug("heading:route-seed", {
+          reason: "zero-vector",
+          bestIdx,
+          nextIdx: bestIdx + 1,
+          distM: bestDist,
+          heading: fallbackHeading,
+        });
+        maybeSetHeading(fallbackHeading, "route");
+        return;
+      }
+
+      const seededHeading = bearingDeg(bestPoint, nextPoint);
+      walkDebug("heading:route-seed", {
+        bestIdx,
+        nextIdx,
+        bestT,
+        distM: bestDist,
+        heading: seededHeading,
+      });
+      maybeSetHeading(seededHeading, "route");
     },
     [maybeSetHeading],
   );
@@ -227,6 +386,11 @@ export function useWalkHeading({
         (accuracyTrustedForMotion && movedM >= HEADING_FALLBACK_MOVE_MIN_M)
       ) {
         lastMotionAtRef.current = now;
+        walkDebug("heading:motion-signal", {
+          speedMps,
+          movedM,
+          accuracyM,
+        });
       }
 
       const hasRecentOrientation =
@@ -240,6 +404,12 @@ export function useWalkHeading({
         accuracyTrustedForMotion &&
         !hasRecentOrientation
       ) {
+        walkDebug("heading:from-gps", {
+          gpsHeading,
+          speedMps,
+          accuracyM,
+          hasRecentOrientation,
+        });
         maybeSetHeading(gpsHeading, "gps");
         return;
       }
@@ -250,6 +420,13 @@ export function useWalkHeading({
         accuracyTrustedForMotion &&
         !hasRecentOrientation
       ) {
+        walkDebug("heading:from-movement", {
+          movedM,
+          accuracyM,
+          hasRecentOrientation,
+          lastPos,
+          nextPos,
+        });
         maybeSetHeading(bearingDeg(lastPos, nextPos), "movement");
         return;
       }
@@ -263,19 +440,85 @@ export function useWalkHeading({
     const onOrientation = (evt: Event) => {
       const orientationEvt = evt as OrientationWithCompass;
       const now = Date.now();
+      const alpha =
+        typeof orientationEvt.alpha === "number" &&
+        Number.isFinite(orientationEvt.alpha)
+          ? orientationEvt.alpha
+          : null;
+      const webkitCompassHeading =
+        typeof orientationEvt.webkitCompassHeading === "number" &&
+        Number.isFinite(orientationEvt.webkitCompassHeading)
+          ? normalizeHeading(orientationEvt.webkitCompassHeading)
+          : null;
+      const screenAngle = getScreenOrientationAngleDeg();
+      const alphaHeading =
+        alpha == null ? null : normalizeHeading(360 - alpha + screenAngle);
+      const hasCompassHeading =
+        typeof orientationEvt.webkitCompassHeading === "number" &&
+        Number.isFinite(orientationEvt.webkitCompassHeading);
       const isAbsoluteLike =
-        evt.type === "deviceorientationabsolute" || orientationEvt.absolute === true;
+        hasCompassHeading ||
+        evt.type === "deviceorientationabsolute" ||
+        orientationEvt.absolute === true;
       if (isAbsoluteLike) {
         lastAbsoluteOrientationAtRef.current = now;
+      } else if (lastAbsoluteOrientationAtRef.current === 0) {
+        // Ignore relative orientation at startup to avoid random initial heading.
+        walkDebug("orientation:ignored", {
+          reason: "relative-before-absolute",
+          type: evt.type,
+          alpha,
+          webkitCompassHeading,
+          alphaHeading,
+          screenAngle,
+        });
+        return;
       } else if (
         now - lastAbsoluteOrientationAtRef.current <=
         HEADING_ABSOLUTE_PRIORITY_WINDOW_MS
       ) {
+        walkDebug("orientation:ignored", {
+          reason: "absolute-priority-window",
+          type: evt.type,
+          sinceAbsoluteMs: now - lastAbsoluteOrientationAtRef.current,
+          alpha,
+          webkitCompassHeading,
+          alphaHeading,
+          screenAngle,
+        });
         return;
       }
 
       const h = extractHeadingFromOrientation(orientationEvt);
-      if (h == null) return;
+      if (h == null) {
+        walkDebug("orientation:ignored", {
+          reason: "no-heading",
+          type: evt.type,
+          alpha,
+          webkitCompassHeading,
+          alphaHeading,
+          screenAngle,
+        });
+        return;
+      }
+
+      const prevSample = lastOrientationSampleRef.current;
+      const sampleDelta =
+        prevSample == null ? null : signedHeadingDelta(prevSample, h);
+      walkDebug("orientation:event", {
+        type: evt.type,
+        isAbsoluteLike,
+        absoluteFlag: orientationEvt.absolute === true,
+        alpha,
+        screenAngle,
+        webkitCompassHeading,
+        alphaHeading,
+        extractedHeading: h,
+        prevSample,
+        sampleDelta,
+        cardinalJump: classifyCardinalJump(sampleDelta),
+      });
+      lastOrientationSampleRef.current = h;
       lastOrientationAtRef.current = Date.now();
       maybeSetHeading(h, "orientation");
     };

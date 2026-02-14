@@ -84,6 +84,7 @@ export function useMapMyLocation(
   const lowSpeedAnchorPosRef = useRef<LatLng | null>(null);
 
   const route = useMapStore((s) => s.route);
+  const myPos = useMapStore((s) => s.myPos);
   const walking = useMapStore((s) => s.walking);
   const walkingPaused = useMapStore((s) => s.walkingPaused);
   const walkingPausedAt = useMapStore((s) => s.walkingPausedAt);
@@ -284,15 +285,13 @@ export function useMapMyLocation(
     manualPosRef.current = false;
     lastGeoRef.current = null;
     resetWalkingRefs();
+    setHeading(null);
     setWalkedDistanceM(0);
     setWalkingPausedTotalMs(0);
     setWalkingPausedAt(null);
     setWalkingPaused(false);
-
-    if (route?.path?.length) {
-      setDrawRoute(true);
-      seedHeadingFromRoute(route.path);
-    }
+    setDrawRoute(Boolean(route?.path?.length));
+    seedHeadingFromRoute(route?.path, myPos);
 
     requestOrientationPermissionIfNeeded();
     setWalkingStartedAt(Date.now());
@@ -320,6 +319,16 @@ export function useMapMyLocation(
   });
 
   useOn("map", "STOP_WALKING", () => {
+    manualPosRef.current = false;
+    if (
+      typeof coords?.latitude === "number" &&
+      typeof coords?.longitude === "number"
+    ) {
+      lastGeoRef.current = { lat: coords.latitude, lng: coords.longitude };
+    } else {
+      lastGeoRef.current = null;
+    }
+
     setWalking(false);
     setWalkingPaused(false);
     setWalkingStartedAt(null);
@@ -328,6 +337,7 @@ export function useMapMyLocation(
     setWalkedDistanceM(0);
     resetWalkingRefs();
     setHeading(null);
+    refresh();
   });
 
   // walking 중 위치 갱신 (watchPosition + 1초 throttle)

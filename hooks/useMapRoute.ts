@@ -2,7 +2,10 @@
 
 import { RefObject, useCallback, useEffect, useRef } from "react";
 import { useMapStore } from "@/stores/mapStore";
+import { useModalStore } from "@/stores/modal";
+import { useRouteActions } from "@/hooks/useRouteActions";
 import type { LatLng } from "@/types/mapEvents";
+import { projectPointToSegmentMeters } from "@/lib/geo";
 
 const ROUTE_STROKE_WEIGHT = 10;
 const ROUTE_BORDER_STROKE_WEIGHT = 14;
@@ -18,6 +21,10 @@ const SNAP_LOCAL_BACKWARD_SEGMENTS = 30;
 const SNAP_LOCAL_FORWARD_SEGMENTS = 120;
 const SNAP_FALLBACK_DISTANCE_M = 35;
 const ROUTE_REDRAW_MIN_MOVE_M = 5;
+const ROUTE_OFF_ROUTE_DISTANCE_M = 25;
+const ROUTE_OFF_ROUTE_CONNECTOR_MAX_M = 45;
+const ROUTE_REROUTE_PROMPT_DISTANCE_M = 60;
+const ROUTE_REROUTE_PROMPT_COOLDOWN_MS = 20_000;
 
 type SnapResult = {
   segIdx: number;
@@ -32,37 +39,51 @@ type ChevronStyle = {
   strokeWidth: number;
 };
 
-function projectPointToSegmentMeters(p: LatLng, a: LatLng, b: LatLng) {
-  const meanLatRad = (((a.lat + b.lat + p.lat) / 3) * Math.PI) / 180;
-  const mPerDegLat = 111132;
-  const mPerDegLng = 111320 * Math.cos(meanLatRad);
+type ReroutePromptConditionInput = {
+  isOffRoute: boolean;
+  snapDistM: number;
+  promptShown: boolean;
+  routeLoading: boolean;
+  isModalOpen: boolean;
+  lastPromptAt: number;
+  now: number;
+};
 
-  const bx = (b.lng - a.lng) * mPerDegLng;
-  const by = (b.lat - a.lat) * mPerDegLat;
-  const px = (p.lng - a.lng) * mPerDegLng;
-  const py = (p.lat - a.lat) * mPerDegLat;
+type RouteRedrawSkipConditionInput = {
+  isOffRoute: boolean;
+  wasOffRoute: boolean;
+  prevProjected: LatLng | null;
+  prevProgressSegIdx: number | null;
+  progressedSegIdx: number;
+  projected: LatLng;
+};
 
-  const len2 = bx * bx + by * by;
-  if (len2 <= 1e-6) {
-    return {
-      t: 0,
-      distM: Math.hypot(px, py),
-      point: { lat: a.lat, lng: a.lng },
-    };
-  }
+type BuildRemainingPathInput = {
+  isOffRoute: boolean;
+  snapDistM: number;
+  myPos: LatLng;
+  projected: LatLng;
+  path: [number, number][];
+  progressedSegIdx: number;
+};
 
-  const t = Math.max(0, Math.min(1, (px * bx + py * by) / len2));
-  const projX = bx * t;
-  const projY = by * t;
-
-  return {
-    t,
-    distM: Math.hypot(px - projX, py - projY),
-    point: {
-      lat: a.lat + (b.lat - a.lat) * t,
-      lng: a.lng + (b.lng - a.lng) * t,
-    },
-  };
+function shouldPromptReroute({
+  isOffRoute,
+  snapDistM,
+  promptShown,
+  routeLoading,
+  isModalOpen,
+  lastPromptAt,
+  now,
+}: ReroutePromptConditionInput) {
+  return (
+    isOffRoute &&
+    snapDistM >= ROUTE_REROUTE_PROMPT_DISTANCE_M &&
+    !promptShown &&
+    !routeLoading &&
+    !isModalOpen &&
+    now - lastPromptAt > ROUTE_REROUTE_PROMPT_COOLDOWN_MS
+  );
 }
 
 function findNearestSnap(
@@ -117,6 +138,42 @@ function haversineMeters(a: LatLng, b: LatLng) {
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
 
   return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function shouldSkipRouteRedraw({
+  isOffRoute,
+  wasOffRoute,
+  prevProjected,
+  prevProgressSegIdx,
+  progressedSegIdx,
+  projected,
+}: RouteRedrawSkipConditionInput) {
+  if (isOffRoute || wasOffRoute) return false;
+  if (!prevProjected || prevProgressSegIdx == null) return false;
+  if (progressedSegIdx !== prevProgressSegIdx) return false;
+
+  return haversineMeters(prevProjected, projected) < ROUTE_REDRAW_MIN_MOVE_M;
+}
+
+function buildRemainingPath({
+  isOffRoute,
+  snapDistM,
+  myPos,
+  projected,
+  path,
+  progressedSegIdx,
+}: BuildRemainingPathInput): [number, number][] {
+  const shouldDrawOffRouteConnector =
+    isOffRoute && snapDistM <= ROUTE_OFF_ROUTE_CONNECTOR_MAX_M;
+  if (!shouldDrawOffRouteConnector) {
+    return [[projected.lng, projected.lat], ...path.slice(progressedSegIdx + 1)];
+  }
+
+  return [
+    [myPos.lng, myPos.lat],
+    [projected.lng, projected.lat],
+    ...path.slice(progressedSegIdx + 1),
+  ];
 }
 
 function bearingDeg(from: LatLng, to: LatLng) {
@@ -194,10 +251,17 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
   const lastDrawnPathRef = useRef<[number, number][] | null>(null);
   const lastProgressSegIdxRef = useRef<number | null>(null);
   const lastProjectedHeadRef = useRef<LatLng | null>(null);
+  const wasOffRouteRef = useRef(false);
+  const reroutePromptShownRef = useRef(false);
+  const lastReroutePromptAtRef = useRef(0);
   const route = useMapStore((s) => s.route);
   const drawRoute = useMapStore((s) => s.drawRoute);
   const myPos = useMapStore((s) => s.myPos);
   const walking = useMapStore((s) => s.walking);
+  const routeLoading = useMapStore((s) => s.routeLoading);
+  const isModalOpen = useModalStore((s) => s.isOpen);
+  const openModal = useModalStore((s) => s.open);
+  const { requestTmapWalkRoute } = useRouteActions();
 
   const clearChevronMarkers = useCallback(() => {
     for (const marker of chevronMarkersRef.current) {
@@ -262,6 +326,56 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     [clearChevronMarkers, mapRef],
   );
 
+  const resetRouteTracking = useCallback(() => {
+    lastProgressSegIdxRef.current = null;
+    lastProjectedHeadRef.current = null;
+    wasOffRouteRef.current = false;
+    reroutePromptShownRef.current = false;
+    lastReroutePromptAtRef.current = 0;
+  }, []);
+
+  const resetOffRoutePromptState = useCallback(() => {
+    wasOffRouteRef.current = false;
+    reroutePromptShownRef.current = false;
+  }, []);
+
+  const maybePromptReroute = useCallback(
+    (snapDistM: number, isOffRoute: boolean) => {
+      if (!isOffRoute) {
+        reroutePromptShownRef.current = false;
+        return;
+      }
+
+      const now = Date.now();
+      if (
+        !shouldPromptReroute({
+          isOffRoute,
+          snapDistM,
+          promptShown: reroutePromptShownRef.current,
+          routeLoading,
+          isModalOpen,
+          lastPromptAt: lastReroutePromptAtRef.current,
+          now,
+        })
+      ) {
+        return;
+      }
+
+      reroutePromptShownRef.current = true;
+      lastReroutePromptAtRef.current = now;
+      openModal({
+        title: "경로를 많이 이탈했어요",
+        body: `현재 경로에서 약 ${Math.round(snapDistM)}m 벗어났습니다. 새 경로를 받을까요?`,
+        confirmLabel: "재탐색",
+        cancelLabel: "유지",
+        onConfirm: () => {
+          requestTmapWalkRoute();
+        },
+      });
+    },
+    [routeLoading, isModalOpen, openModal, requestTmapWalkRoute],
+  );
+
   const clearRouteVisuals = useCallback(() => {
     if (routeBorderRef.current) {
       routeBorderRef.current.setMap(null);
@@ -273,8 +387,8 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     }
     clearChevronMarkers();
     lastDrawnPathRef.current = null;
-    lastProjectedHeadRef.current = null;
-  }, [clearChevronMarkers]);
+    resetRouteTracking();
+  }, [clearChevronMarkers, resetRouteTracking]);
 
   const drawRouteLine = useCallback(
     (path: [number, number][], showChevrons: boolean) => {
@@ -350,9 +464,8 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
   }, [mapRef, drawRouteChevrons, clearChevronMarkers, walking]);
 
   useEffect(() => {
-    lastProgressSegIdxRef.current = null;
-    lastProjectedHeadRef.current = null;
-  }, [route?.path]);
+    resetRouteTracking();
+  }, [route?.path, resetRouteTracking]);
 
   useEffect(() => {
     if (!drawRoute || !route?.path?.length) {
@@ -364,6 +477,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
 
     if (!walking || !myPos || route.path.length < 2) {
       lastProjectedHeadRef.current = null;
+      resetOffRoutePromptState();
       drawRouteLine(route.path, showChevrons);
       return;
     }
@@ -375,10 +489,14 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     );
     if (!snap) {
       lastProjectedHeadRef.current = null;
+      resetOffRoutePromptState();
       drawRouteLine(route.path, showChevrons);
       return;
     }
 
+    const isOffRoute = snap.distM > ROUTE_OFF_ROUTE_DISTANCE_M;
+    maybePromptReroute(snap.distM, isOffRoute);
+    const wasOffRoute = wasOffRouteRef.current;
     const progressedSegIdx = Math.max(
       snap.segIdx,
       lastProgressSegIdxRef.current ?? 0,
@@ -399,25 +517,41 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     const prevProjected = lastProjectedHeadRef.current;
 
     if (
-      prevProjected &&
-      prevProgressSegIdx != null &&
-      progressedSegIdx === prevProgressSegIdx
+      shouldSkipRouteRedraw({
+        isOffRoute,
+        wasOffRoute,
+        prevProjected,
+        prevProgressSegIdx,
+        progressedSegIdx,
+        projected,
+      })
     ) {
-      const movedOnPathM = haversineMeters(prevProjected, projected);
-      if (movedOnPathM < ROUTE_REDRAW_MIN_MOVE_M) {
-        return;
-      }
+      return;
     }
 
     lastProjectedHeadRef.current = projected;
+    wasOffRouteRef.current = isOffRoute;
 
-    const remainingPath: [number, number][] = [
-      [projected.lng, projected.lat],
-      ...route.path.slice(progressedSegIdx + 1),
-    ];
+    const remainingPath = buildRemainingPath({
+      isOffRoute,
+      snapDistM: snap.distM,
+      myPos,
+      projected,
+      path: route.path,
+      progressedSegIdx,
+    });
 
     drawRouteLine(remainingPath, showChevrons);
-  }, [route, drawRoute, myPos, walking, drawRouteLine, clearRouteVisuals]);
+  }, [
+    route,
+    drawRoute,
+    myPos,
+    walking,
+    maybePromptReroute,
+    resetOffRoutePromptState,
+    drawRouteLine,
+    clearRouteVisuals,
+  ]);
 
   useEffect(() => {
     return () => {
