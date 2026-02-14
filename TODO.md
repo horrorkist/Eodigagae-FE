@@ -25,3 +25,15 @@
 ## Search
 
 - [ ] Add search autocomplete suggestions (debounced input, suggestion dropdown, keyboard selection).
+- [ ] Fix desktop/trackpad backdrop click-through while bottom sheet is open:
+  - Backdrop tap/click should only close the sheet.
+  - Must not trigger underlying `MapOverlay` actions (search bar route, POI chip toggle).
+  - Validate on desktop mouse + trackpad and mobile touch.
+
+## Upcoming Features
+
+- [ ] Build onboarding page.
+- [ ] Add walking history page and list view.
+- [ ] Support camera switching during walk mode.
+- [ ] Save photos taken during a walk to the walking history.
+- [ ] Design destination marker UI.
