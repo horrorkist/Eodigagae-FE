@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 import { requestOrientationPermissionIfNeeded } from "@/hooks/useWalkHeading";
@@ -51,16 +52,9 @@ export default function MapOverlay(props: {
   topOffsetPx?: number;
   leftSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
-  onSearchSubmit?: (q: string) => void;
   toggles?: ToggleItem[];
 }) {
-  const {
-    topOffsetPx = 12,
-    leftSlot,
-    rightSlot,
-    onSearchSubmit,
-    toggles = [],
-  } = props;
+  const { topOffsetPx = 12, leftSlot, rightSlot, toggles = [] } = props;
 
   const emit = useEmit();
   const walking = useMapStore((s) => s.walking);
@@ -70,16 +64,15 @@ export default function MapOverlay(props: {
   const walkingPausedAt = useMapStore((s) => s.walkingPausedAt);
   const walkingPausedTotalMs = useMapStore((s) => s.walkingPausedTotalMs);
   const walkedDistanceM = useMapStore((s) => s.walkedDistanceM);
-  const [q, setQ] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const canSubmit = useMemo(() => q.trim().length > 0, [q]);
   const canStartWalking = useMemo(
     () => !!route?.path && route.path.length > 1,
     [route],
   );
   const elapsedSec = useMemo(() => {
     if (!walkingStartedAt) return 0;
-    const effectiveNow = walkingPaused && walkingPausedAt ? walkingPausedAt : nowMs;
+    const effectiveNow =
+      walkingPaused && walkingPausedAt ? walkingPausedAt : nowMs;
     const elapsedMs = Math.max(
       0,
       effectiveNow - walkingStartedAt - walkingPausedTotalMs,
@@ -118,7 +111,13 @@ export default function MapOverlay(props: {
 
     emit({ type: "MOVE_MY_MARKER_READY", channel: "map" });
     setIsMovingMyMarker(true);
-  }, [cancelMoveDest, cancelMoveMyMarker, emit, isMovingMyMarker, isSettingDest]);
+  }, [
+    cancelMoveDest,
+    cancelMoveMyMarker,
+    emit,
+    isMovingMyMarker,
+    isSettingDest,
+  ]);
 
   const onToggleMoveDest = useCallback(() => {
     if (isMovingMyMarker) {
@@ -132,7 +131,13 @@ export default function MapOverlay(props: {
 
     emit({ type: "MOVE_DEST_READY", channel: "map" });
     setIsSettingDest(true);
-  }, [cancelMoveDest, cancelMoveMyMarker, emit, isMovingMyMarker, isSettingDest]);
+  }, [
+    cancelMoveDest,
+    cancelMoveMyMarker,
+    emit,
+    isMovingMyMarker,
+    isSettingDest,
+  ]);
 
   useOn("map", "MY_MARKER_MOVED", () => {
     setIsMovingMyMarker(false);
@@ -273,26 +278,19 @@ export default function MapOverlay(props: {
             <div className="pointer-events-auto">{leftSlot}</div>
 
             <div className="pointer-events-auto flex-1 max-w-140">
-              <form
-                className="flex items-center gap-2 rounded-lg border bg-white/90 backdrop-blur shadow px-3 py-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!canSubmit) return;
-                  onSearchSubmit?.(q.trim());
-                }}
+              <Link
+                href="/search?focus=1"
+                className="flex w-full items-center gap-2 rounded-lg border bg-white/90 backdrop-blur shadow px-3 py-2"
+                aria-label="검색 페이지로 이동"
               >
                 <FontAwesomeIcon
                   icon={faMagnifyingGlass}
                   className="w-3.5 h-3.5 text-gray-400 shrink-0"
                 />
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="어디로 산책할까요?"
-                  className="w-full bg-transparent outline-none text-sm"
-                  inputMode="search"
-                />
-              </form>
+                <span className="text-sm text-gray-500">
+                  어디로 산책할까요?
+                </span>
+              </Link>
 
               {toggles.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">

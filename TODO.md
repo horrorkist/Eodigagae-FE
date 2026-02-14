@@ -22,3 +22,6 @@
   - Slow drift: controlled updates only.
   - Resume from walking to idle: updates restart correctly.
 
+## Search
+
+- [ ] Add search autocomplete suggestions (debounced input, suggestion dropdown, keyboard selection).

@@ -43,7 +43,7 @@ export function useNaverMap() {
     mapRef.current = new window.naver.maps.Map(elRef.current, {
       center,
       zoom: 15,
-      minZoom: 10,
+      minZoom: 13,
       disableKineticPan: false,
     });
   }, [sdkReady, coords, myPos]);
