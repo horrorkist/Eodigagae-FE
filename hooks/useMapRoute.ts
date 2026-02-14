@@ -25,6 +25,7 @@ const ROUTE_OFF_ROUTE_DISTANCE_M = 25;
 const ROUTE_OFF_ROUTE_CONNECTOR_MAX_M = 45;
 const ROUTE_REROUTE_PROMPT_DISTANCE_M = 60;
 const ROUTE_REROUTE_PROMPT_COOLDOWN_MS = 20_000;
+const ROUTE_MIN_RENDERABLE_LENGTH_M = 3;
 
 type SnapResult = {
   segIdx: number;
@@ -174,6 +175,23 @@ function buildRemainingPath({
     [projected.lng, projected.lat],
     ...path.slice(progressedSegIdx + 1),
   ];
+}
+
+function hasRenderablePolyline(path: [number, number][]) {
+  if (path.length < 2) return false;
+
+  let lengthM = 0;
+  for (let i = 0; i < path.length - 1; i++) {
+    const a: LatLng = { lat: path[i][1], lng: path[i][0] };
+    const b: LatLng = { lat: path[i + 1][1], lng: path[i + 1][0] };
+    lengthM += haversineMeters(a, b);
+
+    if (lengthM >= ROUTE_MIN_RENDERABLE_LENGTH_M) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function bearingDeg(from: LatLng, to: LatLng) {
@@ -414,6 +432,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
         });
       } else {
         routeBorderRef.current.setPath(pts);
+        routeBorderRef.current.setMap(mapRef.current);
       }
 
       if (!routeLineRef.current) {
@@ -429,6 +448,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
         });
       } else {
         routeLineRef.current.setPath(pts);
+        routeLineRef.current.setMap(mapRef.current);
       }
 
       if (showChevrons) {
@@ -540,6 +560,11 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       path: route.path,
       progressedSegIdx,
     });
+
+    if (!hasRenderablePolyline(remainingPath)) {
+      drawRouteLine(route.path, showChevrons);
+      return;
+    }
 
     drawRouteLine(remainingPath, showChevrons);
   }, [

@@ -29,6 +29,7 @@ const WALK_STATIONARY_DRIFT_MIN_M = 8;
 const WALK_STATIONARY_DRIFT_MAX_M = 16;
 const WALK_STATIONARY_DRIFT_FROM_ACCURACY_RATIO = 1.0;
 const WALK_SPEED_VALID_MAX_ACCURACY_M = 15;
+const PREWALK_RECENTER_MIN_MOVE_M = 3;
 
 function buildUserMarkerHTML(headingDeg: number | null, walking: boolean) {
   const coreColor = "#2563eb";
@@ -84,7 +85,9 @@ export function useMapMyLocation(
   const lowSpeedAnchorPosRef = useRef<LatLng | null>(null);
 
   const route = useMapStore((s) => s.route);
+  const drawRoute = useMapStore((s) => s.drawRoute);
   const myPos = useMapStore((s) => s.myPos);
+  const pickedPos = useMapStore((s) => s.pickedPos);
   const walking = useMapStore((s) => s.walking);
   const walkingPaused = useMapStore((s) => s.walkingPaused);
   const walkingPausedAt = useMapStore((s) => s.walkingPausedAt);
@@ -189,6 +192,47 @@ export function useMapMyLocation(
     [setMyPos],
   );
 
+  const syncDestinationMarker = useCallback(
+    (pos: LatLng | null) => {
+      if (!window.naver?.maps) return;
+
+      const map = mapRef.current;
+      if (!map || !pos) {
+        destMarkerRef.current?.setMap(null);
+        return;
+      }
+
+      const markerPos = new window.naver.maps.LatLng(pos.lat, pos.lng);
+
+      if (!destMarkerRef.current) {
+        destMarkerRef.current = new window.naver.maps.Marker({
+          map,
+          position: markerPos,
+        });
+        return;
+      }
+
+      destMarkerRef.current.setPosition(markerPos);
+      destMarkerRef.current.setMap(map);
+    },
+    [mapRef],
+  );
+
+  // 도착지 마커 동기화:
+  // - pickedPos 우선
+  // - pickedPos가 없고 경로가 실제로 그려지는 중이면, 경로 마지막 점으로 fallback
+  useEffect(() => {
+    if (!sdkReady) return;
+
+    let markerPos: LatLng | null = pickedPos;
+    if (!markerPos && drawRoute && route?.path?.length) {
+      const [lng, lat] = route.path[route.path.length - 1];
+      markerPos = { lat, lng };
+    }
+
+    syncDestinationMarker(markerPos);
+  }, [sdkReady, pickedPos, drawRoute, route?.path, syncDestinationMarker]);
+
   // geolocation 오류 → 모달 표시
   useEffect(() => {
     if (!error) return;
@@ -234,14 +278,21 @@ export function useMapMyLocation(
     if (walking || manualPosRef.current) return;
 
     if (typeof geoLat === "number" && typeof geoLng === "number") {
+      const nextGeoPos = { lat: geoLat, lng: geoLng };
       const last = lastGeoRef.current;
       if (last && last.lat === geoLat && last.lng === geoLng) return;
 
-      lastGeoRef.current = { lat: geoLat, lng: geoLng };
+      lastGeoRef.current = nextGeoPos;
+      if (
+        myPos &&
+        haversineMeters(myPos, nextGeoPos) < PREWALK_RECENTER_MIN_MOVE_M
+      ) {
+        return;
+      }
 
       emit({
         type: "MOVE_TO",
-        pos: { lat: geoLat, lng: geoLng },
+        pos: nextGeoPos,
         zoom: 15,
         animate: true,
         channel: "map",
@@ -258,7 +309,7 @@ export function useMapMyLocation(
         channel: "map",
       });
     }
-  }, [geoLat, geoLng, error, emit, walking]);
+  }, [geoLat, geoLng, error, emit, myPos, walking]);
 
   // REQUEST_MY_LOCATION → GPS 새로고침
   useOn("map", "REQUEST_MY_LOCATION", () => {
@@ -500,17 +551,10 @@ export function useMapMyLocation(
       (event: naver.maps.PointerEvent) => {
         const lng = event.coord.x;
         const lat = event.coord.y;
+        const nextPickedPos = { lat, lng };
 
-        if (!destMarkerRef.current) {
-          destMarkerRef.current = new window.naver.maps.Marker({
-            map: mapRef.current!,
-            position: { x: lng, y: lat },
-          });
-        } else {
-          destMarkerRef.current.setPosition({ x: lng, y: lat });
-        }
-
-        setPickedPos({ lat, lng });
+        syncDestinationMarker(nextPickedPos);
+        setPickedPos(nextPickedPos);
         emit({ type: "DEST_MOVED", channel: "map" });
       },
     );
@@ -550,6 +594,8 @@ export function useMapMyLocation(
       } finally {
         moveMarkerListenerRef.current = null;
         walkWatchIdRef.current = null;
+        myMarkerRef.current?.setMap(null);
+        destMarkerRef.current?.setMap(null);
       }
     };
   }, [clearMoveMarkerListener, clearWalkWatch, mapRef]);

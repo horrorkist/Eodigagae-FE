@@ -2,7 +2,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BottomSheet from "@/components/BottomSheet";
 import MapOverlay from "@/components/MapOverlay";
 import { useShallow } from "zustand/shallow";
@@ -38,6 +38,10 @@ import {
 import { POI_STYLES } from "@/lib/poiMarker";
 import PoiCard from "@/components/PoiCard";
 import WalkDebugPanel from "@/components/WalkDebugPanel";
+import {
+  isWalkDebugPanelVisible,
+  subscribeWalkDebugUpdates,
+} from "@/lib/walkDebug";
 
 const NaverMapClient = dynamic(() => import("@/components/NaverMapClient"), {
   ssr: false,
@@ -51,6 +55,8 @@ const TAB_BUTTON_INACTIVE_CLASS = "text-gray-600 hover:text-gray-800";
 const TAB_BUTTON_ACTIVE_CLASS = "bg-white text-gray-900 shadow-sm";
 const ACTION_BUTTON_CLASS =
   "flex items-center gap-1.5 border px-3 py-2 rounded text-sm disabled:opacity-50 transition-colors hover:bg-gray-50";
+const POI_INITIAL_RENDER_COUNT = 16;
+const POI_RENDER_BATCH_COUNT = 12;
 
 function PetPoiSummary({
   loading,
@@ -110,6 +116,9 @@ function renderWalkDistanceFeedback(
 
 export default function MapPage() {
   useBusDispatcher(true);
+  const [showWalkDebugPanel, setShowWalkDebugPanel] = useState(() =>
+    isWalkDebugPanelVisible(),
+  );
 
   const {
     myPos,
@@ -163,9 +172,57 @@ export default function MapPage() {
   const [sheetMode, setSheetMode] = useState<SheetContentMode>("main");
   const activeSheetMode: SheetContentMode =
     canShowPoiTab || sheetMode !== "poi" ? sheetMode : "main";
+  const [visiblePoiCount, setVisiblePoiCount] = useState(POI_INITIAL_RENDER_COUNT);
+  const poiLoadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const routeDistanceKm =
     route?.summary?.distance != null ? route.summary.distance / 1000 : null;
+  const visiblePois = useMemo(
+    () => petPois.slice(0, visiblePoiCount),
+    [petPois, visiblePoiCount],
+  );
+  const hasMorePois = visiblePoiCount < petPois.length;
+
+  const syncWalkDebugPanelVisible = useCallback(() => {
+    setShowWalkDebugPanel(isWalkDebugPanelVisible());
+  }, []);
+
+  useEffect(() => {
+    return subscribeWalkDebugUpdates(syncWalkDebugPanelVisible);
+  }, [syncWalkDebugPanelVisible]);
+
+  const loadMorePois = useCallback(() => {
+    setVisiblePoiCount((prev) =>
+      Math.min(prev + POI_RENDER_BATCH_COUNT, petPois.length),
+    );
+  }, [petPois.length]);
+
+  useEffect(() => {
+    if (activeSheetMode !== "poi") return;
+    if (!hasMorePois) return;
+
+    const target = poiLoadMoreRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            loadMorePois();
+            break;
+          }
+        }
+      },
+      {
+        root: null,
+        rootMargin: "160px 0px",
+        threshold: 0,
+      },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [activeSheetMode, hasMorePois, loadMorePois, visiblePoiCount]);
 
   return (
     <div className="w-full h-full">
@@ -211,7 +268,10 @@ export default function MapPage() {
             </button>
             <button
               type="button"
-              onClick={() => setSheetMode("poi")}
+              onClick={() => {
+                setSheetMode("poi");
+                setVisiblePoiCount(Math.min(POI_INITIAL_RENDER_COUNT, petPois.length));
+              }}
               disabled={!canShowPoiTab}
               className={[
                 TAB_BUTTON_BASE_CLASS,
@@ -232,10 +292,19 @@ export default function MapPage() {
                 totalCount={petPoiTotalCount}
               />
 
-              {petPois.map((poi) => {
+              {visiblePois.map((poi) => {
                 const style = POI_STYLES[poi.contenttypeid];
                 return <PoiCard key={poi.contentid} poi={poi} style={style} />;
               })}
+
+              {hasMorePois && (
+                <div
+                  ref={poiLoadMoreRef}
+                  className="h-10 flex items-center justify-center text-xs text-gray-400"
+                >
+                  목록 불러오는 중...
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -406,7 +475,7 @@ export default function MapPage() {
             </>
           )}
 
-          <WalkDebugPanel />
+          {showWalkDebugPanel && <WalkDebugPanel />}
 
         </div>
       </BottomSheet>

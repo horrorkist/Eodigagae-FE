@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useOn } from "./useEventBus";
+import { useMapStore } from "@/stores/mapStore";
 
 const FALLBACK = { lat: 37.5665, lng: 126.978 };
 
@@ -10,6 +11,7 @@ export function useNaverMap() {
   const elRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<naver.maps.Map>(null);
   const [sdkReady, setSdkReady] = useState(false);
+  const myPos = useMapStore((s) => s.myPos);
 
   const { coords } = useGeolocation({
     watch: false,
@@ -24,9 +26,17 @@ export function useNaverMap() {
     if (mapRef.current) return;
 
     const lat =
-      typeof coords?.latitude === "number" ? coords.latitude : FALLBACK.lat;
+      typeof myPos?.lat === "number"
+        ? myPos.lat
+        : typeof coords?.latitude === "number"
+          ? coords.latitude
+          : FALLBACK.lat;
     const lng =
-      typeof coords?.longitude === "number" ? coords.longitude : FALLBACK.lng;
+      typeof myPos?.lng === "number"
+        ? myPos.lng
+        : typeof coords?.longitude === "number"
+          ? coords.longitude
+          : FALLBACK.lng;
 
     const center = new window.naver.maps.LatLng(lat, lng);
 
@@ -36,7 +46,7 @@ export function useNaverMap() {
       minZoom: 10,
       disableKineticPan: false,
     });
-  }, [sdkReady, coords]);
+  }, [sdkReady, coords, myPos]);
 
   useOn("map", "MOVE_MAP_CENTER", (cmd) => {
     if (!mapRef.current || !window.naver?.maps) return;

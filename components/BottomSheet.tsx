@@ -101,6 +101,7 @@ export default function BottomSheet({
   const overDragRef = useRef(0);
   const rafRef = useRef(0);
   const fastOpenFlingRef = useRef(false);
+  const didInitialSyncRef = useRef(false);
 
   /** transform + opacity 만 변경 (Layout/Paint 0회) */
   const applyTop = useCallback(
@@ -124,7 +125,9 @@ export default function BottomSheet({
   useLayoutEffect(() => {
     const target = isOpen ? (snapPoints[index] ?? minSnap) : closedTop;
     if (sheetRef.current) {
-      if (fastOpenFlingRef.current) {
+      if (!didInitialSyncRef.current) {
+        sheetRef.current.style.transition = "none";
+      } else if (fastOpenFlingRef.current) {
         sheetRef.current.style.transition = "transform 80ms ease-out";
         fastOpenFlingRef.current = false;
       } else {
@@ -133,6 +136,7 @@ export default function BottomSheet({
     }
     applyTop(target);
     applyClipPadding(target);
+    didInitialSyncRef.current = true;
   }, [
     isOpen,
     index,
@@ -505,6 +509,8 @@ export default function BottomSheet({
           className="absolute inset-x-0 top-0 h-full bg-white rounded-t-2xl shadow-[0_-12px_24px_rgba(0,0,0,0.1)] pointer-events-auto"
           style={{
             willChange: "transform",
+            // SSR/hydration 이전 프레임에서도 닫힌 위치로 시작해 초기 오픈 플래시를 막는다.
+            transform: `translateY(calc(100% - ${peekHeight}px))`,
           }}
         >
           {/* Handle */}

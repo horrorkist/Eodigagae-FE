@@ -1,7 +1,7 @@
 // hooks/usePetPoiController.ts
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import useSWR from "swr";
 import { useMapStore } from "@/stores/mapStore";
 import type { PetPoiResponse } from "@/types/mapEvents";
@@ -27,9 +27,16 @@ const petPoiFetcher = async (url: string): Promise<PetPoiResponse> => {
   };
 };
 
+function roundByGrid(n: number, grid: number) {
+  if (!Number.isFinite(grid) || grid <= 0) return n;
+  return Math.round(n / grid) * grid;
+}
+
 export function usePetPoiController(opts?: PetPoiControllerProps) {
   const emit = useEmit();
   const myPos = useMapStore((s) => s.myPos);
+  const petPoiOn = useMapStore((s) => s.petPoiOn);
+  const setPetPoiOnState = useMapStore((s) => s.setPetPoiOn);
 
   const radius = opts?.radius ?? PETPOI_DEFAULTS.radius;
   const numOfRows = opts?.numOfRows ?? PETPOI_DEFAULTS.numOfRows;
@@ -37,24 +44,31 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
   const revalidate = opts?.revalidate ?? PETPOI_DEFAULTS.revalidate;
   const cooldownMs = opts?.cooldownMs ?? 10 * 60 * 1000;
 
-  const [on, setOn] = useState(false);
+  const roundedPos = useMemo(() => {
+    if (!myPos) return null;
+    return {
+      lat: roundByGrid(myPos.lat, grid),
+      lng: roundByGrid(myPos.lng, grid),
+    };
+  }, [myPos, grid]);
 
   // SWR key: null disables fetching when toggled off or position unknown
-  // 라운딩은 서버가 담당 — 클라이언트는 raw 좌표 + grid 파라미터만 전달
+  // 클라이언트에서도 grid 기반 key를 안정화해 불필요한 재요청/깜빡임을 줄임
   const swrKey = useMemo(() => {
-    if (!on || !myPos) return null;
+    if (!petPoiOn || !roundedPos) return null;
     return (
-      `/api/petpois?lat=${myPos.lat}&lng=${myPos.lng}` +
+      `/api/petpois?lat=${roundedPos.lat}&lng=${roundedPos.lng}` +
       `&radius=${radius}&numOfRows=${numOfRows}&pageNo=1` +
       `&grid=${grid}&revalidate=${revalidate}`
     );
-  }, [on, myPos, radius, numOfRows, grid, revalidate]);
+  }, [petPoiOn, roundedPos, radius, numOfRows, grid, revalidate]);
 
   const { data, error, isValidating, mutate } = useSWR<PetPoiResponse>(
     swrKey,
     petPoiFetcher,
     {
       dedupingInterval: cooldownMs,
+      keepPreviousData: true,
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       onSuccess(res) {
@@ -79,19 +93,21 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
   );
 
   // 토글 이벤트: on/off만 반영, 나머지는 swrKey 변화로 SWR가 처리
-  useOn("pet", "PETPOI_TOGGLE", (cmd) => setOn(cmd.on));
+  useOn("pet", "PETPOI_TOGGLE", (cmd) => setPetPoiOnState(cmd.on));
 
   // 새로고침 이벤트: bound mutate로 강제 revalidate
   useOn("pet", "PETPOI_REFRESH", () => {
-    if (!on) return;
+    if (!petPoiOn) return;
     mutate();
   });
 
   // 외부에서 쓰기 좋은 helper
   const setPetPoiOn = useCallback(
-    (next: boolean) =>
-      emit({ type: "PETPOI_TOGGLE", on: next, channel: "pet" }),
-    [emit],
+    (next: boolean) => {
+      setPetPoiOnState(next);
+      emit({ type: "PETPOI_TOGGLE", on: next, channel: "pet" });
+    },
+    [emit, setPetPoiOnState],
   );
 
   const refreshPetPoi = useCallback(
@@ -100,7 +116,7 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
   );
 
   return {
-    petPoiOn: on,
+    petPoiOn,
     petPois: data?.items ?? [],
     petPoiTotalCount: data?.meta?.totalCount ?? null,
     petPoiLoading: isValidating,

@@ -26,6 +26,7 @@ type MapState = {
   // basic positions
   myPos: LatLng | null;
   pickedPos: LatLng | null;
+  petPoiOn: boolean;
   walking: boolean;
   walkingPaused: boolean;
   walkingStartedAt: number | null;
@@ -44,6 +45,7 @@ type MapState = {
   // actions
   setMyPos: (p: LatLng | null) => void;
   setPickedPos: (p: LatLng | null) => void;
+  setPetPoiOn: (v: boolean) => void;
   setWalking: (v: boolean) => void;
   setWalkingPaused: (v: boolean) => void;
   setWalkingStartedAt: (ts: number | null) => void;
@@ -68,6 +70,7 @@ export const useMapStore = create<MapState>((set) => ({
   // ----------------------------
   myPos: null,
   pickedPos: null,
+  petPoiOn: false,
   walking: false,
   walkingPaused: false,
   walkingStartedAt: null,
@@ -78,6 +81,7 @@ export const useMapStore = create<MapState>((set) => ({
 
   setMyPos: (p) => set({ myPos: p }),
   setPickedPos: (p) => set({ pickedPos: p }),
+  setPetPoiOn: (v) => set({ petPoiOn: v }),
   setWalking: (v) => set({ walking: v }),
   setWalkingPaused: (v) => set({ walkingPaused: v }),
   setWalkingStartedAt: (ts) => set({ walkingStartedAt: ts }),

@@ -2,6 +2,7 @@
 
 const WALK_DEBUG_QUERY_KEY = "walkDebug";
 const WALK_DEBUG_STORAGE_KEY = "walkDebug";
+const WALK_DEBUG_PANEL_VISIBLE_STORAGE_KEY = "walkDebugPanelVisible";
 const CARDINAL_JUMP_TOLERANCE_DEG = 12;
 const WALK_DEBUG_UPDATED_EVENT = "walk-debug:updated";
 
@@ -52,6 +53,19 @@ export function isWalkDebugEnabled() {
   }
 }
 
+export function isWalkDebugPanelVisible() {
+  if (typeof window === "undefined") return true;
+  try {
+    const fromStorage = window.localStorage.getItem(
+      WALK_DEBUG_PANEL_VISIBLE_STORAGE_KEY,
+    );
+    if (fromStorage == null) return true;
+    return isDebugTruthy(fromStorage);
+  } catch {
+    return true;
+  }
+}
+
 export function classifyCardinalJump(deltaDeg: number | null) {
   if (deltaDeg == null || !Number.isFinite(deltaDeg)) return null;
   const absDelta = Math.abs(deltaDeg);
@@ -83,6 +97,19 @@ export function setWalkDebugEnabled(enabled: boolean) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(WALK_DEBUG_STORAGE_KEY, enabled ? "1" : "0");
+  } catch {
+    // ignore storage errors
+  }
+  dispatchWalkDebugUpdate();
+}
+
+export function setWalkDebugPanelVisible(visible: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      WALK_DEBUG_PANEL_VISIBLE_STORAGE_KEY,
+      visible ? "1" : "0",
+    );
   } catch {
     // ignore storage errors
   }
