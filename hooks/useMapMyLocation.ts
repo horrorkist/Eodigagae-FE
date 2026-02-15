@@ -591,9 +591,10 @@ export function useMapMyLocation(
 
   // MOVE_TO → 지도 이동 + 내 마커 이동 + myPos 반영
   useOn("map", "MOVE_TO", (cmd) => {
-    if (!mapRef.current || !window.naver?.maps) return;
-
+    // Keep store state in sync even before map instance is ready.
     setMyPos(cmd.pos);
+
+    if (!mapRef.current || !window.naver?.maps) return;
 
     const ll = new window.naver.maps.LatLng(cmd.pos.lat, cmd.pos.lng);
 

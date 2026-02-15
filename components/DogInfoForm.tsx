@@ -369,7 +369,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
               placeholder="이름"
               autoComplete="off"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
-                     focus:outline-none focus:border-dg-green-500"
+                      focus:outline-none focus:border-dg-green-500"
             />
             <FieldError message={errors.name?.message?.toString()} />
           </div>
