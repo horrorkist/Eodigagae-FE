@@ -529,8 +529,11 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                 <label
                   htmlFor={opt.value}
                   key={opt.value}
-                  className="flex items-center gap-2 border border-gray-300 rounded-full px-3 py-2
-                       has-checked:border-dg-green-500 has-checked:bg-dg-green-50 cursor-pointer"
+                  className={`flex items-center gap-2 rounded-full border px-3 py-2 cursor-pointer ${
+                    watchedBreed === opt.value
+                      ? "border-dg-green-500 bg-dg-green-50"
+                      : "border-gray-300"
+                  }`}
                 >
                   <input
                     id={opt.value}
