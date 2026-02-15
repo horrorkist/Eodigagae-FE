@@ -118,7 +118,7 @@ export default function BottomSheet({
   /** clip 경계 아래 잘리는 영역만큼 paddingBottom 보상 — settle 시에만 호출 */
   const applyClipPadding = useCallback((snapPx: number) => {
     if (contentRef.current)
-      contentRef.current.style.paddingBottom = `${snapPx + 24}px`;
+      contentRef.current.style.paddingBottom = `${snapPx}px`;
   }, []);
 
   // ── Store → DOM 동기화 ──

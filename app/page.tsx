@@ -178,7 +178,7 @@ export default function MapPage() {
       )}
 
       <BottomSheet peekHeight={30}>
-        <div className="space-y-4 h-full bg-blue-300">
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
             <button
               type="button"
