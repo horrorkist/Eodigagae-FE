@@ -274,8 +274,9 @@ type Props = {
 export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const setDog = useDogStore((s) => s.setDog);
   const currentDog = useDogStore((s) => s.dog);
-  const actionButtonRowRef = useRef<HTMLDivElement | null>(null);
+  const formRootRef = useRef<HTMLDivElement | null>(null);
   const wasWalkRecVisibleRef = useRef(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   const defaultUnit = getDefaultAgeUnit(currentDog);
   const defaultAge = getDefaultAgeValue(currentDog, defaultUnit);
@@ -340,23 +341,35 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
 
   useEffect(() => {
     const isWalkRecVisible = Boolean(walkRec);
-    if (isWalkRecVisible && !wasWalkRecVisibleRef.current) {
+    const wasWalkRecVisible = wasWalkRecVisibleRef.current;
+    const formRoot = formRootRef.current;
+    const bottomSheetContent = formRoot?.closest(
+      "[data-bottom-sheet-content]",
+    ) as HTMLDivElement | null;
+
+    if (!bottomSheetContent) {
+      wasWalkRecVisibleRef.current = isWalkRecVisible;
+      return;
+    }
+
+    if (isWalkRecVisible && !wasWalkRecVisible) {
       requestAnimationFrame(() => {
-        const actionButtonRow = actionButtonRowRef.current;
-        if (!actionButtonRow) return;
-
-        const bottomSheetContent = actionButtonRow.closest(
-          "[data-bottom-sheet-content]",
-        ) as HTMLDivElement | null;
-
-        if (!bottomSheetContent) return;
-
         bottomSheetContent.scrollTo({
           top: bottomSheetContent.scrollHeight,
           behavior: "smooth",
         });
       });
     }
+
+    if (!isWalkRecVisible && wasWalkRecVisible) {
+      requestAnimationFrame(() => {
+        bottomSheetContent.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      });
+    }
+
     wasWalkRecVisibleRef.current = isWalkRecVisible;
   }, [walkRec]);
 
@@ -419,7 +432,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   };
 
   return (
-    <div className="flex h-full flex-col space-y-6">
+    <div ref={formRootRef} className="flex h-full flex-col space-y-6">
       <header className="flex items-center text-lg font-semibold">
         몇 가지만 알려주시면
         <br />
@@ -428,6 +441,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col justify-between"
+        ref={formRef}
       >
         <div className="space-y-6">
           {/* 이름 */}
@@ -601,10 +615,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                     )}
                   />
                 </div>
-                <div
-                  ref={actionButtonRowRef}
-                  className="grid grid-cols-[0.6fr_1.4fr] items-center gap-2 pt-6"
-                >
+                <div className="grid grid-cols-[0.6fr_1.4fr] items-center gap-2 pt-6">
                   <button
                     type="button"
                     onClick={handleReset}
