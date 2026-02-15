@@ -2,7 +2,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import BottomSheet from "@/components/BottomSheet";
 import MapOverlay from "@/components/MapOverlay";
 import { useMapStore } from "@/stores/mapStore";
@@ -12,7 +19,6 @@ import { useDogStore } from "@/stores/dogStore";
 import { useBusDispatcher } from "@/hooks/useEventBus";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faPersonWalking,
   faPaw,
   faPenToSquare,
   faTriangleExclamation,
@@ -69,8 +75,10 @@ function formatDogAgeLabel(ageInMonths: number) {
 
 export default function MapPage() {
   useBusDispatcher(true);
-  const [showWalkDebugPanel, setShowWalkDebugPanel] = useState(() =>
-    isWalkDebugPanelVisible(),
+  const showWalkDebugPanel = useSyncExternalStore(
+    subscribeWalkDebugUpdates,
+    isWalkDebugPanelVisible,
+    () => true,
   );
 
   const myPos = useMapStore((s) => s.myPos);
@@ -108,14 +116,6 @@ export default function MapPage() {
     [petPois, visiblePoiCount],
   );
   const hasMorePois = visiblePoiCount < petPois.length;
-
-  const syncWalkDebugPanelVisible = useCallback(() => {
-    setShowWalkDebugPanel(isWalkDebugPanelVisible());
-  }, []);
-
-  useEffect(() => {
-    return subscribeWalkDebugUpdates(syncWalkDebugPanelVisible);
-  }, [syncWalkDebugPanelVisible]);
 
   const loadMorePois = useCallback(() => {
     setVisiblePoiCount((prev) =>

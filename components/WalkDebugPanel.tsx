@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   clearWalkDebugHistory,
@@ -119,24 +119,31 @@ export default function WalkDebugPanel() {
   const walkRec = dog ? getWalkRecommendation(dog) : null;
   const { requestRoute, requestTmapWalkRoute } = useRouteActions();
 
-  const [enabled, setEnabled] = useState(() => isWalkDebugEnabled());
-  const [entries, setEntries] = useState<WalkDebugEntry[]>(() =>
-    getWalkDebugHistory(),
+  const enabled = useSyncExternalStore(
+    subscribeWalkDebugUpdates,
+    isWalkDebugEnabled,
+    () => false,
   );
+  const [entries, setEntries] = useState<WalkDebugEntry[]>([]);
   const [expanded, setExpanded] = useState(true);
   const canRequest = !!myPos && !!pickedPos && !routeLoading;
   const canDraw = !!route?.path?.length;
   const routeDistanceKm =
     route?.summary?.distance != null ? route.summary.distance / 1000 : null;
 
-  const sync = useCallback(() => {
-    setEnabled(isWalkDebugEnabled());
-    setEntries(getWalkDebugHistory());
-  }, []);
-
   useEffect(() => {
-    return subscribeWalkDebugUpdates(sync);
-  }, [sync]);
+    const syncEntries = () => {
+      setEntries(getWalkDebugHistory());
+    };
+
+    const rafId = window.requestAnimationFrame(syncEntries);
+    const unsubscribe = subscribeWalkDebugUpdates(syncEntries);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      unsubscribe();
+    };
+  }, []);
 
   const visibleEntries = useMemo(
     () => entries.slice(-MAX_VISIBLE_LOGS).reverse(),

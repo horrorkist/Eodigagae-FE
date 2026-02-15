@@ -202,7 +202,7 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
     <div className="space-y-1.5">
       <div className="text-sm font-semibold">산책 시간</div>
       <div className="text-xs text-gray-500">
-        산책 시간을 정하면, 거리보다 시간을 우선해서 추천해드릴게요.
+        산책 시간을 정하면, 거리보다 시간에 맞춰 추천해드릴게요.
       </div>
       <div className="flex items-center gap-2">
         <button
@@ -240,7 +240,7 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
         </button>
       </div>
       <div className="flex items-center justify-between text-[11px] text-gray-500">
-        <span></span>
+        <span>최소 30분</span>
         <span>최대 5시간</span>
       </div>
     </div>
@@ -270,7 +270,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isValid },
     control,
     setValue,
     reset,
@@ -331,6 +331,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     };
     setDog(dogInfo);
     onSubmitSuccess?.(dogInfo);
+    console.log(data);
   };
 
   const ageMax = ageUnit === "months" ? 11 : 30;
@@ -521,32 +522,31 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                         )}
                       />
                     </div>
+                    <div className="grid grid-cols-[0.6fr_1.4fr] items-center gap-2 pt-6">
+                      <button
+                        type="button"
+                        onClick={handleReset}
+                        className="rounded-md border border-gray-300 bg-dg-gray py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                      >
+                        초기화
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!isValid}
+                        className={`rounded-md py-2.5 text-sm font-semibold transition-colors ${
+                          showRecommendDist
+                            ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
+                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        경로 추천
+                      </button>
+                    </div>
                   </>
                 )}
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-
-        <div className="grid grid-cols-[0.6fr_1.4fr] items-center gap-2 pt-6">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded-md border border-gray-300 bg-dg-gray py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-          >
-            초기화
-          </button>
-          <button
-            type="submit"
-            disabled={!showRecommendDist}
-            className={`rounded-md py-2.5 text-sm font-semibold transition-colors ${
-              showRecommendDist
-                ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            경로 추천
-          </button>
         </div>
       </form>
     </div>

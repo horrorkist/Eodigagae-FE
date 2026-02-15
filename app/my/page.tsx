@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import {
   isWalkDebugPanelVisible,
   setWalkDebugPanelVisible,
@@ -8,17 +8,11 @@ import {
 } from "@/lib/walkDebug";
 
 export default function MyPage() {
-  const [showWalkDebugPanel, setShowWalkDebugPanel] = useState(() =>
-    isWalkDebugPanelVisible(),
+  const showWalkDebugPanel = useSyncExternalStore(
+    subscribeWalkDebugUpdates,
+    isWalkDebugPanelVisible,
+    () => true,
   );
-
-  const sync = useCallback(() => {
-    setShowWalkDebugPanel(isWalkDebugPanelVisible());
-  }, []);
-
-  useEffect(() => {
-    return subscribeWalkDebugUpdates(sync);
-  }, [sync]);
 
   return (
     <div className="min-h-full bg-gray-50">
