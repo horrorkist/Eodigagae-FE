@@ -3,12 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faHouse,
-  faMagnifyingGlass,
-  faUser,
-} from "@fortawesome/free-solid-svg-icons";
+import { faHouse, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { faCircleUser } from "@fortawesome/free-regular-svg-icons";
 
 type Tab = {
   href: string;
@@ -19,14 +16,14 @@ type Tab = {
 const tabs: Tab[] = [
   { href: "/", label: "홈", icon: faHouse },
   { href: "/search", label: "검색", icon: faMagnifyingGlass },
-  { href: "/my", label: "마이", icon: faUser },
+  { href: "/my", label: "마이", icon: faCircleUser },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="grid grid-cols-3 h-14">
+    <nav className="grid grid-cols-3 h-14 items-center">
       {tabs.map((t) => {
         const active =
           t.href === "/"
@@ -38,17 +35,16 @@ export default function BottomNav() {
             href={t.href}
             className={[
               "flex flex-col h-14 items-center justify-center gap-1",
-              active ? "text-blue-500" : "text-neutral-400",
+              active ? "text-dg-green-500" : "text-dg-gray",
             ].join(" ")}
           >
-            <FontAwesomeIcon
-              icon={t.icon}
-              className="w-5 h-5"
-            />
-            <span className={[
-              "text-[10px]",
-              active ? "font-semibold" : "font-medium",
-            ].join(" ")}>
+            <FontAwesomeIcon icon={t.icon} className="w-5 h-5" />
+            <span
+              className={[
+                "text-[10px]",
+                active ? "font-semibold" : "font-medium",
+              ].join(" ")}
+            >
               {t.label}
             </span>
           </Link>

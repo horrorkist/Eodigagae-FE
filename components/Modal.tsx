@@ -71,9 +71,7 @@ export default function Modal() {
 
               {/* Content */}
               <div className="px-5 pt-6 pb-4">
-                {icon && (
-                  <div className="flex justify-center mb-3">{icon}</div>
-                )}
+                {icon && <div className="flex justify-center mb-3">{icon}</div>}
                 {title && (
                   <h2 className="text-base font-semibold text-center mb-2">
                     {title}
@@ -96,7 +94,7 @@ export default function Modal() {
                 <button
                   type="button"
                   onClick={handleConfirm}
-                  className="flex-1 py-2.5 rounded-xl bg-blue-500 text-sm font-medium text-white active:bg-blue-600 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl bg-dg-green-500 text-sm font-medium text-white active:bg-dg-green-600 transition-colors"
                 >
                   {confirmLabel}
                 </button>

@@ -44,7 +44,7 @@ export default function MyPage() {
               onClick={() => setWalkDebugPanelVisible(!showWalkDebugPanel)}
               className={[
                 "relative h-7 w-12 rounded-full transition-colors",
-                showWalkDebugPanel ? "bg-blue-500" : "bg-gray-300",
+                showWalkDebugPanel ? "bg-dg-green-500" : "bg-gray-300",
               ].join(" ")}
             >
               <span

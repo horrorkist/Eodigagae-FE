@@ -15,3 +15,20 @@ body {
 body {
   overscroll-behavior-y: none;
 }
+
+@theme {
+  --color-dg-green-50: #ebfceb;
+  --color-dg-green-100: #d8f9d6;
+  --color-dg-green-200: #bbf5b8;
+  --color-dg-green-300: #94f08f;
+  --color-dg-green-400: #63e95c;
+  --color-dg-green-500: #0bdc00;
+  --color-dg-green-600: #09b400;
+  --color-dg-green-700: #079100;
+  --color-dg-green-800: #066e00;
+  --color-dg-green-900: #044f00;
+  --color-dg-black: #2c2c2c;
+  --color-dg-gray: #cecece;
+  --color-dg-white: #ededed;
+  --color-green: #0bdc00;
+}

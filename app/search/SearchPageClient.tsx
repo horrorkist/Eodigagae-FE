@@ -280,7 +280,7 @@ export default function SearchPageClient() {
                 className={[
                   "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                   active
-                    ? "bg-blue-500 text-white"
+                    ? "bg-dg-green-500 text-white"
                     : "text-gray-600 hover:bg-gray-100",
                 ].join(" ")}
               >
@@ -343,8 +343,8 @@ export default function SearchPageClient() {
             </div>
             {items.length > 0 ? (
               <ul className="divide-y divide-gray-100">
-                {items.map((poi) => (
-                  <li key={poi.id} className="px-4 py-4">
+                {items.map((poi, i) => (
+                  <li key={i + "_" + poi.id} className="px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold text-gray-900">
@@ -375,9 +375,9 @@ export default function SearchPageClient() {
                       </div>
                     </div>
 
-                    {(poi.roadAddress || poi.address) && (
+                    {(poi.address || poi.roadAddress) && (
                       <div className="mt-2 text-xs text-gray-700">
-                        {poi.roadAddress || poi.address}
+                        {poi.address || poi.roadAddress}
                       </div>
                     )}
 

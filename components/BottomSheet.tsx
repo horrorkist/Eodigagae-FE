@@ -303,11 +303,14 @@ export default function BottomSheet({
     settleAfterDrag,
   ]);
 
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    beginDrag(e.clientY);
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      beginDrag(e.clientY);
 
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  }, [beginDrag]);
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [beginDrag],
+  );
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -382,10 +385,13 @@ export default function BottomSheet({
     [beginDrag, updateDrag],
   );
 
-  const onContentPointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.pointerType === "touch") return;
-    startContentGesture(e.clientY);
-  }, [startContentGesture]);
+  const onContentPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      startContentGesture(e.clientY);
+    },
+    [startContentGesture],
+  );
 
   const onContentPointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -403,16 +409,22 @@ export default function BottomSheet({
     [processContentMove],
   );
 
-  const onContentPointerUp = useCallback((e?: React.PointerEvent) => {
-    if (e?.pointerType === "touch") return;
-    finishContentGesture();
-  }, [finishContentGesture]);
+  const onContentPointerUp = useCallback(
+    (e?: React.PointerEvent) => {
+      if (e?.pointerType === "touch") return;
+      finishContentGesture();
+    },
+    [finishContentGesture],
+  );
 
-  const onContentTouchStartNative = useCallback((e: TouchEvent) => {
-    const touch = e.touches[0];
-    if (!touch) return;
-    startContentGesture(touch.clientY);
-  }, [startContentGesture]);
+  const onContentTouchStartNative = useCallback(
+    (e: TouchEvent) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      startContentGesture(touch.clientY);
+    },
+    [startContentGesture],
+  );
 
   const onContentTouchMoveNative = useCallback(
     (e: TouchEvent) => {
@@ -532,7 +544,7 @@ export default function BottomSheet({
             ref={contentRef}
             className={[
               "px-4 pb-6 h-[calc(100%-48px)]",
-              isOpen && index === 0 ? "overflow-auto" : "overflow-hidden",
+              isOpen && index === 0 ? "overflow-scroll" : "overflow-hidden",
             ].join(" ")}
             style={{
               opacity: 0,

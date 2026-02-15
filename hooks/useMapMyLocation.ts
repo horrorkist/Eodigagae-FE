@@ -1,6 +1,12 @@
 "use client";
 
-import { RefObject, createElement, useCallback, useEffect, useRef } from "react";
+import {
+  RefObject,
+  createElement,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLocationDot } from "@fortawesome/free-solid-svg-icons";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -32,15 +38,16 @@ const WALK_SPEED_VALID_MAX_ACCURACY_M = 15;
 const PREWALK_RECENTER_MIN_MOVE_M = 3;
 
 function buildUserMarkerHTML(headingDeg: number | null, walking: boolean) {
-  const coreColor = "#2563eb";
-  const haloColor = "rgba(37, 99, 235, 0.28)";
-  const borderColor = "rgba(191, 219, 254, 0.95)";
-  const directionLayer = walking && headingDeg != null
-    ? `<div style="position:absolute;inset:-2px;transform:rotate(${headingDeg.toFixed(1)}deg);transform-origin:50% 50%;">
+  const coreColor = "#0bdc00";
+  const haloColor = "rgba(37, 99, 135, 0.28)";
+  const borderColor = "rgba(206, 206, 206, 0.95)";
+  const directionLayer =
+    walking && headingDeg != null
+      ? `<div style="position:absolute;inset:-2px;transform:rotate(${headingDeg.toFixed(1)}deg);transform-origin:50% 50%;">
         <div style="position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:14px solid rgba(37, 99, 235, 0.28);filter:drop-shadow(0 1px 1px rgba(15, 23, 42, 0.3));"></div>
         <div style="position:absolute;left:50%;top:3px;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:8px solid #fff;"></div>
       </div>`
-    : "";
+      : "";
 
   return `
     <div style="width:${USER_MARKER_SIZE_PX}px;height:${USER_MARKER_SIZE_PX}px;position:relative;pointer-events:none;">
@@ -140,12 +147,15 @@ export function useMapMyLocation(
     [openModal],
   );
 
-  const { resetHeadingTracking, seedHeadingFromRoute, updateHeadingFromPosition } =
-    useWalkHeading({
-      walking,
-      walkingPaused,
-      setHeading,
-    });
+  const {
+    resetHeadingTracking,
+    seedHeadingFromRoute,
+    updateHeadingFromPosition,
+  } = useWalkHeading({
+    walking,
+    walkingPaused,
+    setHeading,
+  });
 
   const clearMoveMarkerListener = useCallback(
     (map: naver.maps.Map | null = mapRef.current) => {
@@ -402,14 +412,14 @@ export function useMapMyLocation(
       (pos) => {
         const c = pos.coords;
 
-        if (
-          typeof c.latitude !== "number" ||
-          typeof c.longitude !== "number"
-        ) {
+        if (typeof c.latitude !== "number" || typeof c.longitude !== "number") {
           return;
         }
 
-        if (typeof c.accuracy === "number" && c.accuracy > MAX_WALK_ACCURACY_M) {
+        if (
+          typeof c.accuracy === "number" &&
+          c.accuracy > MAX_WALK_ACCURACY_M
+        ) {
           return;
         }
 
@@ -421,24 +431,33 @@ export function useMapMyLocation(
         const last = lastWalkPosRef.current;
         const movedM = last ? haversineMeters(last, nextPos) : 0;
         const rawSpeedMps =
-          typeof c.speed === "number" && Number.isFinite(c.speed) ? c.speed : null;
+          typeof c.speed === "number" && Number.isFinite(c.speed)
+            ? c.speed
+            : null;
         const speedMps =
           rawSpeedMps != null &&
-          (c.accuracy ?? Number.POSITIVE_INFINITY) <= WALK_SPEED_VALID_MAX_ACCURACY_M
+          (c.accuracy ?? Number.POSITIVE_INFINITY) <=
+            WALK_SPEED_VALID_MAX_ACCURACY_M
             ? rawSpeedMps
             : null;
         const lowSpeedMoveThresholdM = Math.max(
           WALK_LOW_SPEED_MIN_MOVE_M,
           Math.min(
             WALK_LOW_SPEED_MOVE_MAX_M,
-            Math.max(0, (c.accuracy ?? 0) * WALK_LOW_SPEED_MOVE_FROM_ACCURACY_RATIO),
+            Math.max(
+              0,
+              (c.accuracy ?? 0) * WALK_LOW_SPEED_MOVE_FROM_ACCURACY_RATIO,
+            ),
           ),
         );
         const accuracyMoveThresholdM = Math.min(
           WALK_MOVE_FROM_ACCURACY_MAX_M,
           Math.max(0, (c.accuracy ?? 0) * WALK_MOVE_FROM_ACCURACY_RATIO),
         );
-        const moveThresholdM = Math.max(MIN_WALK_MOVE_M, accuracyMoveThresholdM);
+        const moveThresholdM = Math.max(
+          MIN_WALK_MOVE_M,
+          accuracyMoveThresholdM,
+        );
         const isLowSpeed = speedMps == null || speedMps < WALK_LOW_SPEED_MPS;
 
         if (last && movedM < moveThresholdM) return;
@@ -451,7 +470,10 @@ export function useMapMyLocation(
             WALK_STATIONARY_DRIFT_MIN_M,
             Math.min(
               WALK_STATIONARY_DRIFT_MAX_M,
-              Math.max(0, (c.accuracy ?? 0) * WALK_STATIONARY_DRIFT_FROM_ACCURACY_RATIO),
+              Math.max(
+                0,
+                (c.accuracy ?? 0) * WALK_STATIONARY_DRIFT_FROM_ACCURACY_RATIO,
+              ),
             ),
           );
           const driftFromAnchorM = haversineMeters(anchor, nextPos);
@@ -459,7 +481,8 @@ export function useMapMyLocation(
           if (
             movedM < lowSpeedMoveThresholdM ||
             driftFromAnchorM < stationaryDriftThresholdM
-          ) return;
+          )
+            return;
         }
 
         if (last && movedM <= 80) {

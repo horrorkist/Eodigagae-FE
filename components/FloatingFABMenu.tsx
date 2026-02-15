@@ -44,8 +44,8 @@ export default function FloatingFABMenu({ items }: { items: FABMenuItem[] }) {
                   item.disabled
                     ? "bg-gray-100 text-gray-400 shadow-none cursor-not-allowed"
                     : item.active
-                    ? "bg-blue-500 text-white shadow-blue-500/25"
-                    : "bg-white/90 text-gray-800 hover:bg-white",
+                      ? "bg-dg-green-500 text-white shadow-dg-green-500/25"
+                      : "bg-white/90 text-gray-800 hover:bg-white",
                 ].join(" ")}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -77,7 +77,7 @@ export default function FloatingFABMenu({ items }: { items: FABMenuItem[] }) {
           "transition-[box-shadow,transform]",
           open
             ? "bg-gray-800 shadow-gray-800/30"
-            : "bg-blue-500 shadow-blue-500/30",
+            : "bg-dg-green-500 shadow-dg-green-500/30",
         ].join(" ")}
         aria-expanded={open}
         aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
