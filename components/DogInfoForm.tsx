@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { DogBreed, DogInfo } from "@/types/dog";
 import { useDogStore } from "@/stores/dogStore";
@@ -34,15 +34,25 @@ const AGE_UNIT_LABEL = {
 const WALK_DISTANCE_MIN_KM = 0.5;
 const WALK_DISTANCE_MAX_KM = 10;
 const WALK_DISTANCE_STEP_KM = 0.5;
-const WALK_DURATION_MIN_HOURS = 0;
-const WALK_DURATION_MAX_HOURS = 180;
-const WALK_DURATION_STEP_HOURS = 10;
+// Duration field is stored in minutes.
+const WALK_DURATION_MIN_MINUTES = 0;
+const WALK_DURATION_MAX_MINUTES = 180;
+const WALK_DURATION_STEP_MINUTES = 10;
 const WALK_STEP_BUTTON_CLASS =
   "h-9 w-9 rounded-md border border-gray-300 bg-white text-lg font-semibold text-gray-700 disabled:opacity-40";
 const ERROR_TEXT_CLASS = "flex items-center gap-1 text-xs text-red-600";
 
 function getDefaultAgeUnit(dog: DogInfo | null): AgeUnit {
   return dog && dog.ageInMonths < 12 ? "months" : "years";
+}
+
+function getDefaultAgeValue(
+  dog: DogInfo | null,
+  ageUnit: AgeUnit,
+): number | "" {
+  if (!dog) return "";
+  if (ageUnit === "months") return dog.ageInMonths;
+  return Math.floor(dog.ageInMonths / 12);
 }
 
 function toAgeInMonths(age: number, ageUnit: AgeUnit): number {
@@ -64,10 +74,10 @@ function formatWalkDistance(distanceKm: number) {
   return `${distanceKm.toFixed(1)}km`;
 }
 
-function formatWalkDuration(walkDuration: number) {
-  if (walkDuration === 0) return "정하지 않음";
-  const hours = Math.floor(walkDuration / 60);
-  const mins = walkDuration % 60;
+function formatWalkDuration(minutes: number) {
+  if (minutes === 0) return "정하지 않음";
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
   return `${hours > 0 ? hours + "시간" : ""} ${mins > 0 ? mins + "분" : ""}`;
 }
 
@@ -206,7 +216,7 @@ type WalkDurationSelectorProps = {
 };
 
 function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
-  const walkDurationHours = value;
+  const walkDurationMinutes = value;
 
   return (
     <div className="space-y-1.5">
@@ -217,20 +227,24 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => onChange(walkDurationHours - WALK_DURATION_STEP_HOURS)}
-          disabled={walkDurationHours <= WALK_DURATION_MIN_HOURS}
+          onClick={() =>
+            onChange(walkDurationMinutes - WALK_DURATION_STEP_MINUTES)
+          }
+          disabled={walkDurationMinutes <= WALK_DURATION_MIN_MINUTES}
           aria-label="산책 시간 줄이기"
           className={WALK_STEP_BUTTON_CLASS}
         >
           -
         </button>
         <div className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-center text-sm font-semibold text-gray-800">
-          {formatWalkDuration(walkDurationHours)}
+          {formatWalkDuration(walkDurationMinutes)}
         </div>
         <button
           type="button"
-          onClick={() => onChange(walkDurationHours + WALK_DURATION_STEP_HOURS)}
-          disabled={walkDurationHours >= WALK_DURATION_MAX_HOURS}
+          onClick={() =>
+            onChange(walkDurationMinutes + WALK_DURATION_STEP_MINUTES)
+          }
+          disabled={walkDurationMinutes >= WALK_DURATION_MAX_MINUTES}
           aria-label="산책 시간 늘리기"
           className={WALK_STEP_BUTTON_CLASS}
         >
@@ -248,7 +262,7 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
 type FormValues = {
   name?: string;
   age: number | string;
-  breed: DogBreed;
+  breed?: DogBreed;
   walkDistanceKm: number;
   walkDurationHours: number;
 };
@@ -260,8 +274,18 @@ type Props = {
 export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const setDog = useDogStore((s) => s.setDog);
   const currentDog = useDogStore((s) => s.dog);
+  const actionButtonRowRef = useRef<HTMLDivElement | null>(null);
+  const wasWalkRecVisibleRef = useRef(false);
 
   const defaultUnit = getDefaultAgeUnit(currentDog);
+  const defaultAge = getDefaultAgeValue(currentDog, defaultUnit);
+  const defaultFormValues: FormValues = {
+    name: currentDog?.name ?? "",
+    age: defaultAge,
+    breed: currentDog?.breed,
+    walkDistanceKm: WALK_DISTANCE_MIN_KM,
+    walkDurationHours: WALK_DURATION_MIN_MINUTES,
+  };
 
   const [ageUnit, setAgeUnit] = useState<AgeUnit>(defaultUnit);
 
@@ -274,12 +298,13 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     reset,
   } = useForm<FormValues>({
     mode: "onChange",
+    defaultValues: defaultFormValues,
   });
 
   const watchedName = useWatch({ control, name: "name" });
   const watchedAge = useWatch({ control, name: "age" });
   const watchedBreed = useWatch({ control, name: "breed" });
-  const watchedWalkDurationHours = useWatch({
+  const watchedWalkDurationMinutes = useWatch({
     control,
     name: "walkDurationHours",
   });
@@ -290,11 +315,8 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const ageInMonthsForRecommendation = hasAgeValue
     ? toAgeInMonths(normalizedAge, ageUnit)
     : null;
-  const showRecommendDist =
-    Boolean(watchedBreed) && ageInMonthsForRecommendation !== null;
-
   const walkRec =
-    showRecommendDist && watchedAge && watchedBreed
+    watchedBreed && ageInMonthsForRecommendation !== null
       ? getWalkRecommendation({
           ageInMonths: ageInMonthsForRecommendation,
           breed: watchedBreed,
@@ -304,8 +326,8 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     ? clampWalkDistanceKm(walkRec.minKm)
     : null;
   const isDurationPriority =
-    Number(watchedWalkDurationHours ?? WALK_DURATION_MIN_HOURS) >
-    WALK_DURATION_MIN_HOURS;
+    Number(watchedWalkDurationMinutes ?? WALK_DURATION_MIN_MINUTES) >
+    WALK_DURATION_MIN_MINUTES;
 
   useEffect(() => {
     if (recommendedWalkDistanceKm == null || isDurationPriority) return;
@@ -315,6 +337,19 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
       shouldValidate: true,
     });
   }, [recommendedWalkDistanceKm, setValue, isDurationPriority]);
+
+  useEffect(() => {
+    const isWalkRecVisible = Boolean(walkRec);
+    if (isWalkRecVisible && !wasWalkRecVisibleRef.current) {
+      requestAnimationFrame(() => {
+        actionButtonRowRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+        });
+      });
+    }
+    wasWalkRecVisibleRef.current = isWalkRecVisible;
+  }, [walkRec]);
 
   const trimmedName = watchedName?.trim();
   const ageLabel = hasAgeValue
@@ -327,6 +362,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   );
 
   const onSubmit = (data: FormValues) => {
+    if (!data.breed) return;
     const normalizedName = data.name?.trim();
     const ageInMonths = toAgeInMonths(Number(data.age), ageUnit);
     const dogInfo: DogInfo = {
@@ -336,15 +372,41 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     };
     setDog(dogInfo);
     onSubmitSuccess?.(dogInfo);
-    console.log(data);
   };
 
   const ageMax = ageUnit === "months" ? 11 : 30;
   const agePlaceholder = ageUnit === "months" ? "개월 수 (0~11)" : "나이";
 
   const handleReset = () => {
-    reset();
+    reset(defaultFormValues);
     setAgeUnit(defaultUnit);
+  };
+
+  const handleWalkDurationChange = (
+    nextDuration: number,
+    onChange: (nextValue: number) => void,
+  ) => {
+    const normalizedDuration = Math.min(
+      WALK_DURATION_MAX_MINUTES,
+      Math.max(WALK_DURATION_MIN_MINUTES, nextDuration),
+    );
+
+    onChange(normalizedDuration);
+
+    if (normalizedDuration > WALK_DURATION_MIN_MINUTES) {
+      setValue("walkDistanceKm", 0, {
+        shouldDirty: true,
+        shouldTouch: true,
+        shouldValidate: true,
+      });
+      return;
+    }
+
+    setValue("walkDistanceKm", walkRec?.minKm ?? WALK_DISTANCE_MIN_KM, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
   };
 
   return (
@@ -466,7 +528,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
           </fieldset>
 
           <AnimatePresence>
-            {showRecommendDist && (
+            {walkRec && (
               <motion.div
                 key="recommendation"
                 initial={{ opacity: 0, y: 6 }}
@@ -474,112 +536,85 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                 exit={{ opacity: 0, y: 6 }}
                 className="space-y-6 will-change-transform"
               >
-                {walkRec && (
-                  <>
-                    <div className="space-y-3 rounded-md border border-dg-green-500/25 bg-dg-green-50 px-3 py-2">
-                      <p className="text-xs leading-relaxed">
-                        <span className="font-semibold text-dg-green-700 text-nowrap">
-                          {recommendTargetLabel}
-                        </span>
-                        <span className="text-gray-700">
-                          {watchedName ? getJosa(watchedName) : "에게는"}
-                        </span>
-                        &nbsp;
-                        <span className="font-bold text-dg-green-700 text-nowrap">
-                          {walkRec.minKm}~{walkRec.maxKm}km
-                        </span>
-                        &nbsp;
-                        <span className="text-gray-700 text-nowrap">
-                          정도의 산책을 추천해요.
-                        </span>
-                      </p>
-                    </div>
-                    <div className="space-y-6">
-                      {/* 시간 */}
-                      <Controller
-                        control={control}
-                        name="walkDurationHours"
-                        rules={{
-                          min: WALK_DURATION_MIN_HOURS,
-                          max: WALK_DURATION_MAX_HOURS,
-                        }}
-                        render={({ field }) => (
-                          <WalkDurationSelector
-                            value={field.value ?? WALK_DURATION_MIN_HOURS}
-                            onChange={(nextDuration) => {
-                              const normalizedDuration = Math.min(
-                                WALK_DURATION_MAX_HOURS,
-                                Math.max(WALK_DURATION_MIN_HOURS, nextDuration),
-                              );
-
-                              field.onChange(normalizedDuration);
-
-                              if (
-                                normalizedDuration > WALK_DURATION_MIN_HOURS
-                              ) {
-                                setValue("walkDistanceKm", 0, {
-                                  shouldDirty: true,
-                                  shouldTouch: true,
-                                  shouldValidate: true,
-                                });
-                                return;
-                              }
-
-                              setValue(
-                                "walkDistanceKm",
-                                walkRec?.minKm ?? WALK_DISTANCE_MIN_KM,
-                                {
-                                  shouldDirty: true,
-                                  shouldTouch: true,
-                                  shouldValidate: true,
-                                },
-                              );
-                            }}
-                          />
-                        )}
+                <div className="space-y-3 rounded-md border border-dg-green-500/25 bg-dg-green-50 px-3 py-2">
+                  <p className="text-xs leading-relaxed">
+                    <span className="font-semibold text-dg-green-700 text-nowrap">
+                      {recommendTargetLabel}
+                    </span>
+                    <span className="text-gray-700">
+                      {watchedName ? getJosa(watchedName) : "에게는"}
+                    </span>
+                    &nbsp;
+                    <span className="font-bold text-dg-green-700 text-nowrap">
+                      {walkRec.minKm}~{walkRec.maxKm}km
+                    </span>
+                    &nbsp;
+                    <span className="text-gray-700 text-nowrap">
+                      정도의 산책을 추천해요.
+                    </span>
+                  </p>
+                </div>
+                <div className="space-y-6">
+                  {/* 시간 */}
+                  <Controller
+                    control={control}
+                    name="walkDurationHours"
+                    rules={{
+                      min: WALK_DURATION_MIN_MINUTES,
+                      max: WALK_DURATION_MAX_MINUTES,
+                    }}
+                    render={({ field }) => (
+                      <WalkDurationSelector
+                        value={field.value ?? WALK_DURATION_MIN_MINUTES}
+                        onChange={(nextDuration) =>
+                          handleWalkDurationChange(nextDuration, field.onChange)
+                        }
                       />
-                      {/* 거리 */}
-                      <Controller
-                        key={`${walkRec.minKm}-${walkRec.maxKm}`}
-                        control={control}
-                        name="walkDistanceKm"
-                        rules={{
-                          min: 0,
-                          max: WALK_DISTANCE_MAX_KM,
-                        }}
-                        render={({ field }) => (
-                          <WalkDistanceSelector
-                            minKm={walkRec.minKm}
-                            maxKm={walkRec.maxKm}
-                            value={field.value ?? WALK_DISTANCE_MIN_KM}
-                            onChange={field.onChange}
-                            disabledByDuration={isDurationPriority}
-                          />
-                        )}
+                    )}
+                  />
+                  {/* 거리 */}
+                  <Controller
+                    key={`${walkRec.minKm}-${walkRec.maxKm}`}
+                    control={control}
+                    name="walkDistanceKm"
+                    rules={{
+                      min: 0,
+                      max: WALK_DISTANCE_MAX_KM,
+                    }}
+                    render={({ field }) => (
+                      <WalkDistanceSelector
+                        minKm={walkRec.minKm}
+                        maxKm={walkRec.maxKm}
+                        value={field.value ?? WALK_DISTANCE_MIN_KM}
+                        onChange={field.onChange}
+                        disabledByDuration={isDurationPriority}
                       />
-                    </div>
-                    <div className="grid grid-cols-[0.6fr_1.4fr] items-center gap-2 pt-6">
-                      <button
-                        type="button"
-                        onClick={handleReset}
-                        className="rounded-md border border-gray-300 bg-dg-gray py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                      >
-                        초기화
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={!isValid}
-                        className={`rounded-md py-2.5 text-sm font-semibold transition-colors ${
-                          showRecommendDist
-                            ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
-                            : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        }`}
-                      >
-                        경로 추천
-                      </button>
-                    </div>
-                  </>
-                )}
+                    )}
+                  />
+                </div>
+                <div
+                  ref={actionButtonRowRef}
+                  className="grid grid-cols-[0.6fr_1.4fr] items-center gap-2 pt-6"
+                >
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="rounded-md border border-gray-300 bg-dg-gray py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    초기화
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!isValid}
+                    className={`rounded-md py-2.5 text-sm font-semibold transition-colors ${
+                      walkRec
+                        ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                  >
+                    경로 추천
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
