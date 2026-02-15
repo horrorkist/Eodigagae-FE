@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHouse } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import AppIcon from "@/components/icons/AppIcon";
+import { useBottomSheetStore } from "@/stores/bottomSheet";
 
 type Tab = {
   href: string;
@@ -22,9 +21,17 @@ const tabs: Tab[] = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const isBottomSheetOpen = useBottomSheetStore((s) => s.isOpen);
 
   return (
-    <nav className="grid grid-cols-3 h-14 items-center">
+    <nav
+      className={[
+        "grid grid-cols-3 h-14 items-center bg-white transition-shadow duration-200",
+        isBottomSheetOpen
+          ? "shadow-none"
+          : "shadow-[0_-6px_18px_rgba(15,23,42,0.08)]",
+      ].join(" ")}
+    >
       {tabs.map((t) => {
         const active =
           t.href === "/"
