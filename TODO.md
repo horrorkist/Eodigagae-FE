@@ -38,3 +38,7 @@
 - [ ] Support camera switching during walk mode.
 - [ ] Save photos taken during a walk to the walking history.
 - [ ] Design destination marker UI.
+
+## Icons
+
+- [ ] Consider migrating `AppIcon` to load raw SVG files from `public/icons` (or SVGR import) to avoid duplicating path data in TSX.

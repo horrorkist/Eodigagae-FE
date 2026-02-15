@@ -3,20 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faHouse, faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
+import { faHouse } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import { faCircleUser } from "@fortawesome/free-regular-svg-icons";
+import AppIcon from "@/components/icons/AppIcon";
 
 type Tab = {
   href: string;
   label: string;
-  icon: IconDefinition;
+  icon?: IconDefinition;
+  appIconName?: "magnify" | "user-circle" | "map-pin";
 };
 
 const tabs: Tab[] = [
-  { href: "/", label: "홈", icon: faHouse },
-  { href: "/search", label: "검색", icon: faMagnifyingGlass },
-  { href: "/my", label: "마이", icon: faCircleUser },
+  { href: "/", label: "홈", appIconName: "map-pin" },
+  { href: "/search", label: "검색", appIconName: "magnify" },
+  { href: "/my", label: "마이", appIconName: "user-circle" },
 ];
 
 export default function BottomNav() {
@@ -38,7 +39,10 @@ export default function BottomNav() {
               active ? "text-dg-green-500" : "text-dg-gray",
             ].join(" ")}
           >
-            <FontAwesomeIcon icon={t.icon} className="w-5 h-5" />
+            {/* {t.icon && <FontAwesomeIcon icon={t.icon} className="w-5 h-5" />} */}
+            {t.appIconName && (
+              <AppIcon name={t.appIconName} className="w-6 h-6" />
+            )}
             <span
               className={[
                 "text-[10px]",

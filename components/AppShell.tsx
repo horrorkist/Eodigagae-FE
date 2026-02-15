@@ -21,7 +21,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* 하단탭 */}
         <div
-          className="fixed bottom-0 left-1/2 z-101 w-full max-w-[430px] -translate-x-1/2 border-t bg-white"
+          className="fixed bottom-0 left-1/2 z-101 w-full max-w-[430px] -translate-x-1/2 bg-white"
           style={{ paddingBottom: "var(--safe-bottom)" }}
         >
           <BottomNav />

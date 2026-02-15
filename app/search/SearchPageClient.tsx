@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMagnifyingGlass } from "@fortawesome/free-solid-svg-icons";
 import useSWR from "swr";
 import formatDist from "@/lib/formatDist";
+import AppIcon from "@/components/icons/AppIcon";
 import type {
   TmapPoi,
   TmapPoiSearchResponse,
@@ -249,10 +248,7 @@ export default function SearchPageClient() {
             setSubmitSeq((prev) => prev + 1);
           }}
         >
-          <FontAwesomeIcon
-            icon={faMagnifyingGlass}
-            className="h-3.5 w-3.5 shrink-0 text-gray-400"
-          />
+          <AppIcon name="magnify" className="h-6 w-6 shrink-0 text-black" />
           <input
             id="search-keyword"
             ref={inputRef}

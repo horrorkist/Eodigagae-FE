@@ -622,7 +622,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="rounded-md border border-gray-300 bg-dg-gray py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                    className="rounded-md bg-dg-white py-2.5 text-sm font-semibold text-dg-black transition-colors hover:bg-gray-50"
                   >
                     초기화
                   </button>

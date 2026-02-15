@@ -6,10 +6,10 @@ import { useEmit, useOn } from "@/hooks/useEventBus";
 import { requestOrientationPermissionIfNeeded } from "@/hooks/useWalkHeading";
 import { useMapStore } from "@/stores/mapStore";
 import FloatingFABMenu from "./FloatingFABMenu";
+import AppIcon from "@/components/icons/AppIcon";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faClock,
-  faMagnifyingGlass,
   faLocationCrosshairs,
   faMapLocationDot,
   faFlagCheckered,
@@ -283,9 +283,9 @@ export default function MapOverlay(props: {
                 className="flex w-full items-center gap-2 rounded-lg border bg-white/90 backdrop-blur shadow px-3 py-2"
                 aria-label="검색 페이지로 이동"
               >
-                <FontAwesomeIcon
-                  icon={faMagnifyingGlass}
-                  className="w-3.5 h-3.5 text-gray-400 shrink-0"
+                <AppIcon
+                  name="magnify"
+                  className="h-6 w-6 shrink-0 text-black"
                 />
                 <span className="text-sm text-gray-500">
                   어디로 산책할까요?
