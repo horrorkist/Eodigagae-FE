@@ -542,6 +542,7 @@ export default function BottomSheet({
           {/* Content — 항상 고정 높이, clip container가 가시 영역 처리 */}
           <div
             ref={contentRef}
+            data-bottom-sheet-content="true"
             className={[
               "px-4 pb-6 h-[calc(100%-48px)]",
               isOpen && index === 0 ? "overflow-scroll" : "overflow-hidden",

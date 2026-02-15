@@ -342,9 +342,18 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     const isWalkRecVisible = Boolean(walkRec);
     if (isWalkRecVisible && !wasWalkRecVisibleRef.current) {
       requestAnimationFrame(() => {
-        actionButtonRowRef.current?.scrollIntoView({
+        const actionButtonRow = actionButtonRowRef.current;
+        if (!actionButtonRow) return;
+
+        const bottomSheetContent = actionButtonRow.closest(
+          "[data-bottom-sheet-content]",
+        ) as HTMLDivElement | null;
+
+        if (!bottomSheetContent) return;
+
+        bottomSheetContent.scrollTo({
+          top: bottomSheetContent.scrollHeight,
           behavior: "smooth",
-          block: "end",
         });
       });
     }
