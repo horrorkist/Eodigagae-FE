@@ -35,23 +35,14 @@ const WALK_DISTANCE_MIN_KM = 0.5;
 const WALK_DISTANCE_MAX_KM = 10;
 const WALK_DISTANCE_STEP_KM = 0.5;
 const WALK_DURATION_MIN_HOURS = 0;
-const WALK_DURATION_MAX_HOURS = 5;
-const WALK_DURATION_STEP_HOURS = 0.5;
+const WALK_DURATION_MAX_HOURS = 180;
+const WALK_DURATION_STEP_HOURS = 10;
 const WALK_STEP_BUTTON_CLASS =
   "h-9 w-9 rounded-md border border-gray-300 bg-white text-lg font-semibold text-gray-700 disabled:opacity-40";
 const ERROR_TEXT_CLASS = "flex items-center gap-1 text-xs text-red-600";
 
 function getDefaultAgeUnit(dog: DogInfo | null): AgeUnit {
   return dog && dog.ageInMonths < 12 ? "months" : "years";
-}
-
-function getDefaultAgeValue(
-  dog: DogInfo | null,
-  ageUnit: AgeUnit,
-): number | "" {
-  if (!dog) return "";
-  if (ageUnit === "months") return dog.ageInMonths;
-  return Math.floor(dog.ageInMonths / 12);
 }
 
 function toAgeInMonths(age: number, ageUnit: AgeUnit): number {
@@ -67,24 +58,17 @@ function clampWalkDistanceKm(distanceKm: number) {
 }
 
 function formatWalkDistance(distanceKm: number) {
+  if (distanceKm === 0) return "-";
   if (distanceKm < 1) return `${Math.round(distanceKm * 1000)}m`;
   if (Number.isInteger(distanceKm)) return `${distanceKm}km`;
   return `${distanceKm.toFixed(1)}km`;
 }
 
-function clampWalkDurationHours(hours: number) {
-  const rounded = Math.round(hours * 10) / 10;
-  return Math.min(
-    WALK_DURATION_MAX_HOURS,
-    Math.max(WALK_DURATION_MIN_HOURS, rounded),
-  );
-}
-
-function formatWalkDuration(hours: number) {
-  if (hours === 0) return "정하지 않음";
-  if (Number.isInteger(hours)) return `${hours}시간`;
-  if (hours < 1) return "30분";
-  return `${Math.floor(hours)}시간 30분`;
+function formatWalkDuration(walkDuration: number) {
+  if (walkDuration === 0) return "정하지 않음";
+  const hours = Math.floor(walkDuration / 60);
+  const mins = walkDuration % 60;
+  return `${hours > 0 ? hours + "시간" : ""} ${mins > 0 ? mins + "분" : ""}`;
 }
 
 function getRecommendTargetLabel(
@@ -118,6 +102,7 @@ type WalkDistanceSelectorProps = {
   onChange: (nextDistanceKm: number) => void;
   minKm: number;
   maxKm: number;
+  disabledByDuration?: boolean;
 };
 
 function WalkDistanceSelector({
@@ -125,16 +110,34 @@ function WalkDistanceSelector({
   onChange,
   minKm,
   maxKm,
+  disabledByDuration = false,
 }: WalkDistanceSelectorProps) {
-  const walkDistanceKm = clampWalkDistanceKm(value);
+  const walkDistanceKm = disabledByDuration ? 0 : clampWalkDistanceKm(value);
   const isSelectedInRecommendedRange =
-    walkDistanceKm >= minKm && walkDistanceKm <= maxKm;
+    !disabledByDuration && walkDistanceKm >= minKm && walkDistanceKm <= maxKm;
 
   return (
     <div className="space-y-1.5">
       <div className="text-sm font-semibold">산책 거리</div>
       <div className="relative">
         <AnimatePresence initial={false}>
+          {disabledByDuration && (
+            <div className="pointer-events-none absolute left-1/2 -top-8 z-10 -translate-x-1/2">
+              <motion.div
+                key="walk-duration-priority-tooltip"
+                initial={{ opacity: 0, y: 2 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 2 }}
+                transition={{
+                  duration: 0.5,
+                }}
+                className="relative will-change-transform rounded-md text-nowrap bg-dg-green-600 px-2 py-1 text-[11px] font-medium text-white shadow"
+              >
+                산책 시간에 맞춰 추천해드릴게요.
+                <span className="absolute left-1/2 top-full -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-dg-green-600" />
+              </motion.div>
+            </div>
+          )}
           {isSelectedInRecommendedRange && (
             <div className="pointer-events-none absolute left-1/2 -top-8 z-10 -translate-x-1/2">
               <motion.div
@@ -142,6 +145,9 @@ function WalkDistanceSelector({
                 initial={{ opacity: 0, y: 2 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 2 }}
+                transition={{
+                  duration: 0.5,
+                }}
                 className="relative will-change-transform rounded-md bg-dg-green-600 px-2 py-1 text-[11px] font-medium text-white shadow"
               >
                 추천 거리예요
@@ -158,7 +164,9 @@ function WalkDistanceSelector({
                 clampWalkDistanceKm(walkDistanceKm - WALK_DISTANCE_STEP_KM),
               )
             }
-            disabled={walkDistanceKm <= WALK_DISTANCE_MIN_KM}
+            disabled={
+              disabledByDuration || walkDistanceKm <= WALK_DISTANCE_MIN_KM
+            }
             aria-label="산책 거리 줄이기"
             className={WALK_STEP_BUTTON_CLASS}
           >
@@ -174,7 +182,9 @@ function WalkDistanceSelector({
                 clampWalkDistanceKm(walkDistanceKm + WALK_DISTANCE_STEP_KM),
               )
             }
-            disabled={walkDistanceKm >= WALK_DISTANCE_MAX_KM}
+            disabled={
+              disabledByDuration || walkDistanceKm >= WALK_DISTANCE_MAX_KM
+            }
             aria-label="산책 거리 늘리기"
             className={WALK_STEP_BUTTON_CLASS}
           >
@@ -196,7 +206,7 @@ type WalkDurationSelectorProps = {
 };
 
 function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
-  const walkDurationHours = clampWalkDurationHours(value);
+  const walkDurationHours = value;
 
   return (
     <div className="space-y-1.5">
@@ -207,13 +217,7 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() =>
-            onChange(
-              clampWalkDurationHours(
-                walkDurationHours - WALK_DURATION_STEP_HOURS,
-              ),
-            )
-          }
+          onClick={() => onChange(walkDurationHours - WALK_DURATION_STEP_HOURS)}
           disabled={walkDurationHours <= WALK_DURATION_MIN_HOURS}
           aria-label="산책 시간 줄이기"
           className={WALK_STEP_BUTTON_CLASS}
@@ -225,13 +229,7 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
         </div>
         <button
           type="button"
-          onClick={() =>
-            onChange(
-              clampWalkDurationHours(
-                walkDurationHours + WALK_DURATION_STEP_HOURS,
-              ),
-            )
-          }
+          onClick={() => onChange(walkDurationHours + WALK_DURATION_STEP_HOURS)}
           disabled={walkDurationHours >= WALK_DURATION_MAX_HOURS}
           aria-label="산책 시간 늘리기"
           className={WALK_STEP_BUTTON_CLASS}
@@ -240,8 +238,8 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
         </button>
       </div>
       <div className="flex items-center justify-between text-[11px] text-gray-500">
-        <span>최소 30분</span>
-        <span>최대 5시간</span>
+        <span>최소 10분</span>
+        <span>최대 3시간</span>
       </div>
     </div>
   );
@@ -281,6 +279,10 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const watchedName = useWatch({ control, name: "name" });
   const watchedAge = useWatch({ control, name: "age" });
   const watchedBreed = useWatch({ control, name: "breed" });
+  const watchedWalkDurationHours = useWatch({
+    control,
+    name: "walkDurationHours",
+  });
 
   const normalizedAge =
     watchedAge === "" || watchedAge == null ? null : Number(watchedAge);
@@ -299,17 +301,20 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
         })
       : null;
   const recommendedWalkDistanceKm = walkRec
-    ? clampWalkDistanceKm(walkRec.maxKm)
+    ? clampWalkDistanceKm(walkRec.minKm)
     : null;
+  const isDurationPriority =
+    Number(watchedWalkDurationHours ?? WALK_DURATION_MIN_HOURS) >
+    WALK_DURATION_MIN_HOURS;
 
   useEffect(() => {
-    if (recommendedWalkDistanceKm == null) return;
+    if (recommendedWalkDistanceKm == null || isDurationPriority) return;
     setValue("walkDistanceKm", recommendedWalkDistanceKm, {
       shouldDirty: false,
       shouldTouch: false,
       shouldValidate: true,
     });
-  }, [recommendedWalkDistanceKm, setValue]);
+  }, [recommendedWalkDistanceKm, setValue, isDurationPriority]);
 
   const trimmedName = watchedName?.trim();
   const ageLabel = hasAgeValue
@@ -347,7 +352,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
       <header className="flex items-center text-lg font-semibold">
         몇 가지만 알려주시면
         <br />
-        맞춤 추천 경로를 추천해드릴게요.
+        맞춤 산책 경로를 추천해드릴게요.
       </header>
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -490,23 +495,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                       </p>
                     </div>
                     <div className="space-y-6">
-                      <Controller
-                        key={`${walkRec.minKm}-${walkRec.maxKm}`}
-                        control={control}
-                        name="walkDistanceKm"
-                        rules={{
-                          min: WALK_DISTANCE_MIN_KM,
-                          max: WALK_DISTANCE_MAX_KM,
-                        }}
-                        render={({ field }) => (
-                          <WalkDistanceSelector
-                            minKm={walkRec.minKm}
-                            maxKm={walkRec.maxKm}
-                            value={field.value ?? WALK_DISTANCE_MIN_KM}
-                            onChange={field.onChange}
-                          />
-                        )}
-                      />
+                      {/* 시간 */}
                       <Controller
                         control={control}
                         name="walkDurationHours"
@@ -517,7 +506,54 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                         render={({ field }) => (
                           <WalkDurationSelector
                             value={field.value ?? WALK_DURATION_MIN_HOURS}
+                            onChange={(nextDuration) => {
+                              const normalizedDuration = Math.min(
+                                WALK_DURATION_MAX_HOURS,
+                                Math.max(WALK_DURATION_MIN_HOURS, nextDuration),
+                              );
+
+                              field.onChange(normalizedDuration);
+
+                              if (
+                                normalizedDuration > WALK_DURATION_MIN_HOURS
+                              ) {
+                                setValue("walkDistanceKm", 0, {
+                                  shouldDirty: true,
+                                  shouldTouch: true,
+                                  shouldValidate: true,
+                                });
+                                return;
+                              }
+
+                              setValue(
+                                "walkDistanceKm",
+                                walkRec?.minKm ?? WALK_DISTANCE_MIN_KM,
+                                {
+                                  shouldDirty: true,
+                                  shouldTouch: true,
+                                  shouldValidate: true,
+                                },
+                              );
+                            }}
+                          />
+                        )}
+                      />
+                      {/* 거리 */}
+                      <Controller
+                        key={`${walkRec.minKm}-${walkRec.maxKm}`}
+                        control={control}
+                        name="walkDistanceKm"
+                        rules={{
+                          min: 0,
+                          max: WALK_DISTANCE_MAX_KM,
+                        }}
+                        render={({ field }) => (
+                          <WalkDistanceSelector
+                            minKm={walkRec.minKm}
+                            maxKm={walkRec.maxKm}
+                            value={field.value ?? WALK_DISTANCE_MIN_KM}
                             onChange={field.onChange}
+                            disabledByDuration={isDurationPriority}
                           />
                         )}
                       />
