@@ -6,17 +6,18 @@ import { useModalStore } from "@/stores/modal";
 import { useRouteActions } from "@/hooks/useRouteActions";
 import type { LatLng } from "@/types/mapEvents";
 import { projectPointToSegmentMeters } from "@/lib/geo";
+import { appIconPaw } from "@/components/icons/definitions.generated";
 
 const ROUTE_STROKE_WEIGHT = 10;
 const ROUTE_BORDER_STROKE_WEIGHT = 14;
-const ROUTE_MAIN_COLOR = "#1d4ed8";
-const ROUTE_BORDER_COLOR = "#ffffff";
-const CHEVRON_MIN_SPACING_M = 55;
-const CHEVRON_MAX_SPACING_M = 220;
-const CHEVRON_MIN_SIZE_PX = 10;
-const CHEVRON_MAX_SIZE_PX = 20;
-const CHEVRON_MIN_COUNT = 20;
-const CHEVRON_MAX_COUNT = 120;
+const ROUTE_MAIN_COLOR = "#0bdc00";
+const ROUTE_BORDER_COLOR = "#08a400";
+const ROUTE_DIRECTION_MARKER_SPACING_PX = 40;
+const ROUTE_DIRECTION_MARKER_HARD_MAX = 2400;
+const ROUTE_DIRECTION_MARKER_SIZE_PX = Math.max(
+  6,
+  Math.floor(ROUTE_STROKE_WEIGHT * 0.72),
+);
 const SNAP_LOCAL_BACKWARD_SEGMENTS = 30;
 const SNAP_LOCAL_FORWARD_SEGMENTS = 120;
 const SNAP_FALLBACK_DISTANCE_M = 35;
@@ -30,14 +31,6 @@ const ROUTE_MIN_RENDERABLE_LENGTH_M = 3;
 type SnapResult = {
   segIdx: number;
   distM: number;
-};
-
-type ChevronStyle = {
-  visible: boolean;
-  spacingM: number;
-  sizePx: number;
-  maxCount: number;
-  strokeWidth: number;
 };
 
 type ReroutePromptConditionInput = {
@@ -116,7 +109,10 @@ function findNearestSnap(
   }
 
   const localStart = Math.max(0, idxHint - SNAP_LOCAL_BACKWARD_SEGMENTS);
-  const localEnd = Math.min(segCount - 1, idxHint + SNAP_LOCAL_FORWARD_SEGMENTS);
+  const localEnd = Math.min(
+    segCount - 1,
+    idxHint + SNAP_LOCAL_FORWARD_SEGMENTS,
+  );
   const localBest = runSearch(localStart, localEnd);
 
   if (!localBest || localBest.distM > SNAP_FALLBACK_DISTANCE_M) {
@@ -167,7 +163,10 @@ function buildRemainingPath({
   const shouldDrawOffRouteConnector =
     isOffRoute && snapDistM <= ROUTE_OFF_ROUTE_CONNECTOR_MAX_M;
   if (!shouldDrawOffRouteConnector) {
-    return [[projected.lng, projected.lat], ...path.slice(progressedSegIdx + 1)];
+    return [
+      [projected.lng, projected.lat],
+      ...path.slice(progressedSegIdx + 1),
+    ];
   }
 
   return [
@@ -216,47 +215,20 @@ function lerpLatLng(a: LatLng, b: LatLng, t: number): LatLng {
   };
 }
 
-function clamp(v: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, v));
+type ScreenPoint = {
+  x: number;
+  y: number;
+};
+
+function distancePx(a: ScreenPoint, b: ScreenPoint) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
-function getChevronStyleForZoom(zoom: number): ChevronStyle {
-  if (zoom <= 12) {
-    return {
-      visible: false,
-      spacingM: CHEVRON_MAX_SPACING_M,
-      sizePx: CHEVRON_MIN_SIZE_PX,
-      maxCount: CHEVRON_MIN_COUNT,
-      strokeWidth: 2.2,
-    };
-  }
-
-  const z = clamp(zoom, 13, 18);
-  const t = (z - 13) / 5; // 0..1
-
-  const spacingM = Math.round(
-    CHEVRON_MAX_SPACING_M - (CHEVRON_MAX_SPACING_M - CHEVRON_MIN_SPACING_M) * t,
-  );
-  const sizePx = Math.round(
-    CHEVRON_MIN_SIZE_PX + (CHEVRON_MAX_SIZE_PX - CHEVRON_MIN_SIZE_PX) * t,
-  );
-  const maxCount = Math.round(
-    CHEVRON_MIN_COUNT + (CHEVRON_MAX_COUNT - CHEVRON_MIN_COUNT) * t,
-  );
-  const strokeWidth = 2.2 + 0.6 * t;
-
-  return { visible: true, spacingM, sizePx, maxCount, strokeWidth };
-}
-
-function buildChevronHtml(
-  directionDeg: number,
-  sizePx: number,
-  strokeWidth: number,
-) {
+function buildDirectionMarkerHtml(directionDeg: number, sizePx: number) {
   return `
     <div style="width:${sizePx}px;height:${sizePx}px;position:relative;transform:rotate(${directionDeg.toFixed(1)}deg);transform-origin:50% 50%;pointer-events:none;">
-      <svg width="${sizePx}" height="${sizePx}" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;">
-        <path d="M5.5 9.5 L8 7 L10.5 9.5" stroke="#ffffff" stroke-width="${strokeWidth.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round" />
+      <svg width="${sizePx}" height="${sizePx}" viewBox="${appIconPaw.viewBox}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+        ${appIconPaw.body}
       </svg>
     </div>
   `;
@@ -293,23 +265,47 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       clearChevronMarkers();
       if (!mapRef.current || !window.naver?.maps) return;
       if (!path?.length || path.length < 2) return;
-
-      const zoom = mapRef.current.getZoom();
-      const style = getChevronStyleForZoom(zoom);
-      if (!style.visible) return;
-
-      let distanceFromStartM = 0;
-      let nextChevronAtM = style.spacingM;
-      let created = 0;
+      const projection = mapRef.current.getProjection();
+      const segments: Array<{
+        a: LatLng;
+        b: LatLng;
+        lenPx: number;
+      }> = [];
+      let totalLenPx = 0;
 
       for (let i = 0; i < path.length - 1; i++) {
         const a: LatLng = { lat: path[i][1], lng: path[i][0] };
         const b: LatLng = { lat: path[i + 1][1], lng: path[i + 1][0] };
-        const segLenM = haversineMeters(a, b);
-        if (segLenM <= 0.001) continue;
+        const aOffset = projection.fromCoordToOffset(
+          new window.naver.maps.LatLng(a.lat, a.lng),
+        );
+        const bOffset = projection.fromCoordToOffset(
+          new window.naver.maps.LatLng(b.lat, b.lng),
+        );
+        const aPx: ScreenPoint = { x: aOffset.x, y: aOffset.y };
+        const bPx: ScreenPoint = { x: bOffset.x, y: bOffset.y };
+        const lenPx = distancePx(aPx, bPx);
+        if (lenPx <= 0.001) continue;
 
-        while (distanceFromStartM + segLenM >= nextChevronAtM) {
-          const t = (nextChevronAtM - distanceFromStartM) / segLenM;
+        segments.push({ a, b, lenPx });
+        totalLenPx += lenPx;
+      }
+
+      if (segments.length === 0 || totalLenPx <= 0) return;
+
+      const expectedCount = totalLenPx / ROUTE_DIRECTION_MARKER_SPACING_PX;
+      const spacingPx =
+        expectedCount > ROUTE_DIRECTION_MARKER_HARD_MAX
+          ? totalLenPx / ROUTE_DIRECTION_MARKER_HARD_MAX
+          : ROUTE_DIRECTION_MARKER_SPACING_PX;
+
+      let distanceFromStartPx = 0;
+      let nextChevronAtPx = spacingPx;
+
+      for (const segment of segments) {
+        const { a, b, lenPx } = segment;
+        while (distanceFromStartPx + lenPx >= nextChevronAtPx) {
+          const t = (nextChevronAtPx - distanceFromStartPx) / lenPx;
           const point = lerpLatLng(a, b, t);
           const direction = bearingDeg(a, b);
 
@@ -319,26 +315,22 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
             clickable: false,
             zIndex: 320,
             icon: {
-              content: buildChevronHtml(
+              content: buildDirectionMarkerHtml(
                 direction,
-                style.sizePx,
-                style.strokeWidth,
+                ROUTE_DIRECTION_MARKER_SIZE_PX,
               ),
               anchor: new window.naver.maps.Point(
-                style.sizePx / 2,
-                style.sizePx / 2,
+                ROUTE_DIRECTION_MARKER_SIZE_PX / 2,
+                ROUTE_DIRECTION_MARKER_SIZE_PX / 2,
               ),
             },
           });
 
           chevronMarkersRef.current.push(marker);
-
-          created += 1;
-          if (created >= style.maxCount) return;
-          nextChevronAtM += style.spacingM;
+          nextChevronAtPx += spacingPx;
         }
 
-        distanceFromStartM += segLenM;
+        distanceFromStartPx += lenPx;
       }
     },
     [clearChevronMarkers, mapRef],
@@ -412,7 +404,6 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     (path: [number, number][], showChevrons: boolean) => {
       if (!mapRef.current || !window.naver?.maps) return;
       if (!path?.length) return;
-
       lastDrawnPathRef.current = path;
 
       const pts = path.map(
@@ -464,24 +455,39 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     if (!mapRef.current || !window.naver?.maps) return;
 
     const map = mapRef.current;
-    const listener = naver.maps.Event.addListener(map, "zoom_changed", () => {
-      if (walking) {
-        clearChevronMarkers();
-        return;
-      }
-
-      const path = lastDrawnPathRef.current;
-      if (!path?.length) {
-        clearChevronMarkers();
-        return;
-      }
-      drawRouteChevrons(path);
-    });
+    let rafId: number | null = null;
+    const queueRedraw = () => {
+      if (rafId != null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        if (!drawRoute) {
+          clearChevronMarkers();
+          return;
+        }
+        const path = lastDrawnPathRef.current;
+        if (!path?.length) return;
+        drawRouteChevrons(path);
+      });
+    };
+    const syncListener = naver.maps.Event.addListener(
+      map,
+      "zoom_changed",
+      () => {
+        if (walking) {
+          clearChevronMarkers();
+          return;
+        }
+        queueRedraw();
+      },
+    );
 
     return () => {
-      naver.maps.Event.removeListener(listener);
+      if (rafId != null) {
+        window.cancelAnimationFrame(rafId);
+      }
+      naver.maps.Event.removeListener(syncListener);
     };
-  }, [mapRef, drawRouteChevrons, clearChevronMarkers, walking]);
+  }, [mapRef, drawRoute, drawRouteChevrons, clearChevronMarkers, walking]);
 
   useEffect(() => {
     resetRouteTracking();

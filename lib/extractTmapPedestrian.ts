@@ -1,38 +1,54 @@
 import type { RouteResult } from "@/stores/mapStore";
+type UnknownRecord = Record<string, unknown>;
 
-export function extractTmapPedestrian(data: any): RouteResult {
-  const features: any[] = Array.isArray(data?.features) ? data.features : [];
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function readNumberFromRecord(
+  record: UnknownRecord,
+  key: string,
+): number | undefined {
+  const value = record[key];
+  return typeof value === "number" ? value : undefined;
+}
+
+export function extractTmapPedestrian(data: unknown): RouteResult {
+  const root = isRecord(data) ? data : {};
+  const features = Array.isArray(root.features) ? root.features : [];
 
   const path: [number, number][] = [];
   let distance: number | undefined;
   let duration: number | undefined;
 
   for (const f of features) {
-    const g = f?.geometry;
-    const props = f?.properties;
+    if (!isRecord(f)) continue;
+    const g = isRecord(f.geometry) ? f.geometry : null;
+    const props = isRecord(f.properties) ? f.properties : {};
 
     if (distance == null) {
       const d =
-        props?.totalDistance ??
-        props?.distance ??
-        data?.totalDistance ??
-        data?.distance;
-      if (typeof d === "number") distance = d;
+        readNumberFromRecord(props, "totalDistance") ??
+        readNumberFromRecord(props, "distance") ??
+        readNumberFromRecord(root, "totalDistance") ??
+        readNumberFromRecord(root, "distance");
+      if (d != null) distance = d;
     }
 
     if (duration == null) {
       const t =
-        props?.totalTime ??
-        props?.duration ??
-        data?.totalTime ??
-        data?.duration;
-      if (typeof t === "number") duration = t;
+        readNumberFromRecord(props, "totalTime") ??
+        readNumberFromRecord(props, "duration") ??
+        readNumberFromRecord(root, "totalTime") ??
+        readNumberFromRecord(root, "duration");
+      if (t != null) duration = t;
     }
 
-    if (g?.type === "LineString" && Array.isArray(g?.coordinates)) {
+    if (g?.type === "LineString" && Array.isArray(g.coordinates)) {
       for (const c of g.coordinates) {
-        const lng = c?.[0];
-        const lat = c?.[1];
+        if (!Array.isArray(c)) continue;
+        const lng = c[0];
+        const lat = c[1];
         if (typeof lng === "number" && typeof lat === "number")
           path.push([lng, lat]);
       }

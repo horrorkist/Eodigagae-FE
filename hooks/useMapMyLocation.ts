@@ -349,7 +349,6 @@ export function useMapMyLocation(
       emit({
         type: "MOVE_TO",
         pos: { lat: coords.latitude, lng: coords.longitude },
-        zoom: 15,
         animate: true,
         channel: "map",
       });
