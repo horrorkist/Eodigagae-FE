@@ -39,7 +39,7 @@ const WALK_DURATION_MIN_MINUTES = 0;
 const WALK_DURATION_MAX_MINUTES = 180;
 const WALK_DURATION_STEP_MINUTES = 10;
 const WALK_STEP_BUTTON_CLASS =
-  "h-9 w-9 rounded-md border border-gray-300 bg-white text-lg font-semibold text-gray-700 disabled:opacity-40";
+  "h-9 w-9 rounded-md border border-dg-white bg-white text-lg font-semibold text-gray-700 disabled:opacity-40";
 const ERROR_TEXT_CLASS = "flex items-center gap-1 text-xs text-red-600";
 
 function getDefaultAgeUnit(dog: DogInfo | null): AgeUnit {
@@ -141,10 +141,10 @@ function WalkDistanceSelector({
                 transition={{
                   duration: 0.5,
                 }}
-                className="relative will-change-transform rounded-md text-nowrap bg-dg-green-600 px-2 py-1 text-[11px] font-medium text-white shadow"
+                className="relative will-change-transform rounded-md text-nowrap bg-dg-green-500 px-2 py-1 text-[11px] font-medium text-white shadow"
               >
                 산책 시간에 맞춰 추천해드릴게요.
-                <span className="absolute left-1/2 top-full -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-dg-green-600" />
+                <span className="absolute left-1/2 top-full -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-dg-green-500" />
               </motion.div>
             </div>
           )}
@@ -158,10 +158,10 @@ function WalkDistanceSelector({
                 transition={{
                   duration: 0.5,
                 }}
-                className="relative will-change-transform rounded-md bg-dg-green-600 px-2 py-1 text-[11px] font-medium text-white shadow"
+                className="relative will-change-transform rounded-md bg-dg-green-500 px-2 py-1 text-[11px] font-medium text-white shadow"
               >
                 추천 거리예요
-                <span className="absolute left-1/2 top-full -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-dg-green-600" />
+                <span className="absolute left-1/2 top-full -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-dg-green-500" />
               </motion.div>
             </div>
           )}
@@ -182,7 +182,7 @@ function WalkDistanceSelector({
           >
             -
           </button>
-          <div className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-center text-sm font-semibold text-gray-800">
+          <div className="flex-1 rounded-md border border-dg-white bg-white px-3 py-2 text-center text-sm font-semibold text-gray-800">
             {formatWalkDistance(walkDistanceKm)}
           </div>
           <button
@@ -236,7 +236,7 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
         >
           -
         </button>
-        <div className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-center text-sm font-semibold text-gray-800">
+        <div className="flex-1 rounded-md border border-dg-white bg-white px-3 py-2 text-center text-sm font-semibold text-gray-800">
           {formatWalkDuration(walkDurationMinutes)}
         </div>
         <button
@@ -433,7 +433,10 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   };
 
   return (
-    <div ref={formRootRef} className="flex h-full flex-col space-y-6">
+    <div
+      ref={formRootRef}
+      className="flex h-full flex-col space-y-6 text-dg-black"
+    >
       <header className="flex items-center text-lg font-semibold">
         몇 가지만 알려주시면
         <br />
@@ -454,7 +457,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
               {...register("name")}
               placeholder="이름"
               autoComplete="off"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+              className="w-full border border-dg-white rounded-md px-3 py-2 text-sm
                       focus:outline-none focus:border-dg-green-500"
             />
             <FieldError message={errors.name?.message?.toString()} />
@@ -470,7 +473,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                 반려견 나이
               </label>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <div className="flex-1">
                 <input
                   autoComplete="off"
@@ -486,11 +489,22 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                     },
                   })}
                   placeholder={agePlaceholder}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm
+                  className="w-full border border-dg-white rounded-md px-3 py-2 text-sm
                        focus:outline-none focus:border-dg-green-500"
                 />
               </div>
-              <div className="flex rounded-md border border-gray-300 overflow-hidden text-sm">
+              <div className="flex rounded-md border border-dg-white overflow-hidden text-sm">
+                <button
+                  type="button"
+                  onClick={() => setAgeUnit("years")}
+                  className={`w-[50px] py-2 transition-colors flex-1 ${
+                    ageUnit === "years"
+                      ? "bg-dg-green-500 text-white"
+                      : "bg-white text-gray-700"
+                  }`}
+                >
+                  년
+                </button>
                 <button
                   type="button"
                   onClick={() => setAgeUnit("months")}
@@ -501,17 +515,6 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                   }`}
                 >
                   <p className="text-nowrap">개월</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAgeUnit("years")}
-                  className={`w-[50px] py-2 transition-colors flex-1 ${
-                    ageUnit === "years"
-                      ? "bg-dg-green-500 text-white"
-                      : "bg-white text-gray-700"
-                  }`}
-                >
-                  살
                 </button>
               </div>
             </div>
@@ -541,7 +544,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                         className={`flex items-center gap-2 rounded-full border px-3 py-2 cursor-pointer ${
                           selectedValue === opt.value
                             ? "border-dg-green-500 bg-dg-green-50"
-                            : "border-gray-300"
+                            : "border-dg-white"
                         }`}
                       >
                         <input
@@ -631,18 +634,18 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-[0.6fr_1.4fr] items-center gap-2 pt-6">
+                <div className="grid grid-cols-[0.7fr_1.3fr] items-center gap-3 pt-6 text-lg">
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="rounded-md bg-dg-white py-2.5 text-sm font-semibold text-dg-black transition-colors hover:bg-gray-50"
+                    className="rounded-xl bg-dg-white py-5 font-semibold text-dg-black transition-colors hover:bg-gray-50"
                   >
                     초기화
                   </button>
                   <button
                     type="submit"
                     disabled={!isValid}
-                    className={`rounded-md py-2.5 text-sm font-semibold transition-colors ${
+                    className={`rounded-xl py-5 font-semibold transition-colors ${
                       walkRec
                         ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
                         : "bg-gray-300 text-gray-500 cursor-not-allowed"

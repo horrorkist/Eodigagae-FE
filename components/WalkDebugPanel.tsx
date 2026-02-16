@@ -16,7 +16,6 @@ import { useRouteActions } from "@/hooks/useRouteActions";
 import CoordRow from "@/components/CoordRow";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faRoute,
   faPersonWalking,
   faDrawPolygon,
   faRotateLeft,
@@ -117,7 +116,7 @@ export default function WalkDebugPanel() {
   );
   const dog = useDogStore((s) => s.dog);
   const walkRec = dog ? getWalkRecommendation(dog) : null;
-  const { requestRoute, requestTmapWalkRoute } = useRouteActions();
+  const { requestTmapWalkRoute } = useRouteActions();
 
   const enabled = useSyncExternalStore(
     subscribeWalkDebugUpdates,
@@ -161,20 +160,6 @@ export default function WalkDebugPanel() {
           <button
             type="button"
             className={ACTION_BUTTON_CLASS}
-            onClick={requestRoute}
-            disabled={!canRequest}
-          >
-            <FontAwesomeIcon
-              icon={routeLoading ? faSpinner : faRoute}
-              className="w-3.5 h-3.5"
-              spin={routeLoading}
-            />
-            {routeLoading ? "요청 중..." : "경로 요청"}
-          </button>
-
-          <button
-            type="button"
-            className={ACTION_BUTTON_CLASS}
             onClick={requestTmapWalkRoute}
             disabled={!canRequest}
           >
@@ -183,7 +168,7 @@ export default function WalkDebugPanel() {
               className="w-3.5 h-3.5"
               spin={routeLoading}
             />
-            {routeLoading ? "요청 중..." : "티맵 도보"}
+            {routeLoading ? "요청 중..." : "경로 요청"}
           </button>
 
           <button

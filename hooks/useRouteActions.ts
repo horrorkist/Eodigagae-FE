@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { useShallow } from "zustand/shallow";
 import { useMapStore } from "@/stores/mapStore";
-import { fetchNaverRoute, fetchTmapWalkRoute } from "@/services/routes";
+import { fetchTmapWalkRoute } from "@/services/routes";
 
 export function useRouteActions() {
   const { myPos, pickedPos, setRouteState } = useMapStore(
@@ -13,39 +13,6 @@ export function useRouteActions() {
       setRouteState: s.setRouteState,
     })),
   );
-
-  const requestRoute = useCallback(async () => {
-    if (!myPos || !pickedPos) {
-      setRouteState({
-        routeError: "출발/도착 좌표가 필요해요.",
-        route: null,
-        drawRoute: false,
-      });
-      return;
-    }
-
-    setRouteState({ routeLoading: true, routeError: null });
-
-    try {
-      const result = await fetchNaverRoute({ start: myPos, goal: pickedPos });
-
-      setRouteState({
-        route: result,
-        routeLoading: false,
-        routeError: null,
-        drawRoute: false,
-      });
-    } catch (e: any) {
-      const msg = e?.message ?? "알 수 없는 오류";
-
-      setRouteState({
-        route: null,
-        routeLoading: false,
-        routeError: msg,
-        drawRoute: false,
-      });
-    }
-  }, [myPos, pickedPos, setRouteState]);
 
   const requestTmapWalkRoute = useCallback(async () => {
     if (!myPos || !pickedPos) {
@@ -71,8 +38,9 @@ export function useRouteActions() {
         routeError: null,
         drawRoute: false,
       });
-    } catch (e: any) {
-      const msg = e?.message ?? "알 수 없는 오류";
+    } catch (error: unknown) {
+      const msg =
+        error instanceof Error ? error.message : "알 수 없는 오류";
 
       setRouteState({
         route: null,
@@ -83,5 +51,5 @@ export function useRouteActions() {
     }
   }, [myPos, pickedPos, setRouteState]);
 
-  return { requestRoute, requestTmapWalkRoute };
+  return { requestTmapWalkRoute };
 }
