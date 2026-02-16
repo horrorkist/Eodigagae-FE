@@ -7,10 +7,13 @@ import { requestOrientationPermissionIfNeeded } from "@/hooks/useWalkHeading";
 import { useMapStore } from "@/stores/mapStore";
 import FloatingFABMenu from "./FloatingFABMenu";
 import AppIcon from "@/components/icons/AppIcon";
+import {
+  appIconLocation,
+  appIconMagnify,
+} from "@/components/icons/definitions.generated";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faClock,
-  faLocationCrosshairs,
   faMapLocationDot,
   faFlagCheckered,
   faPause,
@@ -149,12 +152,12 @@ export default function MapOverlay(props: {
 
   const fabItems = useMemo(
     () => [
-      {
-        key: "my-location",
-        icon: faLocationCrosshairs,
-        label: "내 위치",
-        onClick: () => emit({ type: "REQUEST_MY_LOCATION", channel: "map" }),
-      },
+      // {
+      //   key: "my-location",
+      //   icon: faLocationCrosshairs,
+      //   label: "내 위치",
+      //   onClick: () => emit({ type: "REQUEST_MY_LOCATION", channel: "map" }),
+      // },
       {
         key: "move-marker",
         icon: faMapLocationDot,
@@ -284,7 +287,7 @@ export default function MapOverlay(props: {
                 aria-label="검색 페이지로 이동"
               >
                 <AppIcon
-                  name="magnify"
+                  icon={appIconMagnify}
                   className="h-6 w-6 shrink-0 text-black"
                 />
                 <span className="text-sm text-gray-500">
@@ -327,8 +330,16 @@ export default function MapOverlay(props: {
       </div>
 
       {/* 우측 플로팅 버튼 영역 */}
-      <div className="pointer-events-none absolute right-3 bottom-28">
+      <div className="pointer-events-none absolute right-3 bottom-28 flex flex-col items-end space-y-4">
         <FloatingFABMenu items={fabItems} />
+        <button
+          onClick={() => {
+            emit({ type: "REQUEST_MY_LOCATION", channel: "map" });
+          }}
+          className="pointer-events-auto rounded-full w-10 h-10 bg-white p-2 flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden text-dg-black active:bg-dg-green-500 active:text-white"
+        >
+          <AppIcon icon={appIconLocation} className="w-5 h-5" />
+        </button>
       </div>
     </div>
   );

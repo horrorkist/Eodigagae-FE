@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import formatDist from "@/lib/formatDist";
 import AppIcon from "@/components/icons/AppIcon";
+import { appIconMagnify } from "@/components/icons/definitions.generated";
 import type {
   TmapPoi,
   TmapPoiSearchResponse,
@@ -248,7 +249,7 @@ export default function SearchPageClient() {
             setSubmitSeq((prev) => prev + 1);
           }}
         >
-          <AppIcon name="magnify" className="h-6 w-6 shrink-0 text-black" />
+          <AppIcon icon={appIconMagnify} className="h-6 w-6 shrink-0 text-black" />
           <input
             id="search-keyword"
             ref={inputRef}
