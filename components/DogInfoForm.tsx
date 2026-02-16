@@ -262,7 +262,7 @@ function WalkDurationSelector({ value, onChange }: WalkDurationSelectorProps) {
 type FormValues = {
   name?: string;
   age: number | string;
-  breed?: DogBreed;
+  breed: DogBreed | "";
   walkDistanceKm: number;
   walkDurationHours: number;
 };
@@ -283,7 +283,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const defaultFormValues: FormValues = {
     name: currentDog?.name ?? "",
     age: defaultAge,
-    breed: currentDog?.breed,
+    breed: currentDog?.breed ?? "",
     walkDistanceKm: WALK_DISTANCE_MIN_KM,
     walkDurationHours: WALK_DURATION_MIN_MINUTES,
   };
@@ -310,6 +310,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     name: "walkDurationHours",
   });
 
+  const selectedBreed = watchedBreed || undefined;
   const normalizedAge =
     watchedAge === "" || watchedAge == null ? null : Number(watchedAge);
   const hasAgeValue = normalizedAge !== null && !Number.isNaN(normalizedAge);
@@ -317,10 +318,10 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     ? toAgeInMonths(normalizedAge, ageUnit)
     : null;
   const walkRec =
-    watchedBreed && ageInMonthsForRecommendation !== null
+    selectedBreed && ageInMonthsForRecommendation !== null
       ? getWalkRecommendation({
           ageInMonths: ageInMonthsForRecommendation,
-          breed: watchedBreed,
+          breed: selectedBreed,
         })
       : null;
   const recommendedWalkDistanceKm = walkRec
@@ -380,7 +381,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const recommendTargetLabel = getRecommendTargetLabel(
     trimmedName,
     ageLabel,
-    watchedBreed,
+    selectedBreed,
   );
 
   const onSubmit = (data: FormValues) => {
@@ -524,32 +525,43 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
             <legend className="flex items-center gap-1.5 text-sm font-semibold">
               반려견 크기
             </legend>
-            <div className="flex gap-x-2">
-              {BREED_OPTIONS.map((opt) => (
-                <label
-                  htmlFor={opt.value}
-                  key={opt.value}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-2 cursor-pointer ${
-                    watchedBreed === opt.value
-                      ? "border-dg-green-500 bg-dg-green-50"
-                      : "border-gray-300"
-                  }`}
-                >
-                  <input
-                    id={opt.value}
-                    type="radio"
-                    value={opt.value}
-                    {...register("breed", {
-                      required: "견종을 선택해주세요",
-                    })}
-                    className="hidden"
-                  />
-                  <div className="flex space-x-2">
-                    <div className="text-sm font-medium">{opt.value}</div>
+            <Controller
+              control={control}
+              name="breed"
+              rules={{ required: "견종을 선택해주세요" }}
+              render={({ field }) => {
+                const selectedValue = field.value ?? "";
+                return (
+                  <div className="flex gap-x-2">
+                    {BREED_OPTIONS.map((opt) => (
+                      <label
+                        htmlFor={opt.value}
+                        key={opt.value}
+                        className={`flex items-center gap-2 rounded-full border px-3 py-2 cursor-pointer ${
+                          selectedValue === opt.value
+                            ? "border-dg-green-500 bg-dg-green-50"
+                            : "border-gray-300"
+                        }`}
+                      >
+                        <input
+                          id={opt.value}
+                          type="radio"
+                          value={opt.value}
+                          checked={selectedValue === opt.value}
+                          onChange={() => field.onChange(opt.value)}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          className="hidden"
+                        />
+                        <div className="flex space-x-2">
+                          <div className="text-sm font-medium">{opt.value}</div>
+                        </div>
+                      </label>
+                    ))}
                   </div>
-                </label>
-              ))}
-            </div>
+                );
+              }}
+            />
             <FieldError message={errors.breed?.message?.toString()} />
           </fieldset>
 
