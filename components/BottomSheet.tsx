@@ -81,7 +81,7 @@ export default function BottomSheet({
 
     if (range < 96) return [fullyOpenTop];
 
-    const points = [0, 0.5, 0.8].map((fraction) =>
+    const points = [0, 0.7].map((fraction) =>
       Math.round(fullyOpenTop + range * fraction),
     );
 

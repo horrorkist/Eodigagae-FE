@@ -474,6 +474,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
               <div className="flex-1">
                 <input
                   autoComplete="off"
+                  type="number"
                   inputMode="numeric"
                   {...register("age", {
                     required: "나이를 입력해주세요",

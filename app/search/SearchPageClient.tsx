@@ -249,8 +249,12 @@ export default function SearchPageClient() {
             setSubmitSeq((prev) => prev + 1);
           }}
         >
-          <AppIcon icon={appIconMagnify} className="h-6 w-6 shrink-0 text-black" />
+          <AppIcon
+            icon={appIconMagnify}
+            className="h-6 w-6 shrink-0 text-black"
+          />
           <input
+            autoComplete="off"
             id="search-keyword"
             ref={inputRef}
             type="search"

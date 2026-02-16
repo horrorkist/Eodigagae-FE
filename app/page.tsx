@@ -30,6 +30,11 @@ import {
   isWalkDebugPanelVisible,
   subscribeWalkDebugUpdates,
 } from "@/lib/walkDebug";
+import {
+  appIconPuppy,
+  appIconTrashbin,
+  appIconWaterdrop,
+} from "@/components/icons/definitions.generated";
 
 const NaverMapClient = dynamic(() => import("@/components/NaverMapClient"), {
   ssr: false,
@@ -101,6 +106,9 @@ export default function MapPage() {
     cooldownMs: 10 * 60 * 1000, // 클라 쿨다운 10분
   });
 
+  const [showBin, setShowBin] = useState<boolean>(false);
+  const [showWater, setShowWater] = useState<boolean>(false);
+
   const canShowPoiTab = petPoiOn && petPois.length > 0;
 
   const [sheetMode, setSheetMode] = useState<SheetContentMode>("main");
@@ -158,11 +166,31 @@ export default function MapPage() {
         toggles={[
           {
             key: "petpoi",
-            labelOn: petPoiLoading ? "동반 POI 불러오는 중..." : "동반 POI ON",
-            labelOff: "동반 POI OFF",
+            labelOn: "동반 가능",
             value: petPoiOn,
             onChange: setPetPoiOn,
             disabled: !myPos,
+            variant: "orange",
+            icon: appIconPuppy,
+            loading: petPoiLoading,
+          },
+          {
+            key: "bin",
+            labelOn: "쓰레기통",
+            value: showBin,
+            onChange: setShowBin,
+            disabled: !myPos,
+            variant: "green",
+            icon: appIconTrashbin,
+          },
+          {
+            key: "water",
+            labelOn: "음수대",
+            value: showWater,
+            onChange: setShowWater,
+            disabled: !myPos,
+            variant: "blue",
+            icon: appIconWaterdrop,
           },
         ]}
       />

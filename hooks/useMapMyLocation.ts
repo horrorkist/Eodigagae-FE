@@ -24,7 +24,10 @@ const FALLBACK = { lat: 37.5665, lng: 126.978 };
 const WALK_UPDATE_INTERVAL_MS = 1000;
 const MAX_WALK_ACCURACY_M = 50;
 const MIN_WALK_MOVE_M = 1.5;
-const USER_MARKER_SIZE_PX = 26;
+const USER_MARKER_SIZE_PX = 44;
+const USER_DIRECTION_TRIANGLE_WIDTH_PX = 8;
+const USER_DIRECTION_TRIANGLE_HEIGHT_PX = 8;
+const USER_DIRECTION_TRIANGLE_TOP_OFFSET_PX = -1;
 const WALK_MOVE_FROM_ACCURACY_RATIO = 0.35;
 const WALK_MOVE_FROM_ACCURACY_MAX_M = 7;
 const WALK_LOW_SPEED_MPS = 0.8;
@@ -38,27 +41,40 @@ const WALK_SPEED_VALID_MAX_ACCURACY_M = 15;
 const PREWALK_RECENTER_MIN_MOVE_M = 3;
 
 function buildUserMarkerHTML(headingDeg: number | null, walking: boolean) {
-  const coreColor = "#0bdc00";
-  const haloColor = "rgba(37, 99, 135, 0.28)";
-  const borderColor = "rgba(206, 206, 206, 0.95)";
   const directionLayer =
     walking && headingDeg != null
-      ? `<div style="position:absolute;inset:-2px;transform:rotate(${headingDeg.toFixed(1)}deg);transform-origin:50% 50%;">
-        <div style="position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:14px solid rgba(37, 99, 235, 0.28);filter:drop-shadow(0 1px 1px rgba(15, 23, 42, 0.3));"></div>
-        <div style="position:absolute;left:50%;top:3px;transform:translateX(-50%);width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:8px solid #fff;"></div>
+      ? `<div style="position:absolute;inset:0;transform:rotate(${headingDeg.toFixed(1)}deg);transform-origin:50% 50%;">
+        <svg width="${USER_DIRECTION_TRIANGLE_WIDTH_PX}" height="${USER_DIRECTION_TRIANGLE_HEIGHT_PX}" viewBox="0 0 6.9282 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;left:50%;top:${USER_DIRECTION_TRIANGLE_TOP_OFFSET_PX}px;transform:translateX(-50%);overflow:visible;filter:drop-shadow(0 1px 1px rgba(15, 23, 42, 0.3));">
+          <path d="M3.4641 0L6.9282 6H0L3.4641 0Z" fill="#FFFFFF"/>
+        </svg>
       </div>`
       : "";
 
   return `
     <div style="width:${USER_MARKER_SIZE_PX}px;height:${USER_MARKER_SIZE_PX}px;position:relative;pointer-events:none;">
-      <div style="position:absolute;inset:-5px;border-radius:9999px;background:${haloColor};box-shadow:0 0 0 1px rgba(255, 255, 255, 0.18) inset;"></div>
-      <div style="position:absolute;inset:0;border-radius:9999px;background:${coreColor};border:2px solid ${borderColor};box-shadow:0 8px 16px rgba(2, 6, 23, 0.28),inset 0 1px 2px rgba(255, 255, 255, 0.2);"></div>
+      <svg width="${USER_MARKER_SIZE_PX}" height="${USER_MARKER_SIZE_PX}" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;inset:0;">
+        <circle cx="22" cy="22" r="22" fill="#0BDC00" fill-opacity="0.3"/>
+        <g filter="url(#user-marker-filter)">
+          <circle cx="22" cy="22" r="8" fill="#0BDC00"/>
+          <circle cx="22" cy="22" r="9.5" stroke="white" stroke-width="3"/>
+        </g>
+        <defs>
+          <filter id="user-marker-filter" x="2.2" y="2.2" width="39.6" height="39.6" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+            <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+            <feOffset/>
+            <feGaussianBlur stdDeviation="4.4"/>
+            <feComposite in2="hardAlpha" operator="out"/>
+            <feColorMatrix type="matrix" values="0 0 0 0 0.0431373 0 0 0 0 0.862745 0 0 0 0 0 0 0 0 1 0"/>
+            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_181_3"/>
+            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_181_3" result="shape"/>
+          </filter>
+        </defs>
+      </svg>
       ${directionLayer}
-      <div style="position:absolute;left:50%;top:50%;width:8px;height:8px;border-radius:9999px;background:#fff;box-shadow:0 0 0 2px rgba(2, 6, 23, 0.18);transform:translate(-50%,-50%);"></div>
     </div>
-  `;
+    `;
 }
-
 function haversineMeters(a: LatLng, b: LatLng) {
   const toRad = (v: number) => (v * Math.PI) / 180;
   const R = 6371000;
