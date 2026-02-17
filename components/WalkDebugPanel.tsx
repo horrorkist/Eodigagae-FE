@@ -11,7 +11,7 @@ import {
   subscribeWalkDebugUpdates,
   type WalkDebugEntry,
 } from "@/lib/walkDebug";
-import { useMapStore } from "@/stores/mapStore";
+import { useMapStore, type RouteResult } from "@/stores/mapStore";
 import { useRouteActions } from "@/hooks/useRouteActions";
 import CoordRow from "@/components/CoordRow";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -34,11 +34,57 @@ import {
   getWalkRecommendation,
   type WalkRecommendation,
 } from "@/lib/walkRecommendation";
+import { simplifyPathByRdpMeters } from "@/lib/geo";
 
 const MAX_VISIBLE_LOGS = 80;
 const PAYLOAD_PREVIEW_MAX = 220;
+const ROUTE_POLYGON_APPROX_TOLERANCE_M = 12;
 const ACTION_BUTTON_CLASS =
   "flex items-center gap-1.5 border px-3 py-2 rounded text-sm disabled:opacity-50 transition-colors hover:bg-gray-50";
+
+function clonePath(path: [number, number][]) {
+  return path.map(([lng, lat]) => [lng, lat] as [number, number]);
+}
+
+function cloneRoute(route: RouteResult): RouteResult {
+  if (typeof structuredClone === "function") {
+    return structuredClone(route);
+  }
+  return JSON.parse(JSON.stringify(route)) as RouteResult;
+}
+
+function isSamePath(
+  a: [number, number][] | null | undefined,
+  b: [number, number][] | null | undefined,
+) {
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+
+  for (let i = 0; i < a.length; i++) {
+    if (a[i][0] !== b[i][0] || a[i][1] !== b[i][1]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function downloadJsonFile(fileName: string, payload: unknown) {
+  if (typeof window === "undefined") return false;
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const href = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(href);
+  return true;
+}
 
 function formatTime(at: number) {
   try {
@@ -95,10 +141,12 @@ export default function WalkDebugPanel() {
     myPos,
     pickedPos,
     route,
+    routeRawResponse,
     routeLoading,
     routeError,
     drawRoute,
     setDrawRoute,
+    setRouteState,
     clearRoute,
     clearPicked,
   } = useMapStore(
@@ -106,10 +154,12 @@ export default function WalkDebugPanel() {
       myPos: s.myPos,
       pickedPos: s.pickedPos,
       route: s.route,
+      routeRawResponse: s.routeRawResponse,
       routeLoading: s.routeLoading,
       routeError: s.routeError,
       drawRoute: s.drawRoute,
       setDrawRoute: s.setDrawRoute,
+      setRouteState: s.setRouteState,
       clearRoute: s.clearRoute,
       clearPicked: s.clearPicked,
     })),
@@ -125,10 +175,41 @@ export default function WalkDebugPanel() {
   );
   const [entries, setEntries] = useState<WalkDebugEntry[]>([]);
   const [expanded, setExpanded] = useState(true);
+  const [originalRouteBackup, setOriginalRouteBackup] =
+    useState<RouteResult | null>(null);
+  const [approximatedPath, setApproximatedPath] = useState<
+    [number, number][] | null
+  >(null);
+  const [showRouteJson, setShowRouteJson] = useState(false);
   const canRequest = !!myPos && !!pickedPos && !routeLoading;
   const canDraw = !!route?.path?.length;
+  const canPolygonApprox = !!route?.path?.length && route.path.length > 2;
+  const canRestoreOriginal =
+    !!originalRouteBackup &&
+    !!approximatedPath &&
+    !!route?.path?.length &&
+    isSamePath(route.path, approximatedPath);
   const routeDistanceKm =
     route?.summary?.distance != null ? route.summary.distance / 1000 : null;
+  const routeExportPayload = useMemo(() => {
+    if (!route) return null;
+    return {
+      exportedAt: new Date().toISOString(),
+      route,
+      context: {
+        myPos,
+        pickedPos,
+        drawRoute,
+        routeLoading,
+        routeError,
+      },
+    };
+  }, [drawRoute, myPos, pickedPos, route, routeError, routeLoading]);
+  const routeExportJson = useMemo(() => {
+    if (!routeExportPayload) return "";
+    return JSON.stringify(routeExportPayload, null, 2);
+  }, [routeExportPayload]);
+  const isRouteJsonVisible = showRouteJson && !!route;
 
   useEffect(() => {
     const syncEntries = () => {
@@ -187,6 +268,37 @@ export default function WalkDebugPanel() {
           <button
             type="button"
             className={ACTION_BUTTON_CLASS}
+            onClick={() => {
+              if (!route?.path?.length) return;
+              if (canRestoreOriginal && originalRouteBackup) {
+                setRouteState({ route: cloneRoute(originalRouteBackup) });
+                setOriginalRouteBackup(null);
+                setApproximatedPath(null);
+                return;
+              }
+
+              const approximated = simplifyPathByRdpMeters(
+                route.path,
+                ROUTE_POLYGON_APPROX_TOLERANCE_M,
+              );
+              setRouteState({
+                route: {
+                  ...route,
+                  path: approximated,
+                },
+              });
+              setOriginalRouteBackup(cloneRoute(route));
+              setApproximatedPath(clonePath(approximated));
+            }}
+            disabled={!canPolygonApprox && !canRestoreOriginal}
+          >
+            <FontAwesomeIcon icon={faDrawPolygon} className="w-3.5 h-3.5" />
+            {canRestoreOriginal ? "원본 경로 복원" : "다각형 근사"}
+          </button>
+
+          <button
+            type="button"
+            className={ACTION_BUTTON_CLASS}
             onClick={clearRoute}
             disabled={!route && !routeError}
           >
@@ -201,6 +313,41 @@ export default function WalkDebugPanel() {
           >
             <FontAwesomeIcon icon={faEraser} className="w-3.5 h-3.5" />
             클릭 초기화
+          </button>
+
+          <button
+            type="button"
+            className={ACTION_BUTTON_CLASS}
+            onClick={() => setShowRouteJson((prev) => !prev)}
+            disabled={!route}
+          >
+            {isRouteJsonVisible ? "JSON 숨기기" : "JSON 보기"}
+          </button>
+
+          <button
+            type="button"
+            className={ACTION_BUTTON_CLASS}
+            onClick={() => {
+              if (!routeExportPayload) return;
+              const fileName = `route-debug-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+              downloadJsonFile(fileName, routeExportPayload);
+            }}
+            disabled={!routeExportPayload}
+          >
+            JSON 다운로드
+          </button>
+
+          <button
+            type="button"
+            className={ACTION_BUTTON_CLASS}
+            onClick={() => {
+              if (!routeRawResponse) return;
+              const fileName = `route-raw-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+              downloadJsonFile(fileName, routeRawResponse);
+            }}
+            disabled={!routeRawResponse}
+          >
+            Raw 다운로드
           </button>
         </div>
 
@@ -249,6 +396,15 @@ export default function WalkDebugPanel() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {isRouteJsonVisible && routeExportJson && (
+          <div className="text-xs border rounded p-3 space-y-2 bg-gray-50">
+            <div className="font-semibold text-gray-700">Route JSON</div>
+            <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-all text-[11px] text-gray-700">
+              {routeExportJson}
+            </pre>
           </div>
         )}
       </div>
