@@ -153,13 +153,11 @@ function WalkingOverlay({
 }
 
 function ToggleChips({ toggles }: { toggles: ToggleItem[] }) {
-  const [localLoading, setLocalLoading] = useState(false);
-
   if (toggles.length === 0) return null;
 
   return (
-    <div className="mt-2 max-w-full overflow-x-auto pb-1 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <div className="inline-flex min-w-full items-center gap-2">
+    <div className="pointer-events-auto mt-2 w-full overflow-x-auto pb-1 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="inline-flex min-w-full items-center gap-2 px-5">
         {toggles.map((toggle) => {
           const isOn = toggle.value;
           const label = isOn
@@ -172,17 +170,7 @@ function ToggleChips({ toggles }: { toggles: ToggleItem[] }) {
               key={toggle.key}
               type="button"
               disabled={toggle.disabled || toggle.loading}
-              onClick={() => {
-                toggle.onChange(!toggle.value);
-                // if (toggle.value) {
-                // } else {
-                //   setLocalLoading(true);
-                //   setTimeout(() => {
-                //     setLocalLoading(false);
-                //     toggle.onChange(!toggle.value);
-                //   }, 1000);
-                // }
-              }}
+              onClick={() => toggle.onChange(!toggle.value)}
               className={[
                 "pointer-events-auto shrink-0",
                 "flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm shadow backdrop-blur",
@@ -431,13 +419,12 @@ export default function MapOverlay({
                   어디로 산책할까요?
                 </span>
               </Link>
-
-              <ToggleChips toggles={toggles} />
             </div>
 
             <div className="pointer-events-auto">{rightSlot}</div>
           </div>
         </div>
+        <ToggleChips toggles={toggles} />
       </div>
 
       {/* 우측 플로팅 버튼 영역 */}

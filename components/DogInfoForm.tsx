@@ -638,14 +638,14 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="rounded-xl bg-dg-white py-5 font-semibold text-dg-black transition-colors hover:bg-gray-50"
+                    className="rounded-xl bg-dg-white py-4 font-semibold text-dg-black transition-colors hover:bg-gray-50"
                   >
                     초기화
                   </button>
                   <button
                     type="submit"
                     disabled={!isValid}
-                    className={`rounded-xl py-5 font-semibold transition-colors ${
+                    className={`rounded-xl py-4 font-semibold transition-colors ${
                       walkRec
                         ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
                         : "bg-gray-300 text-gray-500 cursor-not-allowed"
