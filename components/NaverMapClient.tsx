@@ -6,16 +6,18 @@ import { useMapMyLocation } from "@/hooks/useMapMyLocation";
 import { useMapRoute } from "@/hooks/useMapRoute";
 import { useMapPetPoi } from "@/hooks/useMapPetPoi";
 import { PetPoiItem } from "@/types/mapEvents";
+import type { UseMapRouteOptions } from "@/hooks/useMapRoute";
 
 export default function NaverMapClient(props: {
   showPetPoi: boolean;
   petPois: PetPoiItem[];
+  routeOptions?: UseMapRouteOptions;
 }) {
-  const { showPetPoi, petPois } = props;
+  const { showPetPoi, petPois, routeOptions } = props;
 
   const { mapRef, elRef, sdkReady, setSdkReady } = useNaverMap();
   useMapMyLocation(mapRef, sdkReady);
-  useMapRoute(mapRef);
+  useMapRoute(mapRef, routeOptions);
   useMapPetPoi(mapRef, sdkReady, showPetPoi, petPois);
 
   const key = process.env.NEXT_PUBLIC_NAVER_MAPS_KEY_ID;

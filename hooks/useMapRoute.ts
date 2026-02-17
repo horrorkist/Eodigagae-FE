@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useCallback, useEffect, useRef } from "react";
+import { RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 import { useMapStore } from "@/stores/mapStore";
 import { useModalStore } from "@/stores/modal";
 import { useRouteActions } from "@/hooks/useRouteActions";
@@ -8,16 +8,10 @@ import type { LatLng } from "@/types/mapEvents";
 import { projectPointToSegmentMeters } from "@/lib/geo";
 import { appIconPaw } from "@/components/icons/definitions.generated";
 
-const ROUTE_STROKE_WEIGHT = 10;
-const ROUTE_BORDER_STROKE_WEIGHT = 14;
-const ROUTE_MAIN_COLOR = "#0bdc00";
-const ROUTE_BORDER_COLOR = "#08a400";
-const ROUTE_DIRECTION_MARKER_SPACING_PX = 40;
-const ROUTE_DIRECTION_MARKER_HARD_MAX = 2400;
-const ROUTE_DIRECTION_MARKER_SIZE_PX = Math.max(
-  6,
-  Math.floor(ROUTE_STROKE_WEIGHT * 0.72),
-);
+const DEFAULT_ROUTE_STROKE_WEIGHT = 10;
+const DEFAULT_ROUTE_BORDER_STROKE_WEIGHT = 14;
+const DEFAULT_ROUTE_GUIDANCE_MARKER_SPACING_PX = 40;
+const DEFAULT_ROUTE_GUIDANCE_MARKER_HARD_MAX = 2400;
 const SNAP_LOCAL_BACKWARD_SEGMENTS = 30;
 const SNAP_LOCAL_FORWARD_SEGMENTS = 120;
 const SNAP_FALLBACK_DISTANCE_M = 35;
@@ -27,6 +21,44 @@ const ROUTE_OFF_ROUTE_CONNECTOR_MAX_M = 45;
 const ROUTE_REROUTE_PROMPT_DISTANCE_M = 60;
 const ROUTE_REROUTE_PROMPT_COOLDOWN_MS = 20_000;
 const ROUTE_MIN_RENDERABLE_LENGTH_M = 3;
+
+type RouteVisualStyle = {
+  lineColor: string;
+  borderColor: string;
+  showGuidanceMarkers: boolean;
+};
+
+export type UseMapRouteOptions = {
+  fullRoute?: Partial<RouteVisualStyle>;
+  activeRoute?: Partial<RouteVisualStyle>;
+  lineStrokeWeight?: number;
+  borderStrokeWeight?: number;
+  guidanceMarkerSpacingPx?: number;
+  guidanceMarkerHardMax?: number;
+  guidanceMarkerIconSizePx?: number;
+};
+
+const DEFAULT_FULL_ROUTE_STYLE: RouteVisualStyle = {
+  lineColor: "#0bdc00",
+  borderColor: "#08a400",
+  showGuidanceMarkers: true,
+};
+
+const DEFAULT_ACTIVE_ROUTE_STYLE: RouteVisualStyle = {
+  lineColor: "#0bdc00",
+  borderColor: "#08a400",
+  showGuidanceMarkers: true,
+};
+
+type ResolvedRouteOptions = {
+  fullRouteStyle: RouteVisualStyle;
+  activeRouteStyle: RouteVisualStyle;
+  lineStrokeWeight: number;
+  borderStrokeWeight: number;
+  guidanceMarkerSpacingPx: number;
+  guidanceMarkerHardMax: number;
+  guidanceMarkerSizePx: number;
+};
 
 type SnapResult = {
   segIdx: number;
@@ -220,11 +252,74 @@ type ScreenPoint = {
   y: number;
 };
 
+type PathSegmentPx = {
+  a: LatLng;
+  b: LatLng;
+  lenPx: number;
+};
+
+type PathSegmentsResult = {
+  segments: PathSegmentPx[];
+  totalLenPx: number;
+};
+
+function resolveRouteOptions(options: UseMapRouteOptions): ResolvedRouteOptions {
+  const lineStrokeWeight =
+    options.lineStrokeWeight ?? DEFAULT_ROUTE_STROKE_WEIGHT;
+  const borderStrokeWeight =
+    options.borderStrokeWeight ?? DEFAULT_ROUTE_BORDER_STROKE_WEIGHT;
+
+  return {
+    fullRouteStyle: { ...DEFAULT_FULL_ROUTE_STYLE, ...options.fullRoute },
+    activeRouteStyle: { ...DEFAULT_ACTIVE_ROUTE_STYLE, ...options.activeRoute },
+    lineStrokeWeight,
+    borderStrokeWeight,
+    guidanceMarkerSpacingPx:
+      options.guidanceMarkerSpacingPx ??
+      DEFAULT_ROUTE_GUIDANCE_MARKER_SPACING_PX,
+    guidanceMarkerHardMax:
+      options.guidanceMarkerHardMax ?? DEFAULT_ROUTE_GUIDANCE_MARKER_HARD_MAX,
+    guidanceMarkerSizePx:
+      options.guidanceMarkerIconSizePx ??
+      Math.max(6, Math.floor(lineStrokeWeight * 0.72)),
+  };
+}
+
+function toPathSegmentsPx(
+  path: [number, number][],
+  projection: naver.maps.MapSystemProjection,
+): PathSegmentsResult {
+  const segments: PathSegmentPx[] = [];
+  let totalLenPx = 0;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const a: LatLng = { lat: path[i][1], lng: path[i][0] };
+    const b: LatLng = { lat: path[i + 1][1], lng: path[i + 1][0] };
+    const aOffset = projection.fromCoordToOffset(
+      new window.naver.maps.LatLng(a.lat, a.lng),
+    );
+    const bOffset = projection.fromCoordToOffset(
+      new window.naver.maps.LatLng(b.lat, b.lng),
+    );
+    const lenPx = distancePx(
+      { x: aOffset.x, y: aOffset.y },
+      { x: bOffset.x, y: bOffset.y },
+    );
+
+    if (lenPx <= 0.001) continue;
+
+    segments.push({ a, b, lenPx });
+    totalLenPx += lenPx;
+  }
+
+  return { segments, totalLenPx };
+}
+
 function distancePx(a: ScreenPoint, b: ScreenPoint) {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
-function buildDirectionMarkerHtml(directionDeg: number, sizePx: number) {
+function buildGuidanceMarkerHtml(directionDeg: number, sizePx: number) {
   return `
     <div style="width:${sizePx}px;height:${sizePx}px;position:relative;transform:rotate(${directionDeg.toFixed(1)}deg);transform-origin:50% 50%;pointer-events:none;">
       <svg width="${sizePx}" height="${sizePx}" viewBox="${appIconPaw.viewBox}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
@@ -234,11 +329,77 @@ function buildDirectionMarkerHtml(directionDeg: number, sizePx: number) {
   `;
 }
 
-export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
+function createGuidanceMarker(params: {
+  map: naver.maps.Map;
+  point: LatLng;
+  direction: number;
+  sizePx: number;
+}): naver.maps.Marker {
+  const { map, point, direction, sizePx } = params;
+
+  return new window.naver.maps.Marker({
+    map,
+    position: new window.naver.maps.LatLng(point.lat, point.lng),
+    clickable: false,
+    zIndex: 320,
+    icon: {
+      content: buildGuidanceMarkerHtml(direction, sizePx),
+      anchor: new window.naver.maps.Point(sizePx / 2, sizePx / 2),
+    },
+  });
+}
+
+function toNaverLatLngPath(path: [number, number][]) {
+  return path.map(([lng, lat]) => new window.naver.maps.LatLng(lat, lng));
+}
+
+function upsertRoutePolyline(params: {
+  current: naver.maps.Polyline | null;
+  map: naver.maps.Map;
+  path: naver.maps.LatLng[];
+  strokeWeight: number;
+  strokeColor: string;
+  strokeOpacity: number;
+  zIndex: number;
+}): naver.maps.Polyline {
+  const { current, map, path, strokeWeight, strokeColor, strokeOpacity, zIndex } =
+    params;
+
+  if (!current) {
+    return new window.naver.maps.Polyline({
+      map,
+      path,
+      strokeWeight,
+      strokeColor,
+      strokeLineCap: "round",
+      strokeLineJoin: "round",
+      strokeOpacity,
+      zIndex,
+    });
+  }
+
+  current.setOptions({
+    path,
+    strokeWeight,
+    strokeColor,
+    strokeLineCap: "round",
+    strokeLineJoin: "round",
+    strokeOpacity,
+    zIndex,
+  });
+  current.setMap(map);
+  return current;
+}
+
+export function useMapRoute(
+  mapRef: RefObject<naver.maps.Map | null>,
+  options: UseMapRouteOptions = {},
+) {
   const routeBorderRef = useRef<naver.maps.Polyline | null>(null);
   const routeLineRef = useRef<naver.maps.Polyline | null>(null);
-  const chevronMarkersRef = useRef<naver.maps.Marker[]>([]);
+  const guidanceMarkersRef = useRef<naver.maps.Marker[]>([]);
   const lastDrawnPathRef = useRef<[number, number][] | null>(null);
+  const lastMarkerVisibleRef = useRef(false);
   const lastProgressSegIdxRef = useRef<number | null>(null);
   const lastProjectedHeadRef = useRef<LatLng | null>(null);
   const wasOffRouteRef = useRef(false);
@@ -252,88 +413,69 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
   const isModalOpen = useModalStore((s) => s.isOpen);
   const openModal = useModalStore((s) => s.open);
   const { requestTmapWalkRoute } = useRouteActions();
+  const {
+    fullRouteStyle,
+    activeRouteStyle,
+    lineStrokeWeight,
+    borderStrokeWeight,
+    guidanceMarkerSpacingPx,
+    guidanceMarkerHardMax,
+    guidanceMarkerSizePx,
+  } = useMemo(() => resolveRouteOptions(options), [options]);
 
-  const clearChevronMarkers = useCallback(() => {
-    for (const marker of chevronMarkersRef.current) {
+  const clearGuidanceMarkers = useCallback(() => {
+    for (const marker of guidanceMarkersRef.current) {
       marker.setMap(null);
     }
-    chevronMarkersRef.current = [];
+    guidanceMarkersRef.current = [];
   }, []);
 
-  const drawRouteChevrons = useCallback(
+  const drawRouteGuidanceMarkers = useCallback(
     (path: [number, number][]) => {
-      clearChevronMarkers();
+      clearGuidanceMarkers();
       if (!mapRef.current || !window.naver?.maps) return;
       if (!path?.length || path.length < 2) return;
-      const projection = mapRef.current.getProjection();
-      const segments: Array<{
-        a: LatLng;
-        b: LatLng;
-        lenPx: number;
-      }> = [];
-      let totalLenPx = 0;
-
-      for (let i = 0; i < path.length - 1; i++) {
-        const a: LatLng = { lat: path[i][1], lng: path[i][0] };
-        const b: LatLng = { lat: path[i + 1][1], lng: path[i + 1][0] };
-        const aOffset = projection.fromCoordToOffset(
-          new window.naver.maps.LatLng(a.lat, a.lng),
-        );
-        const bOffset = projection.fromCoordToOffset(
-          new window.naver.maps.LatLng(b.lat, b.lng),
-        );
-        const aPx: ScreenPoint = { x: aOffset.x, y: aOffset.y };
-        const bPx: ScreenPoint = { x: bOffset.x, y: bOffset.y };
-        const lenPx = distancePx(aPx, bPx);
-        if (lenPx <= 0.001) continue;
-
-        segments.push({ a, b, lenPx });
-        totalLenPx += lenPx;
-      }
-
+      const map = mapRef.current;
+      const projection = map.getProjection();
+      const { segments, totalLenPx } = toPathSegmentsPx(path, projection);
       if (segments.length === 0 || totalLenPx <= 0) return;
 
-      const expectedCount = totalLenPx / ROUTE_DIRECTION_MARKER_SPACING_PX;
+      const expectedCount = totalLenPx / guidanceMarkerSpacingPx;
       const spacingPx =
-        expectedCount > ROUTE_DIRECTION_MARKER_HARD_MAX
-          ? totalLenPx / ROUTE_DIRECTION_MARKER_HARD_MAX
-          : ROUTE_DIRECTION_MARKER_SPACING_PX;
+        expectedCount > guidanceMarkerHardMax
+          ? totalLenPx / guidanceMarkerHardMax
+          : guidanceMarkerSpacingPx;
 
       let distanceFromStartPx = 0;
-      let nextChevronAtPx = spacingPx;
+      let nextMarkerAtPx = spacingPx;
 
       for (const segment of segments) {
         const { a, b, lenPx } = segment;
-        while (distanceFromStartPx + lenPx >= nextChevronAtPx) {
-          const t = (nextChevronAtPx - distanceFromStartPx) / lenPx;
+        while (distanceFromStartPx + lenPx >= nextMarkerAtPx) {
+          const t = (nextMarkerAtPx - distanceFromStartPx) / lenPx;
           const point = lerpLatLng(a, b, t);
           const direction = bearingDeg(a, b);
-
-          const marker = new window.naver.maps.Marker({
-            map: mapRef.current,
-            position: new window.naver.maps.LatLng(point.lat, point.lng),
-            clickable: false,
-            zIndex: 320,
-            icon: {
-              content: buildDirectionMarkerHtml(
-                direction,
-                ROUTE_DIRECTION_MARKER_SIZE_PX,
-              ),
-              anchor: new window.naver.maps.Point(
-                ROUTE_DIRECTION_MARKER_SIZE_PX / 2,
-                ROUTE_DIRECTION_MARKER_SIZE_PX / 2,
-              ),
-            },
-          });
-
-          chevronMarkersRef.current.push(marker);
-          nextChevronAtPx += spacingPx;
+          guidanceMarkersRef.current.push(
+            createGuidanceMarker({
+              map,
+              point,
+              direction,
+              sizePx: guidanceMarkerSizePx,
+            }),
+          );
+          nextMarkerAtPx += spacingPx;
         }
 
         distanceFromStartPx += lenPx;
       }
     },
-    [clearChevronMarkers, mapRef],
+    [
+      clearGuidanceMarkers,
+      guidanceMarkerHardMax,
+      guidanceMarkerSizePx,
+      guidanceMarkerSpacingPx,
+      mapRef,
+    ],
   );
 
   const resetRouteTracking = useCallback(() => {
@@ -395,60 +537,54 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       routeLineRef.current.setMap(null);
       routeLineRef.current = null;
     }
-    clearChevronMarkers();
+    clearGuidanceMarkers();
     lastDrawnPathRef.current = null;
+    lastMarkerVisibleRef.current = false;
     resetRouteTracking();
-  }, [clearChevronMarkers, resetRouteTracking]);
+  }, [clearGuidanceMarkers, resetRouteTracking]);
 
   const drawRouteLine = useCallback(
-    (path: [number, number][], showChevrons: boolean) => {
+    (path: [number, number][], visualStyle: RouteVisualStyle) => {
       if (!mapRef.current || !window.naver?.maps) return;
       if (!path?.length) return;
+      const map = mapRef.current;
       lastDrawnPathRef.current = path;
+      lastMarkerVisibleRef.current = visualStyle.showGuidanceMarkers;
+      const pts = toNaverLatLngPath(path);
 
-      const pts = path.map(
-        ([lng, lat]) => new window.naver.maps.LatLng(lat, lng),
-      );
+      routeBorderRef.current = upsertRoutePolyline({
+        current: routeBorderRef.current,
+        map,
+        path: pts,
+        strokeWeight: borderStrokeWeight,
+        strokeColor: visualStyle.borderColor,
+        strokeOpacity: 0.95,
+        zIndex: 290,
+      });
 
-      if (!routeBorderRef.current) {
-        routeBorderRef.current = new window.naver.maps.Polyline({
-          map: mapRef.current,
-          path: pts,
-          strokeWeight: ROUTE_BORDER_STROKE_WEIGHT,
-          strokeColor: ROUTE_BORDER_COLOR,
-          strokeLineCap: "round",
-          strokeLineJoin: "round",
-          strokeOpacity: 0.95,
-          zIndex: 290,
-        });
+      routeLineRef.current = upsertRoutePolyline({
+        current: routeLineRef.current,
+        map,
+        path: pts,
+        strokeWeight: lineStrokeWeight,
+        strokeColor: visualStyle.lineColor,
+        strokeOpacity: 0.9,
+        zIndex: 300,
+      });
+
+      if (visualStyle.showGuidanceMarkers) {
+        drawRouteGuidanceMarkers(path);
       } else {
-        routeBorderRef.current.setPath(pts);
-        routeBorderRef.current.setMap(mapRef.current);
-      }
-
-      if (!routeLineRef.current) {
-        routeLineRef.current = new window.naver.maps.Polyline({
-          map: mapRef.current,
-          path: pts,
-          strokeWeight: ROUTE_STROKE_WEIGHT,
-          strokeColor: ROUTE_MAIN_COLOR,
-          strokeLineCap: "round",
-          strokeLineJoin: "round",
-          strokeOpacity: 0.9,
-          zIndex: 300,
-        });
-      } else {
-        routeLineRef.current.setPath(pts);
-        routeLineRef.current.setMap(mapRef.current);
-      }
-
-      if (showChevrons) {
-        drawRouteChevrons(path);
-      } else {
-        clearChevronMarkers();
+        clearGuidanceMarkers();
       }
     },
-    [drawRouteChevrons, clearChevronMarkers, mapRef],
+    [
+      borderStrokeWeight,
+      clearGuidanceMarkers,
+      drawRouteGuidanceMarkers,
+      lineStrokeWeight,
+      mapRef,
+    ],
   );
 
   useEffect(() => {
@@ -461,22 +597,22 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       rafId = window.requestAnimationFrame(() => {
         rafId = null;
         if (!drawRoute) {
-          clearChevronMarkers();
+          clearGuidanceMarkers();
           return;
         }
         const path = lastDrawnPathRef.current;
         if (!path?.length) return;
-        drawRouteChevrons(path);
+        if (!lastMarkerVisibleRef.current) {
+          clearGuidanceMarkers();
+          return;
+        }
+        drawRouteGuidanceMarkers(path);
       });
     };
     const syncListener = naver.maps.Event.addListener(
       map,
       "zoom_changed",
       () => {
-        if (walking) {
-          clearChevronMarkers();
-          return;
-        }
         queueRedraw();
       },
     );
@@ -487,7 +623,12 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       }
       naver.maps.Event.removeListener(syncListener);
     };
-  }, [mapRef, drawRoute, drawRouteChevrons, clearChevronMarkers, walking]);
+  }, [
+    mapRef,
+    drawRoute,
+    drawRouteGuidanceMarkers,
+    clearGuidanceMarkers,
+  ]);
 
   useEffect(() => {
     resetRouteTracking();
@@ -499,12 +640,14 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       return;
     }
 
-    const showChevrons = !walking;
-
-    if (!walking || !myPos || route.path.length < 2) {
+    const drawFullRoute = () => {
       lastProjectedHeadRef.current = null;
       resetOffRoutePromptState();
-      drawRouteLine(route.path, showChevrons);
+      drawRouteLine(route.path, fullRouteStyle);
+    };
+
+    if (!walking || !myPos || route.path.length < 2) {
+      drawFullRoute();
       return;
     }
 
@@ -514,9 +657,7 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
       lastProgressSegIdxRef.current,
     );
     if (!snap) {
-      lastProjectedHeadRef.current = null;
-      resetOffRoutePromptState();
-      drawRouteLine(route.path, showChevrons);
+      drawFullRoute();
       return;
     }
 
@@ -568,14 +709,16 @@ export function useMapRoute(mapRef: RefObject<naver.maps.Map | null>) {
     });
 
     if (!hasRenderablePolyline(remainingPath)) {
-      drawRouteLine(route.path, showChevrons);
+      drawFullRoute();
       return;
     }
 
-    drawRouteLine(remainingPath, showChevrons);
+    drawRouteLine(remainingPath, activeRouteStyle);
   }, [
+    activeRouteStyle,
     route,
     drawRoute,
+    fullRouteStyle,
     myPos,
     walking,
     maybePromptReroute,
