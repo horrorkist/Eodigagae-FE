@@ -205,7 +205,7 @@ export default function MapPage() {
         </div>
       )}
 
-      <BottomSheet peekHeight={30}>
+      <BottomSheet peekHeight={30} coverBottomNav>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
             <button

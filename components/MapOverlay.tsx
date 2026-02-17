@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 import { requestOrientationPermissionIfNeeded } from "@/hooks/useWalkHeading";
 import { useMapStore } from "@/stores/mapStore";
+import { useUiChromeStore } from "@/stores/uiChrome";
 import FloatingFABMenu from "./FloatingFABMenu";
 import AppIcon from "@/components/icons/AppIcon";
 import {
@@ -211,6 +212,9 @@ export default function MapOverlay({
   toggles = [],
 }: MapOverlayProps) {
   const emit = useEmit();
+  const isBottomChromeVisible = useUiChromeStore(
+    (s) => s.isBottomChromeVisible,
+  );
   const walking = useMapStore((s) => s.walking);
   const route = useMapStore((s) => s.route);
   const walkingPaused = useMapStore((s) => s.walkingPaused);
@@ -428,7 +432,12 @@ export default function MapOverlay({
       </div>
 
       {/* 우측 플로팅 버튼 영역 */}
-      <div className="pointer-events-none absolute right-3 bottom-28 flex flex-col items-end space-y-4">
+      <div
+        className="pointer-events-none absolute right-3 flex flex-col items-end space-y-4"
+        style={{
+          bottom: `calc(var(--safe-bottom) + ${isBottomChromeVisible ? 108 : 24}px)`,
+        }}
+      >
         <FloatingFABMenu items={fabItems} />
         <button
           onClick={onRequestMyLocation}

@@ -1,6 +1,7 @@
 // stores/bottomSheet.ts
 import { RefObject } from "react";
 import { create } from "zustand";
+import { useUiChromeStore } from "@/stores/uiChrome";
 
 type BottomSheetState = {
   snapPoints: number[];
@@ -29,6 +30,9 @@ export const useBottomSheetStore = create<BottomSheetState>((set, get) => ({
   },
 
   open: (toIndex) => {
+    const { isBottomChromeVisible } = useUiChromeStore.getState();
+    if (!isBottomChromeVisible) return;
+
     const { snapPoints } = get();
     if (snapPoints.length === 0) return;
     const next = clamp(toIndex ?? 0, 0, snapPoints.length - 1);
@@ -43,6 +47,9 @@ export const useBottomSheetStore = create<BottomSheetState>((set, get) => ({
   },
 
   close: (bottomSheetRef) => {
+    const { isOpen } = get();
+    if (!isOpen) return;
+
     set({ isOpen: false });
     if (bottomSheetRef && bottomSheetRef.current) {
       const elements = bottomSheetRef.current.querySelectorAll<

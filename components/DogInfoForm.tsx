@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { DogBreed, DogInfo } from "@/types/dog";
 import { useDogStore } from "@/stores/dogStore";
+import { useUiChromeStore } from "@/stores/uiChrome";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { AnimatePresence, motion } from "framer-motion";
@@ -274,6 +275,7 @@ type Props = {
 export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const setDog = useDogStore((s) => s.setDog);
   const currentDog = useDogStore((s) => s.dog);
+  const hideBottomChrome = useUiChromeStore((s) => s.hideBottomChrome);
   const formRootRef = useRef<HTMLDivElement | null>(null);
   const wasWalkRecVisibleRef = useRef(false);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -395,6 +397,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     };
     setDog(dogInfo);
     onSubmitSuccess?.(dogInfo);
+    hideBottomChrome();
   };
 
   const ageMax = ageUnit === "months" ? 11 : 30;

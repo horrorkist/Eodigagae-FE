@@ -45,6 +45,11 @@ export function useNaverMap() {
       zoom: 15,
       minZoom: 13,
       disableKineticPan: false,
+      scaleControl: false,
+      logoControlOptions: {
+        position: window.naver.maps.Position.BOTTOM_LEFT,
+      },
+      mapDataControl: false,
     });
   }, [sdkReady, coords, myPos]);
 

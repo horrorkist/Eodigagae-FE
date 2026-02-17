@@ -1,4 +1,4 @@
-import BottomNav from "./BottomNav";
+import BottomNavHost from "./BottomNavHost";
 import Modal from "./Modal";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -20,12 +20,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </main>
 
         {/* 하단탭 */}
-        <div
-          className="fixed bottom-0 left-1/2 z-101 w-full max-w-[430px] -translate-x-1/2 bg-white"
-          style={{ paddingBottom: "var(--safe-bottom)" }}
-        >
-          <BottomNav />
-        </div>
+        <BottomNavHost />
 
         <Modal />
       </div>

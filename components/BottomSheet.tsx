@@ -9,12 +9,14 @@ import React, {
   useState,
 } from "react";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
+import { useUiChromeStore } from "@/stores/uiChrome";
 
 type Props = {
   children: React.ReactNode;
   title?: string;
   peekHeight?: number;
   bottomNavHeight?: number;
+  coverBottomNav?: boolean;
   closeThreshold?: number;
   openThreshold?: number;
 };
@@ -24,6 +26,7 @@ export default function BottomSheet({
   title,
   peekHeight = 72,
   bottomNavHeight = 56,
+  coverBottomNav = false,
   closeThreshold = 140,
   openThreshold = 40,
 }: Props) {
@@ -34,6 +37,9 @@ export default function BottomSheet({
   const open = useBottomSheetStore((s) => s.open);
   const close = useBottomSheetStore((s) => s.close);
   const snapTo = useBottomSheetStore((s) => s.snapTo);
+  const isBottomChromeVisible = useUiChromeStore(
+    (s) => s.isBottomChromeVisible,
+  );
 
   const minSnap = useMemo(() => Math.min(...snapPoints), [snapPoints]);
   const maxSnap = useMemo(() => Math.max(...snapPoints), [snapPoints]);
@@ -63,11 +69,23 @@ export default function BottomSheet({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const bottomInset = bottomNavHeight + safeBottom;
+  useEffect(() => {
+    if (isBottomChromeVisible) return;
+    if (!isOpen) return;
+    close();
+  }, [isBottomChromeVisible, isOpen, close]);
+
+  const shouldCoverBottomNav = coverBottomNav && isOpen;
+  const closedBottomInset = bottomNavHeight + safeBottom;
+  const activeBottomInset = shouldCoverBottomNav
+    ? safeBottom
+    : closedBottomInset;
+  const backdropZIndexClass = shouldCoverBottomNav ? "z-[110]" : "z-100";
+  const clipZIndexClass = shouldCoverBottomNav ? "z-[111]" : "z-101";
 
   const closedTop = useMemo(
-    () => Math.max(0, vh - bottomInset - peekHeight),
-    [vh, bottomInset, peekHeight],
+    () => Math.max(0, vh - closedBottomInset - peekHeight),
+    [vh, closedBottomInset, peekHeight],
   );
 
   const dynamicSnapPoints = useMemo(() => {
@@ -475,18 +493,21 @@ export default function BottomSheet({
     [],
   );
 
+  if (!isBottomChromeVisible) return null;
+
   return (
     <>
       {/* Backdrop */}
       <div
         className={[
-          "fixed left-0 right-0 top-0 z-100 transition-opacity duration-300",
+          "fixed left-0 right-0 top-0 transition-opacity duration-300",
+          backdropZIndexClass,
           isOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none",
         ].join(" ")}
         style={{
-          bottom: bottomInset,
+          bottom: activeBottomInset,
           backgroundColor: "rgba(0,0,0,0.35)",
           touchAction: "none",
         }}
@@ -509,8 +530,11 @@ export default function BottomSheet({
 
       {/* Clip boundary */}
       <div
-        className="fixed inset-0 z-101 overflow-hidden pointer-events-none"
-        style={{ bottom: bottomInset }}
+        className={[
+          "fixed inset-0 overflow-hidden pointer-events-none",
+          clipZIndexClass,
+        ].join(" ")}
+        style={{ bottom: activeBottomInset }}
       >
         {/* Sheet — h-full 고정, transform으로만 이동 */}
         <div
