@@ -10,13 +10,66 @@ export type RouteSummary = {
   duration?: number; // ms or sec (upstream dependent)
 };
 
+export type RouteGuidanceStep = {
+  order: number;
+  coordinate: [number, number]; // [lng, lat]
+  index?: number;
+  pointIndex?: number;
+  name?: string;
+  guidePointName?: string;
+  description?: string;
+  direction?: string;
+  intersectionName?: string;
+  nearPoiName?: string;
+  nearPoi?: [number, number]; // [lng, lat]
+  crossName?: string;
+  turnType?: number;
+  pointType?: string;
+};
+
+export type RouteSegment = {
+  order: number;
+  index?: number;
+  lineIndex?: number;
+  name?: string;
+  roadName?: string;
+  description?: string;
+  distance?: number; // meters
+  duration?: number; // sec or ms (upstream dependent)
+  roadType?: number;
+  categoryRoadType?: number;
+  facilityType?: number;
+  facilityName?: string;
+  coordinateCount: number;
+  start: [number, number]; // [lng, lat]
+  end: [number, number]; // [lng, lat]
+};
+
+export type RouteEndpoints = {
+  start?: RouteGuidanceStep;
+  end?: RouteGuidanceStep;
+};
+
+export type RouteFeatureStats = {
+  totalFeatures: number;
+  pointFeatures: number;
+  lineFeatures: number;
+};
+
 export type RouteResult = {
   summary?: RouteSummary;
   path: [number, number][]; // [[lng,lat], ...]
+  guidance?: RouteGuidanceStep[];
+  segments?: RouteSegment[];
+  endpoints?: RouteEndpoints;
+  featureStats?: RouteFeatureStats;
 };
 
 export type RouteStatePatch = Partial<
-  Pick<MapState, "route" | "routeLoading" | "routeError" | "drawRoute">
+  Pick<
+    MapState,
+    "route" | "routeRawResponse" | "routeLoading" | "routeError" | "drawRoute"
+  >
 >;
 
 // ================================
@@ -37,6 +90,7 @@ type MapState = {
 
   // route
   route: RouteResult | null;
+  routeRawResponse: unknown | null;
   routeLoading: boolean;
   routeError: string | null;
   drawRoute: boolean;
@@ -99,6 +153,7 @@ export const useMapStore = create<MapState>((set) => ({
   // route
   // ----------------------------
   route: null,
+  routeRawResponse: null,
   routeLoading: false,
   routeError: null,
   drawRoute: false,
@@ -107,5 +162,11 @@ export const useMapStore = create<MapState>((set) => ({
 
   setDrawRoute: (v) => set({ drawRoute: v }),
 
-  clearRoute: () => set({ route: null, routeError: null, drawRoute: false }),
+  clearRoute: () =>
+    set({
+      route: null,
+      routeRawResponse: null,
+      routeError: null,
+      drawRoute: false,
+    }),
 }));

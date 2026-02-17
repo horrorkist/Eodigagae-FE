@@ -2,10 +2,15 @@ import type { LatLng } from "@/types/mapEvents";
 import type { RouteResult } from "@/stores/mapStore";
 import { extractTmapPedestrian } from "@/lib/extractTmapPedestrian";
 
+export type TmapWalkRouteFetchResult = {
+  route: RouteResult;
+  rawResponse: unknown;
+};
+
 export async function fetchTmapWalkRoute(params: {
   start: LatLng;
   goal: LatLng;
-}): Promise<RouteResult> {
+}): Promise<TmapWalkRouteFetchResult> {
   const res = await fetch("/api/tmap/pedestrian", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -20,5 +25,8 @@ export async function fetchTmapWalkRoute(params: {
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error ?? "TMAP 도보 경로 요청 실패");
 
-  return extractTmapPedestrian(data);
+  return {
+    route: extractTmapPedestrian(data),
+    rawResponse: data,
+  };
 }

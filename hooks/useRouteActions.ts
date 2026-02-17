@@ -19,6 +19,7 @@ export function useRouteActions() {
       setRouteState({
         routeError: "출발/도착 좌표가 필요해요.",
         route: null,
+        routeRawResponse: null,
         drawRoute: false,
       });
       return;
@@ -33,7 +34,8 @@ export function useRouteActions() {
       });
 
       setRouteState({
-        route: result,
+        route: result.route,
+        routeRawResponse: result.rawResponse,
         routeLoading: false,
         routeError: null,
         drawRoute: false,
@@ -44,6 +46,7 @@ export function useRouteActions() {
 
       setRouteState({
         route: null,
+        routeRawResponse: null,
         routeLoading: false,
         routeError: msg,
         drawRoute: false,

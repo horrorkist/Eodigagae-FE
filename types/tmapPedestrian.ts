@@ -70,4 +70,8 @@ export type TmapPedestrianFeature =
 export type TmapPedestrianRouteResponse = {
   type: "FeatureCollection";
   features: TmapPedestrianFeature[];
+  totalDistance?: number;
+  totalTime?: number;
+  distance?: number;
+  duration?: number;
 };
