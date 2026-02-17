@@ -40,6 +40,9 @@ export default function BottomSheet({
   const isBottomChromeVisible = useUiChromeStore(
     (s) => s.isBottomChromeVisible,
   );
+  const isBottomSheetCoverEnabled = useUiChromeStore(
+    (s) => s.isBottomSheetCoverEnabled,
+  );
 
   const minSnap = useMemo(() => Math.min(...snapPoints), [snapPoints]);
   const maxSnap = useMemo(() => Math.max(...snapPoints), [snapPoints]);
@@ -75,7 +78,7 @@ export default function BottomSheet({
     close();
   }, [isBottomChromeVisible, isOpen, close]);
 
-  const shouldCoverBottomNav = coverBottomNav && isOpen;
+  const shouldCoverBottomNav = coverBottomNav && isBottomSheetCoverEnabled && isOpen;
   const closedBottomInset = bottomNavHeight + safeBottom;
   const activeBottomInset = shouldCoverBottomNav
     ? safeBottom
