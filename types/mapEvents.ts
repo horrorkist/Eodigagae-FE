@@ -48,7 +48,7 @@ export type PetPoiResponse = {
   items: PetPoiItem[];
 };
 
-export type MapChannel = "map" | "pet";
+export type MapChannel = "map" | "pet" | "ui";
 
 export type BaseEvent<C extends MapChannel, T extends string> = {
   channel: C;
@@ -96,4 +96,11 @@ export type PetEvents =
       key: string;
     });
 
-export type AppEvent = MapEvents | PetEvents;
+/** UI chrome events */
+export type UiEvents =
+  | BaseEvent<"ui", "UI_BOTTOM_CHROME_SHOW">
+  | BaseEvent<"ui", "UI_BOTTOM_CHROME_HIDE">
+  | BaseEvent<"ui", "UI_BOTTOM_CHROME_HIDE_ON_NEXT_HOME">
+  | BaseEvent<"ui", "UI_HOME_ENTERED">;
+
+export type AppEvent = MapEvents | PetEvents | UiEvents;

@@ -14,10 +14,11 @@ import BottomSheet from "@/components/BottomSheet";
 import FocusedPoiSheet from "@/components/FocusedPoiSheet";
 import MapOverlay from "@/components/MapOverlay";
 import { useMapStore } from "@/stores/mapStore";
+import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
 import DogInfoForm from "@/components/DogInfoForm";
 import { useDogStore } from "@/stores/dogStore";
-import { useBusDispatcher } from "@/hooks/useEventBus";
+import { useEmit } from "@/hooks/useEventBus";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPaw,
@@ -82,7 +83,7 @@ function formatDogAgeLabel(ageInMonths: number) {
 }
 
 export default function MapPage() {
-  useBusDispatcher(true);
+  const emit = useEmit();
   const showWalkDebugPanel = useSyncExternalStore(
     subscribeWalkDebugUpdates,
     isWalkDebugPanelVisible,
@@ -96,6 +97,7 @@ export default function MapPage() {
 
   const dog = useDogStore((s) => s.dog);
   const clearDog = useDogStore((s) => s.clearDog);
+  const openBottomSheet = useBottomSheetStore((s) => s.open);
 
   const {
     petPoiOn,
@@ -118,6 +120,10 @@ export default function MapPage() {
   const canShowPoiTab = petPoiOn && petPois.length > 0;
 
   const [sheetMode, setSheetMode] = useState<SheetContentMode>("main");
+  const [isRoutePlanningMode, setIsRoutePlanningMode] = useState(false);
+  const [preferRouteRecommendSheet, setPreferRouteRecommendSheet] = useState(
+    () => !dog,
+  );
   const activeSheetMode: SheetContentMode =
     canShowPoiTab || sheetMode !== "poi" ? sheetMode : "main";
   const [visiblePoiCount, setVisiblePoiCount] = useState(
@@ -143,6 +149,43 @@ export default function MapPage() {
     },
     [setFocusedPoi],
   );
+
+  const handleRouteRecommendRequested = useCallback(() => {
+    setPreferRouteRecommendSheet(true);
+    setSheetMode("main");
+    setIsRoutePlanningMode(true);
+  }, []);
+
+  const handleRouteEdit = useCallback(() => {
+    setIsRoutePlanningMode(false);
+    setPreferRouteRecommendSheet(true);
+    setSheetMode("main");
+    emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
+    requestAnimationFrame(() => {
+      openBottomSheet(0);
+    });
+  }, [emit, openBottomSheet]);
+
+  const handleGuideStart = useCallback(() => {
+    // 안내 시작 기능은 다음 단계에서 연결 예정
+  }, []);
+
+  useEffect(() => {
+    emit({ channel: "ui", type: "UI_HOME_ENTERED" });
+    return () => {
+      emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
+    };
+  }, [emit]);
+
+  useEffect(() => {
+    if (isRoutePlanningMode) {
+      emit({ channel: "ui", type: "UI_BOTTOM_CHROME_HIDE" });
+      return;
+    }
+
+    if (focusedPoi) return;
+    emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
+  }, [emit, focusedPoi, isRoutePlanningMode]);
 
   useEffect(() => {
     if (activeSheetMode !== "poi") return;
@@ -206,6 +249,9 @@ export default function MapPage() {
             icon: appIconWaterdrop,
           },
         ]}
+        isRoutePlanningMode={isRoutePlanningMode}
+        onRouteEdit={handleRouteEdit}
+        onGuideStart={handleGuideStart}
       />
 
       {petPoiError && (
@@ -287,8 +333,10 @@ export default function MapPage() {
               </>
             ) : (
               <>
-                {!dog ? (
-                  <DogInfoForm />
+                {!dog || preferRouteRecommendSheet ? (
+                  <DogInfoForm
+                    onRouteRecommendRequested={handleRouteRecommendRequested}
+                  />
                 ) : (
                   <div className="border rounded-md p-3 flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm">

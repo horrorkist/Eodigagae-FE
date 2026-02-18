@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { DogBreed, DogInfo } from "@/types/dog";
 import { useDogStore } from "@/stores/dogStore";
-import { useUiChromeStore } from "@/stores/uiChrome";
+import type { DogInfoFormDraft } from "@/stores/dogStore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { AnimatePresence, motion } from "framer-motion";
@@ -270,27 +270,42 @@ type FormValues = {
 
 type Props = {
   onSubmitSuccess?: (data: DogInfo) => void;
+  onRouteRecommendRequested?: (draft: DogInfoFormDraft) => void;
 };
 
-export default function DogInfoForm({ onSubmitSuccess }: Props) {
+export default function DogInfoForm({
+  onSubmitSuccess,
+  onRouteRecommendRequested,
+}: Props) {
   const setDog = useDogStore((s) => s.setDog);
   const currentDog = useDogStore((s) => s.dog);
-  const hideBottomChrome = useUiChromeStore((s) => s.hideBottomChrome);
+  const currentFormDraft = useDogStore((s) => s.formDraft);
+  const setFormDraft = useDogStore((s) => s.setFormDraft);
   const formRootRef = useRef<HTMLDivElement | null>(null);
   const wasWalkRecVisibleRef = useRef(false);
   const formRef = useRef<HTMLFormElement | null>(null);
 
-  const defaultUnit = getDefaultAgeUnit(currentDog);
-  const defaultAge = getDefaultAgeValue(currentDog, defaultUnit);
-  const defaultFormValues: FormValues = {
-    name: currentDog?.name ?? "",
+  const dogDefaultUnit = getDefaultAgeUnit(currentDog);
+  const restoreUnit = currentFormDraft?.ageUnit ?? dogDefaultUnit;
+  const defaultAge =
+    currentFormDraft?.age ?? getDefaultAgeValue(currentDog, restoreUnit);
+  const restoreFormValues: FormValues = {
+    name: currentFormDraft?.name ?? currentDog?.name ?? "",
     age: defaultAge,
-    breed: currentDog?.breed ?? "",
+    breed: currentFormDraft?.breed ?? currentDog?.breed ?? "",
+    walkDistanceKm: currentFormDraft?.walkDistanceKm ?? WALK_DISTANCE_MIN_KM,
+    walkDurationHours:
+      currentFormDraft?.walkDurationMinutes ?? WALK_DURATION_MIN_MINUTES,
+  };
+  const resetFormValues: FormValues = {
+    name: "",
+    age: "",
+    breed: "",
     walkDistanceKm: WALK_DISTANCE_MIN_KM,
     walkDurationHours: WALK_DURATION_MIN_MINUTES,
   };
 
-  const [ageUnit, setAgeUnit] = useState<AgeUnit>(defaultUnit);
+  const [ageUnit, setAgeUnit] = useState<AgeUnit>(restoreUnit);
 
   const {
     register,
@@ -301,7 +316,7 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
     reset,
   } = useForm<FormValues>({
     mode: "onChange",
-    defaultValues: defaultFormValues,
+    defaultValues: restoreFormValues,
   });
 
   const watchedName = useWatch({ control, name: "name" });
@@ -332,15 +347,17 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const isDurationPriority =
     Number(watchedWalkDurationMinutes ?? WALK_DURATION_MIN_MINUTES) >
     WALK_DURATION_MIN_MINUTES;
+  const hasSavedDraft = currentFormDraft != null;
 
   useEffect(() => {
+    if (hasSavedDraft) return;
     if (recommendedWalkDistanceKm == null || isDurationPriority) return;
     setValue("walkDistanceKm", recommendedWalkDistanceKm, {
       shouldDirty: false,
       shouldTouch: false,
       shouldValidate: true,
     });
-  }, [recommendedWalkDistanceKm, setValue, isDurationPriority]);
+  }, [recommendedWalkDistanceKm, setValue, isDurationPriority, hasSavedDraft]);
 
   useEffect(() => {
     const isWalkRecVisible = Boolean(walkRec);
@@ -389,23 +406,35 @@ export default function DogInfoForm({ onSubmitSuccess }: Props) {
   const onSubmit = (data: FormValues) => {
     if (!data.breed) return;
     const normalizedName = data.name?.trim();
-    const ageInMonths = toAgeInMonths(Number(data.age), ageUnit);
+    const normalizedAge = Number(data.age);
+    const ageInMonths = toAgeInMonths(normalizedAge, ageUnit);
     const dogInfo: DogInfo = {
       name: normalizedName ? normalizedName : undefined,
       ageInMonths,
       breed: data.breed,
     };
+    const nextFormDraft: DogInfoFormDraft = {
+      name: normalizedName ? normalizedName : undefined,
+      age: normalizedAge,
+      ageUnit,
+      breed: data.breed,
+      walkDistanceKm: Number(data.walkDistanceKm),
+      walkDurationMinutes: Number(data.walkDurationHours),
+    };
+
     setDog(dogInfo);
+    setFormDraft(nextFormDraft);
     onSubmitSuccess?.(dogInfo);
-    hideBottomChrome();
+    onRouteRecommendRequested?.(nextFormDraft);
   };
 
   const ageMax = ageUnit === "months" ? 11 : 30;
   const agePlaceholder = ageUnit === "months" ? "개월 수 (0~11)" : "나이";
 
   const handleReset = () => {
-    reset(defaultFormValues);
-    setAgeUnit(defaultUnit);
+    reset(resetFormValues);
+    setAgeUnit("years");
+    setFormDraft(null);
   };
 
   const handleWalkDurationChange = (

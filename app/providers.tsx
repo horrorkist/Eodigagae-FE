@@ -1,6 +1,8 @@
 "use client";
 
 import { SWRConfig } from "swr";
+import { useBusDispatcher } from "@/hooks/useEventBus";
+import { useUiChromeController } from "@/hooks/useUiChromeController";
 
 const fetcher = async (url: string) => {
   const res = await fetch(url);
@@ -14,6 +16,9 @@ const fetcher = async (url: string) => {
 };
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  useBusDispatcher(true);
+  useUiChromeController();
+
   return (
     <SWRConfig
       value={{

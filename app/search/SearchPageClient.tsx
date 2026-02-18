@@ -13,6 +13,7 @@ import type {
   TmapPoiSearchSort,
 } from "@/types/tmapPoi";
 import { useMapStore } from "@/stores/mapStore";
+import { useEmit } from "@/hooks/useEventBus";
 
 const SEARCH_COUNT = 150;
 const GEO_TIMEOUT_MS = 5000;
@@ -121,6 +122,7 @@ function getDistanceBadgeClass(distanceM: number | null) {
 
 export default function SearchPageClient() {
   const router = useRouter();
+  const emit = useEmit();
   const inputRef = useRef<HTMLInputElement>(null);
   const centerRef = useRef<SearchCenter | null>(null);
   const centerUpdatedAtRef = useRef(0);
@@ -352,6 +354,10 @@ export default function SearchPageClient() {
                     <button
                       type="button"
                       onClick={() => {
+                        emit({
+                          channel: "ui",
+                          type: "UI_BOTTOM_CHROME_HIDE_ON_NEXT_HOME",
+                        });
                         setFocusedPoi(fromTmapPoi(poi));
                         router.push("/");
                       }}
