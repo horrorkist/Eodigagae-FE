@@ -375,7 +375,23 @@ export default function BottomSheet({
   const processContentMove = useCallback(
     (clientY: number, hooks?: ContentMoveHooks) => {
       const mode = contentGestureModeRef.current;
-      if (mode === "idle" || mode === "scroll") return;
+      if (mode === "idle") return;
+
+      if (mode === "scroll") {
+        const dy = clientY - contentStartYRef.current;
+        const contentTop = contentRef.current?.scrollTop ?? 0;
+        const shouldSwitchToSheet =
+          !contentForceSheetRef.current &&
+          dy > 0 &&
+          contentTop <= CONTENT_TOP_EPSILON;
+
+        if (!shouldSwitchToSheet) return;
+
+        contentGestureModeRef.current = "sheet";
+        beginDrag(clientY);
+        hooks?.onEnterSheet?.();
+        return;
+      }
 
       if (mode === "pending") {
         const dy = clientY - contentStartYRef.current;
@@ -438,8 +454,8 @@ export default function BottomSheet({
     [finishContentGesture],
   );
 
-  const onContentTouchStartNative = useCallback(
-    (e: TouchEvent) => {
+  const onContentTouchStart = useCallback(
+    (e: React.TouchEvent) => {
       const touch = e.touches[0];
       if (!touch) return;
       startContentGesture(touch.clientY);
@@ -447,8 +463,8 @@ export default function BottomSheet({
     [startContentGesture],
   );
 
-  const onContentTouchMoveNative = useCallback(
-    (e: TouchEvent) => {
+  const onContentTouchMove = useCallback(
+    (e: React.TouchEvent) => {
       const touch = e.touches[0];
       if (!touch) return;
       processContentMove(touch.clientY);
@@ -456,38 +472,9 @@ export default function BottomSheet({
     [processContentMove],
   );
 
-  const onContentTouchEndNative = useCallback(() => {
+  const onContentTouchEnd = useCallback(() => {
     finishContentGesture();
   }, [finishContentGesture]);
-
-  useEffect(() => {
-    const contentEl = contentRef.current;
-    if (!contentEl) return;
-
-    contentEl.addEventListener("touchstart", onContentTouchStartNative, {
-      passive: true,
-    });
-    contentEl.addEventListener("touchmove", onContentTouchMoveNative, {
-      passive: true,
-    });
-    contentEl.addEventListener("touchend", onContentTouchEndNative, {
-      passive: true,
-    });
-    contentEl.addEventListener("touchcancel", onContentTouchEndNative, {
-      passive: true,
-    });
-
-    return () => {
-      contentEl.removeEventListener("touchstart", onContentTouchStartNative);
-      contentEl.removeEventListener("touchmove", onContentTouchMoveNative);
-      contentEl.removeEventListener("touchend", onContentTouchEndNative);
-      contentEl.removeEventListener("touchcancel", onContentTouchEndNative);
-    };
-  }, [
-    onContentTouchStartNative,
-    onContentTouchMoveNative,
-    onContentTouchEndNative,
-  ]);
 
   useEffect(
     () => () => {
@@ -584,6 +571,10 @@ export default function BottomSheet({
             onPointerMove={onContentPointerMove}
             onPointerUp={onContentPointerUp}
             onPointerCancel={onContentPointerUp}
+            onTouchStart={onContentTouchStart}
+            onTouchMove={onContentTouchMove}
+            onTouchEnd={onContentTouchEnd}
+            onTouchCancel={onContentTouchEnd}
           >
             {children}
           </div>
