@@ -11,6 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import BottomSheet from "@/components/BottomSheet";
+import FocusedPoiSheet from "@/components/FocusedPoiSheet";
 import MapOverlay from "@/components/MapOverlay";
 import { useMapStore } from "@/stores/mapStore";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
@@ -24,8 +25,10 @@ import {
   faTriangleExclamation,
 } from "@fortawesome/free-solid-svg-icons";
 import { POI_STYLES } from "@/lib/poiMarker";
+import { fromPetPoiItem } from "@/lib/focusedPoi";
 import PoiCard from "@/components/PoiCard";
 import WalkDebugPanel from "@/components/WalkDebugPanel";
+import { PetPoiItem } from "@/types/mapEvents";
 import {
   isWalkDebugPanelVisible,
   subscribeWalkDebugUpdates,
@@ -87,6 +90,9 @@ export default function MapPage() {
   );
 
   const myPos = useMapStore((s) => s.myPos);
+  const focusedPoi = useMapStore((s) => s.focusedPoi);
+  const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
+  const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
 
   const dog = useDogStore((s) => s.dog);
   const clearDog = useDogStore((s) => s.clearDog);
@@ -130,6 +136,13 @@ export default function MapPage() {
       Math.min(prev + POI_RENDER_BATCH_COUNT, petPois.length),
     );
   }, [petPois.length]);
+
+  const handleFocusPetPoi = useCallback(
+    (poi: PetPoiItem) => {
+      setFocusedPoi(fromPetPoiItem(poi));
+    },
+    [setFocusedPoi],
+  );
 
   useEffect(() => {
     if (activeSheetMode !== "poi") return;
@@ -205,99 +218,110 @@ export default function MapPage() {
         </div>
       )}
 
-      <BottomSheet peekHeight={30} coverBottomNav>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
-            <button
-              type="button"
-              onClick={() => setSheetMode("main")}
-              className={[
-                TAB_BUTTON_BASE_CLASS,
-                activeSheetMode === "main"
-                  ? TAB_BUTTON_ACTIVE_CLASS
-                  : TAB_BUTTON_INACTIVE_CLASS,
-              ].join(" ")}
-            >
-              경로 추천
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSheetMode("poi");
-                setVisiblePoiCount(
-                  Math.min(POI_INITIAL_RENDER_COUNT, petPois.length),
-                );
-              }}
-              disabled={!canShowPoiTab}
-              className={[
-                TAB_BUTTON_BASE_CLASS,
-                "disabled:cursor-not-allowed disabled:opacity-50",
-                activeSheetMode === "poi"
-                  ? TAB_BUTTON_ACTIVE_CLASS
-                  : TAB_BUTTON_INACTIVE_CLASS,
-              ].join(" ")}
-            >
-              장소 목록
-            </button>
-          </div>
+      {focusedPoi ? (
+        <FocusedPoiSheet poi={focusedPoi} onClose={clearFocusedPoi} />
+      ) : (
+        <BottomSheet peekHeight={30} coverBottomNav>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
+              <button
+                type="button"
+                onClick={() => setSheetMode("main")}
+                className={[
+                  TAB_BUTTON_BASE_CLASS,
+                  activeSheetMode === "main"
+                    ? TAB_BUTTON_ACTIVE_CLASS
+                    : TAB_BUTTON_INACTIVE_CLASS,
+                ].join(" ")}
+              >
+                경로 추천
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSheetMode("poi");
+                  setVisiblePoiCount(
+                    Math.min(POI_INITIAL_RENDER_COUNT, petPois.length),
+                  );
+                }}
+                disabled={!canShowPoiTab}
+                className={[
+                  TAB_BUTTON_BASE_CLASS,
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                  activeSheetMode === "poi"
+                    ? TAB_BUTTON_ACTIVE_CLASS
+                    : TAB_BUTTON_INACTIVE_CLASS,
+                ].join(" ")}
+              >
+                장소 목록
+              </button>
+            </div>
 
-          {activeSheetMode === "poi" ? (
-            <>
-              <PetPoiSummary
-                loading={petPoiLoading}
-                totalCount={petPoiTotalCount}
-              />
+            {activeSheetMode === "poi" ? (
+              <>
+                <PetPoiSummary
+                  loading={petPoiLoading}
+                  totalCount={petPoiTotalCount}
+                />
 
-              {visiblePois.map((poi) => {
-                const style = POI_STYLES[poi.contenttypeid];
-                return <PoiCard key={poi.contentid} poi={poi} style={style} />;
-              })}
-
-              {hasMorePois && (
-                <div
-                  ref={poiLoadMoreRef}
-                  className="h-10 flex items-center justify-center text-xs text-gray-400"
-                >
-                  목록 불러오는 중...
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {!dog ? (
-                <DogInfoForm />
-              ) : (
-                <div className="border rounded-md p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm">
-                    <FontAwesomeIcon
-                      icon={faPaw}
-                      className="w-3.5 h-3.5 text-blue-500"
+                {visiblePois.map((poi) => {
+                  const style = POI_STYLES[poi.contenttypeid];
+                  return (
+                    <PoiCard
+                      key={poi.contentid}
+                      poi={poi}
+                      style={style}
+                      onClick={() => handleFocusPetPoi(poi)}
                     />
-                    <span className="font-semibold">{dog.name}</span>
-                    <span className="text-gray-500">
-                      {formatDogAgeLabel(dog.ageInMonths)} · {dog.breed}
-                    </span>
-                  </div>
-                  <button
-                    className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600"
-                    onClick={clearDog}
-                  >
-                    <FontAwesomeIcon icon={faPenToSquare} className="w-3 h-3" />
-                    수정
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+                  );
+                })}
 
-          {showWalkDebugPanel && (
-            <>
-              <div className="border border-blue-200 bg-blue-50 rounded-md p-3 text-sm"></div>
-              <WalkDebugPanel />
-            </>
-          )}
-        </div>
-      </BottomSheet>
+                {hasMorePois && (
+                  <div
+                    ref={poiLoadMoreRef}
+                    className="h-10 flex items-center justify-center text-xs text-gray-400"
+                  >
+                    목록 불러오는 중...
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {!dog ? (
+                  <DogInfoForm />
+                ) : (
+                  <div className="border rounded-md p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm">
+                      <FontAwesomeIcon
+                        icon={faPaw}
+                        className="w-3.5 h-3.5 text-blue-500"
+                      />
+                      <span className="font-semibold">{dog.name}</span>
+                      <span className="text-gray-500">
+                        {formatDogAgeLabel(dog.ageInMonths)} · {dog.breed}
+                      </span>
+                    </div>
+                    <button
+                      className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600"
+                      onClick={clearDog}
+                    >
+                      <FontAwesomeIcon icon={faPenToSquare} className="w-3 h-3" />
+                      수정
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {showWalkDebugPanel && (
+              <>
+                <div className="border border-blue-200 bg-blue-50 rounded-md p-3 text-sm"></div>
+                <WalkDebugPanel />
+              </>
+            )}
+          </div>
+        </BottomSheet>
+      )}
     </div>
   );
 }

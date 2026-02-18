@@ -123,6 +123,7 @@ export type TmapPoi = {
   name: string;
   lat: number;
   lng: number;
+  middleAddress: string;
   address: string;
   roadAddress: string;
   categoryPath: string[];

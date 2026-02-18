@@ -12,6 +12,7 @@ export function useNaverMap() {
   const mapRef = useRef<naver.maps.Map>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const myPos = useMapStore((s) => s.myPos);
+  const focusedPoi = useMapStore((s) => s.focusedPoi);
 
   const { coords } = useGeolocation({
     watch: false,
@@ -69,6 +70,22 @@ export function useNaverMap() {
   useEffect(() => {
     initMapOnce();
   }, [initMapOnce]);
+
+  useEffect(() => {
+    if (!sdkReady) return;
+    if (!focusedPoi) return;
+    if (!mapRef.current || !window.naver?.maps) return;
+    if (!Number.isFinite(focusedPoi.lat) || !Number.isFinite(focusedPoi.lng))
+      return;
+
+    const center = new window.naver.maps.LatLng(focusedPoi.lat, focusedPoi.lng);
+    if ((mapRef.current as any).panTo) {
+      (mapRef.current as any).panTo(center);
+      return;
+    }
+
+    mapRef.current.setCenter(center);
+  }, [sdkReady, focusedPoi]);
 
   return { mapRef, elRef, sdkReady, setSdkReady };
 }

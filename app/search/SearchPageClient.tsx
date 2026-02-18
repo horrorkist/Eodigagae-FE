@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import formatDist from "@/lib/formatDist";
 import AppIcon from "@/components/icons/AppIcon";
 import { appIconMagnify } from "@/components/icons/definitions.generated";
+import { fromTmapPoi } from "@/lib/focusedPoi";
 import type {
   TmapPoi,
   TmapPoiSearchResponse,
@@ -119,12 +120,14 @@ function getDistanceBadgeClass(distanceM: number | null) {
 }
 
 export default function SearchPageClient() {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const centerRef = useRef<SearchCenter | null>(null);
   const centerUpdatedAtRef = useRef(0);
   const searchParams = useSearchParams();
   const shouldFocusInput = searchParams.get("focus") === "1";
   const myPos = useMapStore((s) => s.myPos);
+  const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const [keyword, setKeyword] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
   const [submittedSort, setSubmittedSort] = useState<TmapPoiSearchSort>("R");
@@ -346,54 +349,63 @@ export default function SearchPageClient() {
               <ul className="divide-y divide-gray-100">
                 {items.map((poi, i) => (
                   <li key={i + "_" + poi.id} className="px-4 py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-gray-900">
-                          {poi.name}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFocusedPoi(fromTmapPoi(poi));
+                        router.push("/");
+                      }}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-gray-900">
+                            {poi.name}
+                          </div>
+                          <div className="mt-1 text-[11px] text-gray-500">
+                            {poi.categoryPath.length > 0
+                              ? poi.categoryPath.join(" · ")
+                              : "업종 정보 없음"}
+                          </div>
                         </div>
-                        <div className="mt-1 text-[11px] text-gray-500">
-                          {poi.categoryPath.length > 0
-                            ? poi.categoryPath.join(" · ")
-                            : "업종 정보 없음"}
+                        <div className="shrink-0 space-y-1 text-right">
+                          <div
+                            className={[
+                              "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium",
+                              getDistanceBadgeClass(poi.distanceM),
+                            ].join(" ")}
+                          >
+                            {poi.distanceM != null
+                              ? `직선 ${formatDist(poi.distanceM)}`
+                              : "거리 정보 없음"}
+                          </div>
+                          {poi.estimatedWalkMin != null && (
+                            <div className="text-[11px] text-gray-500">
+                              도보 약 {poi.estimatedWalkMin}분
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="shrink-0 space-y-1 text-right">
-                        <div
-                          className={[
-                            "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                            getDistanceBadgeClass(poi.distanceM),
-                          ].join(" ")}
-                        >
-                          {poi.distanceM != null
-                            ? `직선 ${formatDist(poi.distanceM)}`
-                            : "거리 정보 없음"}
+
+                      {(poi.address || poi.roadAddress) && (
+                        <div className="mt-2 text-xs text-gray-700">
+                          {poi.address || poi.roadAddress}
                         </div>
-                        {poi.estimatedWalkMin != null && (
-                          <div className="text-[11px] text-gray-500">
-                            도보 약 {poi.estimatedWalkMin}분
-                          </div>
+                      )}
+
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {poi.hasDetailInfo === true && (
+                          <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] text-sky-700">
+                            상세정보 제공
+                          </span>
+                        )}
+                        {poi.telNo && (
+                          <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600">
+                            {poi.telNo}
+                          </span>
                         )}
                       </div>
-                    </div>
-
-                    {(poi.address || poi.roadAddress) && (
-                      <div className="mt-2 text-xs text-gray-700">
-                        {poi.address || poi.roadAddress}
-                      </div>
-                    )}
-
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {poi.hasDetailInfo === true && (
-                        <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] text-sky-700">
-                          상세정보 제공
-                        </span>
-                      )}
-                      {poi.telNo && (
-                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600">
-                          {poi.telNo}
-                        </span>
-                      )}
-                    </div>
+                    </button>
                   </li>
                 ))}
               </ul>

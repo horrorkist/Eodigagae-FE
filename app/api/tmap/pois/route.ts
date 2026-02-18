@@ -140,6 +140,7 @@ function normalizePoi(
 
   const roadAddress = createRoadAddress(raw);
   const address = createJibunAddress(raw);
+  const middleAddress = String(raw?.middleAddrName ?? "").trim();
   const id = String(raw?.id ?? `${name}:${lat}:${lng}`);
   const categoryPath = toCategoryPath(raw);
   const distanceM = calcStraightDistanceM(centerLat, centerLon, lat, lng);
@@ -154,6 +155,7 @@ function normalizePoi(
     name,
     lat,
     lng,
+    middleAddress,
     address,
     roadAddress,
     categoryPath,

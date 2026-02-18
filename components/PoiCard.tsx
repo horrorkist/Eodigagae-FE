@@ -3,32 +3,21 @@ import { PoiStyle } from "@/lib/poiMarker";
 import { PetPoiItem } from "@/types/mapEvents";
 import React from "react";
 import PoiThumb from "./PoiThumb";
-import { useEmit } from "@/hooks/useEventBus";
-import { useBottomSheetStore } from "@/stores/bottomSheet";
 
 export default function PoiCard({
   poi,
   style,
+  onClick,
 }: {
   poi: PetPoiItem;
   style: PoiStyle;
+  onClick: () => void;
 }) {
-  const emit = useEmit();
-  const closeBottomSheet = useBottomSheetStore((s) => s.close);
-
-  const onClick = () => {
-    emit({
-      type: "MOVE_MAP_CENTER",
-      pos: { lat: Number(poi.mapy), lng: Number(poi.mapx) },
-      animate: true,
-      channel: "map",
-    });
-    closeBottomSheet();
-  };
   return (
-    <div
+    <button
+      type="button"
       className="
-        group flex items-stretch justify-between gap-4
+        group flex w-full items-stretch justify-between gap-4 text-left
         rounded-2xl border border-gray-200 bg-white p-4
         shadow-sm transition
         hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md
@@ -57,6 +46,6 @@ export default function PoiCard({
       <div className="relative h-20 w-20 flex-none overflow-hidden rounded-xl bg-gray-100 ring-1 ring-black/5">
         <PoiThumb src={poi.firstimage2} alt={poi.title} poiStyle={style} />
       </div>
-    </div>
+    </button>
   );
 }
