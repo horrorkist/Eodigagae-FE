@@ -18,6 +18,7 @@ import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
 import DogInfoForm from "@/components/DogInfoForm";
 import { useDogStore } from "@/stores/dogStore";
+import { useModalStore } from "@/stores/modal";
 import { useEmit } from "@/hooks/useEventBus";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -98,6 +99,7 @@ export default function MapPage() {
   const dog = useDogStore((s) => s.dog);
   const clearDog = useDogStore((s) => s.clearDog);
   const openBottomSheet = useBottomSheetStore((s) => s.open);
+  const openModal = useModalStore((s) => s.open);
 
   const {
     petPoiOn,
@@ -106,6 +108,7 @@ export default function MapPage() {
     petPoiLoading,
     petPoiError,
     setPetPoiOn,
+    clearPetPoiError,
   } = usePetPoiController({
     radius: 10000,
     numOfRows: 80,
@@ -117,7 +120,7 @@ export default function MapPage() {
   const [showBin, setShowBin] = useState<boolean>(false);
   const [showWater, setShowWater] = useState<boolean>(false);
 
-  const canShowPoiTab = petPoiOn && petPois.length > 0;
+  const canShowPoiTab = petPoiOn;
 
   const [sheetMode, setSheetMode] = useState<SheetContentMode>("main");
   const [isRoutePlanningMode, setIsRoutePlanningMode] = useState(false);
@@ -130,6 +133,7 @@ export default function MapPage() {
     POI_INITIAL_RENDER_COUNT,
   );
   const poiLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const lastPetPoiErrorRef = useRef<string | null>(null);
 
   const visiblePois = useMemo(
     () => petPois.slice(0, visiblePoiCount),
@@ -214,6 +218,32 @@ export default function MapPage() {
     return () => observer.disconnect();
   }, [activeSheetMode, hasMorePois, loadMorePois, visiblePoiCount]);
 
+  useEffect(() => {
+    if (!petPoiError) {
+      lastPetPoiErrorRef.current = null;
+      return;
+    }
+    if (lastPetPoiErrorRef.current === petPoiError) return;
+
+    lastPetPoiErrorRef.current = petPoiError;
+    openModal({
+      title: "동반 가능 정보를 불러오지 못했어요",
+      icon: (
+        <FontAwesomeIcon
+          icon={faTriangleExclamation}
+          className="w-8 h-8 text-red-400"
+        />
+      ),
+      body: (
+        <p className="whitespace-pre-line">
+          {"일시적인 오류가 발생했어요.\n잠시 후 다시 시도해 주세요."}
+        </p>
+      ),
+      onDismiss: clearPetPoiError,
+      onConfirm: clearPetPoiError,
+    });
+  }, [clearPetPoiError, openModal, petPoiError]);
+
   return (
     <div className="w-full h-full">
       <NaverMapClient showPetPoi={petPoiOn} petPois={petPois} />
@@ -225,7 +255,7 @@ export default function MapPage() {
             labelOn: "동반 가능",
             value: petPoiOn,
             onChange: setPetPoiOn,
-            disabled: !myPos,
+            disabled: !myPos || Boolean(petPoiError),
             variant: "orange",
             icon: appIconPuppy,
             loading: petPoiLoading,
@@ -253,16 +283,6 @@ export default function MapPage() {
         onRouteEdit={handleRouteEdit}
         onGuideStart={handleGuideStart}
       />
-
-      {petPoiError && (
-        <div className="absolute left-3 right-3 top-20 z-50 flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-2">
-          <FontAwesomeIcon
-            icon={faTriangleExclamation}
-            className="w-3.5 h-3.5 shrink-0"
-          />
-          <span>{petPoiError}</span>
-        </div>
-      )}
 
       {focusedPoi ? (
         <FocusedPoiSheet poi={focusedPoi} onClose={clearFocusedPoi} />
@@ -321,6 +341,12 @@ export default function MapPage() {
                     />
                   );
                 })}
+
+                {!petPoiLoading && visiblePois.length === 0 && (
+                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
+                    표시할 장소가 없어요. 상단의 동반 가능 토글을 확인해 주세요.
+                  </div>
+                )}
 
                 {hasMorePois && (
                   <div

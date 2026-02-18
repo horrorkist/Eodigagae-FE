@@ -1,7 +1,7 @@
 // hooks/usePetPoiController.ts
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import useSWR from "swr";
 import { useMapStore } from "@/stores/mapStore";
 import type { PetPoiResponse } from "@/types/mapEvents";
@@ -37,6 +37,7 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
   const myPos = useMapStore((s) => s.myPos);
   const petPoiOn = useMapStore((s) => s.petPoiOn);
   const setPetPoiOnState = useMapStore((s) => s.setPetPoiOn);
+  const [petPoiError, setPetPoiError] = useState<string | null>(null);
 
   const radius = opts?.radius ?? PETPOI_DEFAULTS.radius;
   const numOfRows = opts?.numOfRows ?? PETPOI_DEFAULTS.numOfRows;
@@ -63,7 +64,7 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
     );
   }, [petPoiOn, roundedPos, radius, numOfRows, grid, revalidate]);
 
-  const { data, error, isValidating, mutate } = useSWR<PetPoiResponse>(
+  const { data, isValidating, mutate } = useSWR<PetPoiResponse>(
     swrKey,
     petPoiFetcher,
     {
@@ -72,6 +73,7 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
       onSuccess(res) {
+        setPetPoiError(null);
         emit({
           channel: "pet",
           type: "PETPOI_RESULT",
@@ -81,9 +83,12 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
         });
       },
       onError(err) {
+        const nextError = err?.message ?? "알 수 없는 오류";
+        setPetPoiError(nextError);
+        setPetPoiOnState(false);
         emit({
           type: "PETPOI_ERROR",
-          message: err?.message ?? "알 수 없는 오류",
+          message: nextError,
           key: swrKey ?? "petpoi:unknown",
           ts: Date.now(),
           channel: "pet",
@@ -114,14 +119,18 @@ export function usePetPoiController(opts?: PetPoiControllerProps) {
     () => emit({ type: "PETPOI_REFRESH", channel: "pet" }),
     [emit],
   );
+  const clearPetPoiError = useCallback(() => {
+    setPetPoiError(null);
+  }, []);
 
   return {
     petPoiOn,
     petPois: data?.items ?? [],
     petPoiTotalCount: data?.meta?.totalCount ?? null,
     petPoiLoading: isValidating,
-    petPoiError: error?.message ?? null,
+    petPoiError,
     setPetPoiOn,
     refreshPetPoi,
+    clearPetPoiError,
   };
 }

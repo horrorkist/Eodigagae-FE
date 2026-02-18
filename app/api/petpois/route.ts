@@ -13,6 +13,12 @@ function normalizeItems(raw: any) {
   return Array.isArray(raw) ? raw : [raw];
 }
 
+function toShortText(value: unknown, maxLen = 180) {
+  if (typeof value !== "string") return "";
+  if (value.length <= maxLen) return value;
+  return `${value.slice(0, maxLen)}...`;
+}
+
 /**
  * grid(도 단위)로 라운딩. 예: 0.002 ~= 200m 내외(위도 기준)
  * - decimals 방식보다 "요청에서 제어하기 쉬움"
@@ -99,17 +105,50 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const resultCode = data?.response?.header?.resultCode;
-    const resultMsg = data?.response?.header?.resultMsg;
+    // KTO 장애 시에는 response.header 대신 최상단 resultCode/resultMsg 형태로 내려올 수 있음.
+    const nestedResultCode = data?.response?.header?.resultCode;
+    const nestedResultMsg = data?.response?.header?.resultMsg;
+    const topLevelResultCode = data?.resultCode;
+    const topLevelResultMsg = data?.resultMsg;
+
+    const resultCode =
+      typeof nestedResultCode === "string"
+        ? nestedResultCode
+        : typeof topLevelResultCode === "string"
+          ? topLevelResultCode
+          : null;
+    const resultMsg =
+      typeof nestedResultMsg === "string"
+        ? nestedResultMsg
+        : typeof topLevelResultMsg === "string"
+          ? topLevelResultMsg
+          : null;
 
     if (resultCode && resultCode !== "0000") {
       return NextResponse.json(
-        { error: "Upstream error", resultCode, resultMsg },
+        {
+          error: `KTO API 오류(${resultCode})${
+            resultMsg ? `: ${toShortText(resultMsg)}` : ""
+          }`,
+          resultCode,
+          resultMsg: toShortText(resultMsg, 500),
+        },
         { status: 502 },
       );
     }
 
-    const rawItems = data?.response?.body?.items?.item;
+    const body = data?.response?.body;
+    if (!body) {
+      return NextResponse.json(
+        {
+          error: "Malformed upstream payload",
+          detail: toShortText(text, 500),
+        },
+        { status: 502 },
+      );
+    }
+
+    const rawItems = body?.items?.item;
     const items = normalizeItems(rawItems);
 
     // ✅ 클라(usePetPoiController)가 기대하는 key/meta/items로 반환
@@ -124,7 +163,7 @@ export async function GET(req: NextRequest) {
           numOfRows,
           pageNo,
           revalidate,
-          totalCount: data?.response?.body?.totalCount ?? null,
+          totalCount: body?.totalCount ?? null,
         },
         items,
       },
