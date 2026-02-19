@@ -2,13 +2,17 @@
 
 import BottomNav from "./BottomNav";
 import { useUiChromeStore } from "@/stores/uiChrome";
+import { usePathname } from "next/navigation";
 
 export default function BottomNavHost() {
+  const pathname = usePathname();
   const isBottomChromeVisible = useUiChromeStore(
     (s) => s.isBottomChromeVisible,
   );
+  const isOnboardingRoute =
+    pathname === "/onboarding" || pathname.startsWith("/onboarding/");
 
-  if (!isBottomChromeVisible) return null;
+  if (!isBottomChromeVisible || isOnboardingRoute) return null;
 
   return (
     <div
