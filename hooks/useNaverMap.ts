@@ -13,6 +13,7 @@ export function useNaverMap() {
   const [sdkReady, setSdkReady] = useState(false);
   const myPos = useMapStore((s) => s.myPos);
   const focusedPoi = useMapStore((s) => s.focusedPoi);
+  const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
 
   const { coords } = useGeolocation({
     watch: false,
@@ -26,14 +27,19 @@ export function useNaverMap() {
     if (!window.naver?.maps) return;
     if (mapRef.current) return;
 
-    const lat =
-      typeof myPos?.lat === "number"
+    const hasFocusedPoiCenter =
+      Number.isFinite(focusedPoi?.lat) && Number.isFinite(focusedPoi?.lng);
+
+    const lat = hasFocusedPoiCenter
+      ? focusedPoi.lat
+      : typeof myPos?.lat === "number"
         ? myPos.lat
         : typeof coords?.latitude === "number"
           ? coords.latitude
           : FALLBACK.lat;
-    const lng =
-      typeof myPos?.lng === "number"
+    const lng = hasFocusedPoiCenter
+      ? focusedPoi.lng
+      : typeof myPos?.lng === "number"
         ? myPos.lng
         : typeof coords?.longitude === "number"
           ? coords.longitude
@@ -52,7 +58,7 @@ export function useNaverMap() {
       },
       mapDataControl: false,
     });
-  }, [sdkReady, coords, myPos]);
+  }, [sdkReady, coords, focusedPoi, myPos]);
 
   useOn("map", "MOVE_MAP_CENTER", (cmd) => {
     if (!mapRef.current || !window.naver?.maps) return;
@@ -86,6 +92,20 @@ export function useNaverMap() {
 
     mapRef.current.setCenter(center);
   }, [sdkReady, focusedPoi]);
+
+  useEffect(() => {
+    if (!sdkReady) return;
+    if (!mapRef.current || !window.naver?.maps) return;
+
+    const listener = naver.maps.Event.addListener(mapRef.current, "click", () => {
+      if (!useMapStore.getState().focusedPoi) return;
+      clearFocusedPoi();
+    });
+
+    return () => {
+      naver.maps.Event.removeListener(listener);
+    };
+  }, [sdkReady, clearFocusedPoi]);
 
   return { mapRef, elRef, sdkReady, setSdkReady };
 }

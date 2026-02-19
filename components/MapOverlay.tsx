@@ -322,19 +322,21 @@ function RoutePlanningOverlay({
                     <div
                       className={[
                         "px-2 py-0.5 rounded-full text-white text-base",
-                        selected === index ? "bg-dg-green-500" : "bg-dg-gray",
+                        selected === index
+                          ? "bg-dg-green-500"
+                          : "bg-dg-gray-500",
                       ].join(" ")}
                     >
                       {`경로 ${index}`}
                     </div>
-                    <div className="text-dg-gray font-medium tracking-tighter">
+                    <div className="text-dg-gray-500 font-medium tracking-tighter">
                       {dist}
                     </div>
                   </div>
                   <div
                     className={[
                       "tabular-nums -tracking-tight flex gap-x-1 items-end",
-                      selected === index ? "text-dg-black" : "text-dg-gray",
+                      selected === index ? "text-dg-black" : "text-dg-gray-500",
                     ].join(" ")}
                   >
                     {hours > 0 && (

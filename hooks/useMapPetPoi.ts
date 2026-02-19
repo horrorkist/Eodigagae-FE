@@ -3,6 +3,8 @@
 import { MutableRefObject, useCallback, useEffect, useRef } from "react";
 import { PetPoiItem } from "@/types/mapEvents";
 import { buildPinMarkerHTML, buildLabelMarkerHTML } from "@/lib/poiMarker";
+import { fromPetPoiItem } from "@/lib/focusedPoi";
+import { useMapStore } from "@/stores/mapStore";
 
 export function useMapPetPoi(
   mapRef: MutableRefObject<naver.maps.Map | null>,
@@ -10,6 +12,8 @@ export function useMapPetPoi(
   showPetPoi: boolean,
   petPois: PetPoiItem[],
 ) {
+  const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
+  const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
   const petPinMarkersRef = useRef<naver.maps.Marker[]>([]);
   const petLabelMarkersRef = useRef<naver.maps.Marker[]>([]);
   const pinListenersRef = useRef<naver.maps.MapEventListener[]>([]);
@@ -103,12 +107,14 @@ export function useMapPetPoi(
           // Tapping the same pin hides the label
           label.setMap(null);
           activeLabelIdxRef.current = null;
+          clearFocusedPoi();
         } else {
           // Hide previous label
           hideActiveLabel();
           // Show this label
           label.setMap(map);
           activeLabelIdxRef.current = idx;
+          setFocusedPoi(fromPetPoiItem(it));
         }
       });
 
@@ -127,7 +133,16 @@ export function useMapPetPoi(
     );
 
     pendingDrawRef.current = false;
-  }, [sdkReady, showPetPoi, petPois, mapRef, clearPetMarkers, hideActiveLabel]);
+  }, [
+    sdkReady,
+    showPetPoi,
+    petPois,
+    mapRef,
+    clearPetMarkers,
+    hideActiveLabel,
+    clearFocusedPoi,
+    setFocusedPoi,
+  ]);
 
   useEffect(() => {
     drawPetMarkers();

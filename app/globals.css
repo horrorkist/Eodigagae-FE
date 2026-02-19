@@ -28,7 +28,8 @@ body {
   --color-dg-green-800: #066e00;
   --color-dg-green-900: #044f00;
   --color-dg-black: #2c2c2c;
-  --color-dg-gray: #cecece;
+  --color-dg-gray-500: #cecece;
+  --color-dg-gray-600: #979797;
   --color-dg-white: #ededed;
   --color-green-sub: #0ad000;
   --color-dg-orange-100: #fff1e1;
@@ -49,4 +50,5 @@ body {
   --color-dg-blue-700: #0091ff;
   --color-dg-blue-800: #007de5;
   --color-dg-blue-900: #006fce;
+  --shadow-drop: 0px 0px 8px 0px rgba(0, 0, 0, 0.15);
 }

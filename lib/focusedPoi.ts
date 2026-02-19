@@ -1,6 +1,7 @@
 import type { PetPoiItem } from "@/types/mapEvents";
 import type { TmapPoi } from "@/types/tmapPoi";
 import type { FocusedPoi } from "@/types/focusedPoi";
+import { POI_STYLES } from "./poiMarker";
 
 function toStringValue(value: unknown) {
   if (typeof value !== "string") return "";
@@ -27,7 +28,6 @@ function deriveMiddleAddress(value: string) {
 
 export function fromPetPoiItem(item: PetPoiItem): FocusedPoi {
   const jibunAddress = toStringValue(item.addr1);
-  const roadAddress = toStringValue(item.addr2);
   const middleAddress = deriveMiddleAddress(jibunAddress);
 
   return {
@@ -36,11 +36,10 @@ export function fromPetPoiItem(item: PetPoiItem): FocusedPoi {
     name: toStringValue(item.title),
     lat: Number(item.mapy),
     lng: Number(item.mapx),
-    bizCategory: toStringValue(item.cat3),
+    bizCategory: POI_STYLES[item.contenttypeid].label,
     distanceM: toDistanceNumber(item.dist),
     middleAddress,
     jibunAddress,
-    roadAddress,
     tel: toStringValue(item.tel),
     thumbnail: toStringValue(item.firstimage2 || item.firstimage),
   };

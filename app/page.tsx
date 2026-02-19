@@ -99,6 +99,7 @@ export default function MapPage() {
   const dog = useDogStore((s) => s.dog);
   const clearDog = useDogStore((s) => s.clearDog);
   const openBottomSheet = useBottomSheetStore((s) => s.open);
+  const closeBottomSheet = useBottomSheetStore((s) => s.close);
   const openModal = useModalStore((s) => s.open);
 
   const {
@@ -149,9 +150,10 @@ export default function MapPage() {
 
   const handleFocusPetPoi = useCallback(
     (poi: PetPoiItem) => {
+      closeBottomSheet();
       setFocusedPoi(fromPetPoiItem(poi));
     },
-    [setFocusedPoi],
+    [closeBottomSheet, setFocusedPoi],
   );
 
   const handleRouteRecommendRequested = useCallback(() => {

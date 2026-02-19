@@ -9,8 +9,8 @@ export type FocusedPoi = {
   bizCategory: string;
   distanceM: number | null;
   middleAddress: string;
-  jibunAddress: string;
-  roadAddress: string;
+  jibunAddress?: string;
+  roadAddress?: string;
   tel: string;
   thumbnail: string;
 };

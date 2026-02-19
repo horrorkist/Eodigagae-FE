@@ -125,6 +125,18 @@ function createRoadAddress(raw: TmapPoiUpstream) {
     .trim();
 }
 
+function deriveBizCategory(raw: TmapPoiUpstream): string {
+  if (!raw) return "";
+
+  if (typeof raw.detailBizName === "string" && raw.detailBizName !== "기타") {
+    return raw.detailBizName;
+  }
+
+  if (typeof raw.lowerBizName === "string") return raw.lowerBizName;
+
+  return "";
+}
+
 function normalizePoi(
   raw: TmapPoiUpstream,
   centerLat: number,
@@ -159,7 +171,7 @@ function normalizePoi(
     address,
     roadAddress,
     categoryPath,
-    bizCategory: categoryPath[categoryPath.length - 1] ?? "",
+    bizCategory: deriveBizCategory(raw),
     telNo: String(raw?.telNo ?? "").trim(),
     distanceM,
     estimatedWalkMin,

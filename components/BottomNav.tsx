@@ -47,7 +47,7 @@ export default function BottomNav() {
             href={t.href}
             className={[
               "flex flex-col h-14 items-center justify-center gap-1",
-              active ? "text-dg-green-500" : "text-dg-gray",
+              active ? "text-dg-green-500" : "text-dg-gray-500",
             ].join(" ")}
           >
             <AppIcon icon={t.icon} className="w-6 h-6" />

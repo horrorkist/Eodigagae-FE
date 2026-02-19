@@ -102,6 +102,7 @@ export function useMapMyLocation(
   const walkWatchIdRef = useRef<number | null>(null);
 
   const manualPosRef = useRef(false);
+  const didInitialAutoCenterRef = useRef(false);
   const lastGeoRef = useRef<{ lat: number; lng: number } | null>(null);
   const lastWalkAtRef = useRef(0);
   const lastWalkPosRef = useRef<LatLng | null>(null);
@@ -111,6 +112,7 @@ export function useMapMyLocation(
   const drawRoute = useMapStore((s) => s.drawRoute);
   const myPos = useMapStore((s) => s.myPos);
   const pickedPos = useMapStore((s) => s.pickedPos);
+  const focusedPoi = useMapStore((s) => s.focusedPoi);
   const walking = useMapStore((s) => s.walking);
   const walkingPaused = useMapStore((s) => s.walkingPaused);
   const walkingPausedAt = useMapStore((s) => s.walkingPausedAt);
@@ -213,9 +215,17 @@ export function useMapMyLocation(
       if (!window.naver?.maps) return;
 
       const ll = new window.naver.maps.LatLng(pos.lat, pos.lng);
-      myMarkerRef.current?.setPosition(ll);
+      const marker = myMarkerRef.current;
+      if (!marker) return;
+
+      marker.setPosition(ll);
+
+      const map = mapRef.current;
+      if (map && marker.getMap() !== map) {
+        marker.setMap(map);
+      }
     },
-    [setMyPos],
+    [mapRef, setMyPos],
   );
 
   const syncDestinationMarker = useCallback(
@@ -270,9 +280,23 @@ export function useMapMyLocation(
     if (!sdkReady || !mapRef.current || !window.naver?.maps) return;
     if (myMarkerRef.current) return;
 
+    const hasStorePos =
+      typeof myPos?.lat === "number" && typeof myPos?.lng === "number";
+    const hasGeoCoords =
+      typeof coords?.latitude === "number" &&
+      typeof coords?.longitude === "number";
+    const initialPos = hasStorePos
+      ? { lat: myPos.lat, lng: myPos.lng }
+      : hasGeoCoords
+        ? { lat: coords.latitude, lng: coords.longitude }
+        : null;
+    const initialLatLng = initialPos
+      ? new window.naver.maps.LatLng(initialPos.lat, initialPos.lng)
+      : mapRef.current.getCenter();
+
     myMarkerRef.current = new window.naver.maps.Marker({
-      position: mapRef.current.getCenter(),
-      map: mapRef.current,
+      position: initialLatLng,
+      map: initialPos ? mapRef.current : null,
       icon: {
         content: buildUserMarkerHTML(null, false),
         anchor: new window.naver.maps.Point(
@@ -281,7 +305,7 @@ export function useMapMyLocation(
         ),
       },
     });
-  }, [sdkReady, mapRef]);
+  }, [sdkReady, mapRef, myPos, coords]);
 
   // heading / walking 상태를 마커 아이콘에 반영
   useEffect(() => {
@@ -309,13 +333,23 @@ export function useMapMyLocation(
       if (last && last.lat === geoLat && last.lng === geoLng) return;
 
       lastGeoRef.current = nextGeoPos;
+      updateMyPosition(nextGeoPos);
+
+      if (didInitialAutoCenterRef.current) return;
+      if (focusedPoi) {
+        didInitialAutoCenterRef.current = true;
+        return;
+      }
+
       if (
         myPos &&
         haversineMeters(myPos, nextGeoPos) < PREWALK_RECENTER_MIN_MOVE_M
       ) {
+        didInitialAutoCenterRef.current = true;
         return;
       }
 
+      didInitialAutoCenterRef.current = true;
       emit({
         type: "MOVE_TO",
         pos: nextGeoPos,
@@ -327,6 +361,13 @@ export function useMapMyLocation(
     }
 
     if (error) {
+      if (didInitialAutoCenterRef.current) return;
+      if (focusedPoi) {
+        didInitialAutoCenterRef.current = true;
+        return;
+      }
+
+      didInitialAutoCenterRef.current = true;
       emit({
         type: "MOVE_TO",
         pos: FALLBACK,
@@ -335,7 +376,7 @@ export function useMapMyLocation(
         channel: "map",
       });
     }
-  }, [geoLat, geoLng, error, emit, myPos, walking]);
+  }, [geoLat, geoLng, error, emit, focusedPoi, myPos, updateMyPosition, walking]);
 
   // REQUEST_MY_LOCATION → GPS 새로고침
   useOn("map", "REQUEST_MY_LOCATION", () => {
@@ -619,7 +660,12 @@ export function useMapMyLocation(
     if (animate) mapRef.current.panTo(ll);
     else mapRef.current.setCenter(ll);
 
-    myMarkerRef.current?.setPosition(ll);
+    if (myMarkerRef.current) {
+      myMarkerRef.current.setPosition(ll);
+      if (myMarkerRef.current.getMap() !== mapRef.current) {
+        myMarkerRef.current.setMap(mapRef.current);
+      }
+    }
   });
 
   // cleanup

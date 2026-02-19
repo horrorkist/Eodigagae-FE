@@ -37,8 +37,8 @@ export default function PoiCard({
           {poi.title}
         </div>
 
-        <div className="mt-2 text-xs text-gray-600 line-clamp-1">
-          {poi.addr1 ?? ""}
+        <div className="mt-2 text-xs text-gray-600 line-clamp-1 flex flex-col">
+          <span>{poi.addr1 ?? ""}</span>
         </div>
       </div>
 
