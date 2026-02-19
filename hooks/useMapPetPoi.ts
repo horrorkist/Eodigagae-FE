@@ -6,6 +6,42 @@ import { buildPinMarkerHTML, buildLabelMarkerHTML } from "@/lib/poiMarker";
 import { fromPetPoiItem } from "@/lib/focusedPoi";
 import { useMapStore } from "@/stores/mapStore";
 
+type MarkerEntry = {
+  key: string;
+  item: PetPoiItem;
+  lat: number;
+  lng: number;
+  pin: naver.maps.Marker;
+  label: naver.maps.Marker;
+  listener: naver.maps.MapEventListener;
+};
+
+type NormalizedPoi = {
+  key: string;
+  item: PetPoiItem;
+  lat: number;
+  lng: number;
+};
+
+function toPoiKey(item: PetPoiItem) {
+  const contentId = String(item.contentid ?? "").trim();
+  if (contentId) return `contentid:${contentId}`;
+  return `fallback:${item.mapx}:${item.mapy}:${item.title ?? ""}:${item.contenttypeid ?? ""}`;
+}
+
+function toNormalizedPoi(item: PetPoiItem): NormalizedPoi | null {
+  const lng = Number(item.mapx);
+  const lat = Number(item.mapy);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  return {
+    key: toPoiKey(item),
+    item,
+    lat,
+    lng,
+  };
+}
+
 export function useMapPetPoi(
   mapRef: MutableRefObject<naver.maps.Map | null>,
   sdkReady: boolean,
@@ -14,150 +50,238 @@ export function useMapPetPoi(
 ) {
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
-  const petPinMarkersRef = useRef<naver.maps.Marker[]>([]);
-  const petLabelMarkersRef = useRef<naver.maps.Marker[]>([]);
-  const pinListenersRef = useRef<naver.maps.MapEventListener[]>([]);
+  const markerEntriesRef = useRef<Map<string, MarkerEntry>>(new Map());
   const mapListenerRef = useRef<naver.maps.MapEventListener | null>(null);
-  const activeLabelIdxRef = useRef<number | null>(null);
-  const pendingDrawRef = useRef(false);
+  const activeKeyRef = useRef<string | null>(null);
+  const pendingSyncRef = useRef(false);
 
   const hideActiveLabel = useCallback(() => {
-    const idx = activeLabelIdxRef.current;
-    if (idx !== null && petLabelMarkersRef.current[idx]) {
-      petLabelMarkersRef.current[idx].setMap(null);
-      activeLabelIdxRef.current = null;
+    const activeKey = activeKeyRef.current;
+    if (!activeKey) return;
+    const activeEntry = markerEntriesRef.current.get(activeKey);
+    if (!activeEntry) {
+      activeKeyRef.current = null;
+      return;
+    }
+
+    activeEntry.label.setMap(null);
+    activeKeyRef.current = null;
+  }, []);
+
+  const removeEntry = useCallback((key: string) => {
+    const entry = markerEntriesRef.current.get(key);
+    if (!entry) return;
+
+    naver.maps.Event.removeListener(entry.listener);
+    entry.label.setMap(null);
+    entry.pin.setMap(null);
+    markerEntriesRef.current.delete(key);
+
+    if (activeKeyRef.current === key) {
+      activeKeyRef.current = null;
     }
   }, []);
 
-  const clearPetMarkers = useCallback(() => {
-    // Remove pin click listeners
-    for (const l of pinListenersRef.current) {
-      naver.maps.Event.removeListener(l);
+  const clearAllMarkers = useCallback(() => {
+    for (const key of markerEntriesRef.current.keys()) {
+      removeEntry(key);
     }
-    pinListenersRef.current = [];
 
-    // Remove map click listener
     if (mapListenerRef.current) {
       naver.maps.Event.removeListener(mapListenerRef.current);
       mapListenerRef.current = null;
     }
 
-    activeLabelIdxRef.current = null;
+    activeKeyRef.current = null;
+  }, [removeEntry]);
 
-    for (const m of petLabelMarkersRef.current) m.setMap(null);
-    petLabelMarkersRef.current = [];
+  const ensureMapClickListener = useCallback(
+    (map: naver.maps.Map) => {
+      if (mapListenerRef.current) return;
 
-    for (const m of petPinMarkersRef.current) m.setMap(null);
-    petPinMarkersRef.current = [];
-  }, []);
+      mapListenerRef.current = naver.maps.Event.addListener(
+        map,
+        "click",
+        () => {
+          hideActiveLabel();
+        },
+      );
+    },
+    [hideActiveLabel],
+  );
 
-  const drawPetMarkers = useCallback(() => {
-    if (!sdkReady) return;
-    if (!window.naver?.maps) return;
+  const updateExistingEntry = useCallback(
+    (entry: MarkerEntry, next: NormalizedPoi, map: naver.maps.Map) => {
+      const moved = entry.lat !== next.lat || entry.lng !== next.lng;
+      const titleChanged = entry.item.title !== next.item.title;
+      const typeChanged = entry.item.contenttypeid !== next.item.contenttypeid;
 
-    if (!showPetPoi) {
-      clearPetMarkers();
-      return;
-    }
+      if (moved) {
+        const pos = new window.naver.maps.LatLng(next.lat, next.lng);
+        entry.pin.setPosition(pos);
+        entry.label.setPosition(pos);
+      }
 
-    if (!mapRef.current) {
-      pendingDrawRef.current = true;
-      return;
-    }
+      if (titleChanged) {
+        entry.pin.setTitle(next.item.title ?? "");
+      }
 
-    clearPetMarkers();
+      if (titleChanged || typeChanged) {
+        entry.pin.setIcon({
+          content: buildPinMarkerHTML(next.item.contenttypeid),
+          anchor: new window.naver.maps.Point(0, 0),
+        });
+        entry.label.setIcon({
+          content: buildLabelMarkerHTML(
+            next.item.title ?? "",
+            next.item.contenttypeid,
+          ),
+          anchor: new window.naver.maps.Point(0, 0),
+        });
+      }
 
-    const map = mapRef.current;
+      if (entry.pin.getMap() !== map) {
+        entry.pin.setMap(map);
+      }
 
-    for (let i = 0; i < (petPois ?? []).length; i++) {
-      const it = petPois[i];
-      const lng = Number(it.mapx);
-      const lat = Number(it.mapy);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      entry.item = next.item;
+      entry.lat = next.lat;
+      entry.lng = next.lng;
+    },
+    [],
+  );
 
-      const pos = new window.naver.maps.LatLng(lat, lng);
+  const createEntry = useCallback(
+    (next: NormalizedPoi, map: naver.maps.Map): MarkerEntry => {
+      const pos = new window.naver.maps.LatLng(next.lat, next.lng);
 
-      // Custom icon pin marker
       const pin = new window.naver.maps.Marker({
         map,
         position: pos,
-        title: it.title ?? "",
+        title: next.item.title ?? "",
         icon: {
-          content: buildPinMarkerHTML(it.contenttypeid),
+          content: buildPinMarkerHTML(next.item.contenttypeid),
           anchor: new window.naver.maps.Point(0, 0),
         },
       });
 
-      // Label marker — created but NOT placed on map yet
       const label = new window.naver.maps.Marker({
-        map: undefined, // hidden initially
+        map: undefined,
         position: pos,
         clickable: false,
         icon: {
-          content: buildLabelMarkerHTML(it.title ?? "", it.contenttypeid),
+          content: buildLabelMarkerHTML(
+            next.item.title ?? "",
+            next.item.contenttypeid,
+          ),
           anchor: new window.naver.maps.Point(0, 0),
         },
         zIndex: 1000,
       });
 
-      // Tap pin → toggle its label
-      const idx = petPinMarkersRef.current.length; // capture index
+      const key = next.key;
       const listener = naver.maps.Event.addListener(pin, "click", () => {
-        if (activeLabelIdxRef.current === idx) {
-          // Tapping the same pin hides the label
-          label.setMap(null);
-          activeLabelIdxRef.current = null;
+        const current = markerEntriesRef.current.get(key);
+        if (!current) return;
+
+        if (activeKeyRef.current === key) {
+          current.label.setMap(null);
+          activeKeyRef.current = null;
           clearFocusedPoi();
-        } else {
-          // Hide previous label
-          hideActiveLabel();
-          // Show this label
-          label.setMap(map);
-          activeLabelIdxRef.current = idx;
-          setFocusedPoi(fromPetPoiItem(it));
+          return;
         }
+
+        hideActiveLabel();
+        current.label.setMap(map);
+        activeKeyRef.current = key;
+        setFocusedPoi(fromPetPoiItem(current.item));
       });
 
-      pinListenersRef.current.push(listener);
-      petPinMarkersRef.current.push(pin);
-      petLabelMarkersRef.current.push(label);
+      return {
+        key,
+        item: next.item,
+        lat: next.lat,
+        lng: next.lng,
+        pin,
+        label,
+        listener,
+      };
+    },
+    [clearFocusedPoi, hideActiveLabel, setFocusedPoi],
+  );
+
+  const syncPetMarkers = useCallback(() => {
+    if (!sdkReady || !window.naver?.maps) return;
+
+    if (!showPetPoi) {
+      clearAllMarkers();
+      return;
     }
 
-    // Tap the map background → dismiss active label
-    mapListenerRef.current = naver.maps.Event.addListener(
-      map,
-      "click",
-      () => {
-        hideActiveLabel();
-      },
-    );
+    if (!mapRef.current) {
+      pendingSyncRef.current = true;
+      return;
+    }
 
-    pendingDrawRef.current = false;
+    const map = mapRef.current;
+    ensureMapClickListener(map);
+
+    const normalized: NormalizedPoi[] = [];
+    const nextKeySet = new Set<string>();
+
+    for (const item of petPois ?? []) {
+      const normalizedPoi = toNormalizedPoi(item);
+      if (!normalizedPoi) continue;
+      if (nextKeySet.has(normalizedPoi.key)) continue;
+
+      normalized.push(normalizedPoi);
+      nextKeySet.add(normalizedPoi.key);
+    }
+
+    for (const key of Array.from(markerEntriesRef.current.keys())) {
+      if (!nextKeySet.has(key)) {
+        removeEntry(key);
+      }
+    }
+
+    for (const next of normalized) {
+      const existing = markerEntriesRef.current.get(next.key);
+      if (existing) {
+        updateExistingEntry(existing, next, map);
+        continue;
+      }
+
+      const created = createEntry(next, map);
+      markerEntriesRef.current.set(created.key, created);
+    }
+
+    pendingSyncRef.current = false;
   }, [
     sdkReady,
     showPetPoi,
-    petPois,
+    clearAllMarkers,
     mapRef,
-    clearPetMarkers,
-    hideActiveLabel,
-    clearFocusedPoi,
-    setFocusedPoi,
+    ensureMapClickListener,
+    petPois,
+    removeEntry,
+    updateExistingEntry,
+    createEntry,
   ]);
 
   useEffect(() => {
-    drawPetMarkers();
-  }, [drawPetMarkers]);
+    syncPetMarkers();
+  }, [syncPetMarkers]);
 
-  // 지도 생성 후 pending이면 그리기
   useEffect(() => {
-    if (mapRef.current && pendingDrawRef.current) {
-      queueMicrotask(drawPetMarkers);
+    if (mapRef.current && pendingSyncRef.current) {
+      queueMicrotask(syncPetMarkers);
     }
-  }, [mapRef, sdkReady, drawPetMarkers]);
+  }, [mapRef, sdkReady, syncPetMarkers]);
 
   useEffect(() => {
     return () => {
-      clearPetMarkers();
+      clearAllMarkers();
     };
-  }, [clearPetMarkers]);
+  }, [clearAllMarkers]);
 }
+
