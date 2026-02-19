@@ -296,7 +296,7 @@ export function useMapMyLocation(
 
     myMarkerRef.current = new window.naver.maps.Marker({
       position: initialLatLng,
-      map: initialPos ? mapRef.current : null,
+      map: initialPos ? mapRef.current : undefined,
       icon: {
         content: buildUserMarkerHTML(null, false),
         anchor: new window.naver.maps.Point(
@@ -376,7 +376,16 @@ export function useMapMyLocation(
         channel: "map",
       });
     }
-  }, [geoLat, geoLng, error, emit, focusedPoi, myPos, updateMyPosition, walking]);
+  }, [
+    geoLat,
+    geoLng,
+    error,
+    emit,
+    focusedPoi,
+    myPos,
+    updateMyPosition,
+    walking,
+  ]);
 
   // REQUEST_MY_LOCATION → GPS 새로고침
   useOn("map", "REQUEST_MY_LOCATION", () => {
