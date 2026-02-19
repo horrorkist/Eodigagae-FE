@@ -1,9 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AppIcon from "@/components/icons/AppIcon";
-import {
-  appIconMagnify,
-} from "@/components/icons/definitions.generated";
+import { appIconMagnify } from "@/components/icons/definitions.generated";
 import type { ToggleItem, ToggleVariant } from "@/components/map-overlay/types";
 
 const TOGGLE_STYLES: Record<
@@ -50,12 +48,14 @@ function ToggleChips({ toggles }: { toggles: ToggleItem[] }) {
               type="button"
               disabled={toggle.disabled || toggle.loading}
               onClick={() => toggle.onChange(!toggle.value)}
+              data-coachmark-id={
+                toggle.key === "petpoi" ? "petpoi-chip" : undefined
+              }
               className={[
                 "pointer-events-auto shrink-0",
                 "flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm shadow backdrop-blur",
                 "active:scale-[0.98] transition",
                 isOn ? style.on : style.off,
-                toggle.disabled ? "opacity-40" : "",
               ].join(" ")}
             >
               <AppIcon

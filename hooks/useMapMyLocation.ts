@@ -29,6 +29,7 @@ import {
 import { useMapStore } from "@/stores/mapStore";
 import { useModalStore } from "@/stores/modal";
 import { useMapControlStore } from "@/stores/mapControlStore";
+import { useCoachmarkStore } from "@/stores/coachmark";
 import { getGeoErrorInfo } from "@/lib/geolocationErrors";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 import type { LatLng } from "@/types/mapEvents";
@@ -78,6 +79,7 @@ export function useMapMyLocation(
   const setHeading = useMapStore((s) => s.setHeading);
   const markerPlacementMode = useMapControlStore((s) => s.markerPlacementMode);
   const myLocationRequestSeq = useMapControlStore((s) => s.myLocationRequestSeq);
+  const isCoachmarkActive = useCoachmarkStore((s) => s.isActive);
   const completeMarkerPlacement = useMapControlStore(
     (s) => s.completeMarkerPlacement,
   );
@@ -86,7 +88,7 @@ export function useMapMyLocation(
 
   const { coords, error, refresh } = useGeolocation({
     watch: false,
-    immediate: true,
+    immediate: !isCoachmarkActive,
     enableHighAccuracy: true,
   });
 
@@ -94,6 +96,7 @@ export function useMapMyLocation(
 
   const showGeoErrorModal = useCallback(
     (geoErr: GeolocationPositionError | Error) => {
+      if (isCoachmarkActive) return;
       const info = getGeoErrorInfo(geoErr);
 
       openModal({
@@ -114,7 +117,7 @@ export function useMapMyLocation(
         ),
       });
     },
-    [openModal],
+    [isCoachmarkActive, openModal],
   );
 
   const {

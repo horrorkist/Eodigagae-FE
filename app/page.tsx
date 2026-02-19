@@ -31,6 +31,7 @@ import {
   isWalkDebugPanelVisible,
   subscribeWalkDebugUpdates,
 } from "@/lib/walkDebug";
+import CoachmarkTour from "@/components/CoachmarkTour";
 import {
   appIconPuppy,
   appIconTrashbin,
@@ -423,6 +424,8 @@ export default function MapPage() {
           </div>
         </BottomSheet>
       )}
+
+      <CoachmarkTour />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useOn } from "./useEventBus";
 import { useMapStore } from "@/stores/mapStore";
+import { useCoachmarkStore } from "@/stores/coachmark";
 
 const FALLBACK = { lat: 37.5665, lng: 126.978 };
 
@@ -14,10 +15,11 @@ export function useNaverMap() {
   const myPos = useMapStore((s) => s.myPos);
   const focusedPoi = useMapStore((s) => s.focusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
+  const isCoachmarkActive = useCoachmarkStore((s) => s.isActive);
 
   const { coords } = useGeolocation({
     watch: false,
-    immediate: true,
+    immediate: !isCoachmarkActive,
     enableHighAccuracy: true,
   });
 

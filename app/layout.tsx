@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR } from "next/font/google";
+// import { Noto_Sans_KR } from "next/font/google";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
 import Providers from "./providers";
@@ -8,11 +8,12 @@ import { config } from "@fortawesome/fontawesome-svg-core";
 import "@fortawesome/fontawesome-svg-core/styles.css";
 config.autoAddCss = false;
 
-const notoSansKr = Noto_Sans_KR({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
+// const notoSansKr = Noto_Sans_KR({
+//   subsets: ["latin"],
+//   weight: ["400", "500", "600", "700"],
+//   display: "swap",
+//   variable: "--font-noto-sans-kr",
+// });
 
 export const metadata: Metadata = {
   title: "어디가개",
@@ -34,7 +35,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className={`${notoSansKr.className} overflow-hidden`}>
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"
+        />
+      </head>
+      <body className={`overflow-hidden`}>
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>

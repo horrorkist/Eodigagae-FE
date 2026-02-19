@@ -541,6 +541,7 @@ export default function BottomSheet({
         >
           {/* Handle */}
           <div
+            data-coachmark-id="bottom-sheet-handle"
             className="px-4 pt-3 pb-2 select-none touch-none"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}

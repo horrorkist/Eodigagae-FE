@@ -14,6 +14,16 @@ body {
 /* 모바일에서 튕김/드래그 감성 조절 */
 body {
   overscroll-behavior-y: none;
+  font-family:
+    "Pretendard",
+    "Pretendard Variable",
+    var(--font-noto-sans-kr),
+    -apple-system,
+    BlinkMacSystemFont,
+    "Apple SD Gothic Neo",
+    "Malgun Gothic",
+    "Segoe UI",
+    sans-serif;
 }
 
 @theme {
