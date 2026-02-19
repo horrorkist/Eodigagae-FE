@@ -79,7 +79,9 @@ export function useMapMyLocation(
   const setHeading = useMapStore((s) => s.setHeading);
   const markerPlacementMode = useMapControlStore((s) => s.markerPlacementMode);
   const myLocationRequestSeq = useMapControlStore((s) => s.myLocationRequestSeq);
+  const isCoachmarkResolved = useCoachmarkStore((s) => s.isResolved);
   const isCoachmarkActive = useCoachmarkStore((s) => s.isActive);
+  const shouldDeferGeolocation = !isCoachmarkResolved || isCoachmarkActive;
   const completeMarkerPlacement = useMapControlStore(
     (s) => s.completeMarkerPlacement,
   );
@@ -88,7 +90,7 @@ export function useMapMyLocation(
 
   const { coords, error, refresh } = useGeolocation({
     watch: false,
-    immediate: !isCoachmarkActive,
+    immediate: !shouldDeferGeolocation,
     enableHighAccuracy: true,
   });
 
@@ -96,7 +98,7 @@ export function useMapMyLocation(
 
   const showGeoErrorModal = useCallback(
     (geoErr: GeolocationPositionError | Error) => {
-      if (isCoachmarkActive) return;
+      if (shouldDeferGeolocation) return;
       const info = getGeoErrorInfo(geoErr);
 
       openModal({
@@ -117,7 +119,7 @@ export function useMapMyLocation(
         ),
       });
     },
-    [isCoachmarkActive, openModal],
+    [openModal, shouldDeferGeolocation],
   );
 
   const {

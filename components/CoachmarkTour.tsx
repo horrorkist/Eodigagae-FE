@@ -69,13 +69,14 @@ const TARGETS: TargetDefinition[] = [
 ];
 
 const TEXT_LEFT_MARGIN = 70;
-const TEXT_WIDTH = 400;
+const TEXT_WIDTH = 360;
 const TEXT_VERTICAL_GAP = 40;
 const TEXT_LABEL_OFFSET_X = 8;
 const TEXT_FIRST_LINE_CENTER_OFFSET_Y = 12;
 const TEXT_LINE_DOT_GAP_X = 12;
 const LINE_START_X_RATIO = 0.12;
 const CONNECTOR_CORNER_RADIUS = 10;
+const OVERLAY_BLEED_PX = 2;
 const DEFAULT_VIEWPORT: ViewportSize = { width: 390, height: 844 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -130,10 +131,7 @@ function createTargetLayout(
   rect: DOMRect,
   viewport: ViewportSize,
 ): TargetLayout {
-  const textWidth = Math.min(
-    TEXT_WIDTH,
-    viewport.width - TEXT_LEFT_MARGIN,
-  );
+  const textWidth = Math.min(TEXT_WIDTH, viewport.width - TEXT_LEFT_MARGIN);
   const centerX = rect.left + rect.width / 2;
   const startX = rect.left + rect.width * LINE_START_X_RATIO;
   const maxTextLeft = viewport.width - textWidth;
@@ -174,7 +172,11 @@ function createTargetLayout(
 
 export default function CoachmarkTour() {
   const maskId = useId();
+  const isCoachmarkResolved = useCoachmarkStore((s) => s.isResolved);
   const isCoachmarkActive = useCoachmarkStore((s) => s.isActive);
+  const resolveCoachmarkFromCookie = useCoachmarkStore(
+    (s) => s.resolveFromCookie,
+  );
   const setCoachmarkActive = useCoachmarkStore((s) => s.setActive);
   const [viewport, setViewport] = useState<ViewportSize>(getViewport);
   const [targetRects, setTargetRects] = useState<
@@ -192,6 +194,10 @@ export default function CoachmarkTour() {
     }
     setCoachmarkActive(false);
   }, [setCoachmarkActive]);
+
+  useEffect(() => {
+    resolveCoachmarkFromCookie();
+  }, [resolveCoachmarkFromCookie]);
 
   useEffect(() => {
     if (!isCoachmarkActive) return;
@@ -241,7 +247,17 @@ export default function CoachmarkTour() {
     }));
   }, [layouts, viewport]);
 
-  if (!isCoachmarkActive) return null;
+  const overlayBounds = useMemo(
+    () => ({
+      x: -OVERLAY_BLEED_PX,
+      y: -OVERLAY_BLEED_PX,
+      width: viewport.width + OVERLAY_BLEED_PX * 2,
+      height: viewport.height + OVERLAY_BLEED_PX * 2,
+    }),
+    [viewport],
+  );
+
+  if (!isCoachmarkResolved || !isCoachmarkActive) return null;
 
   return (
     <button
@@ -255,12 +271,20 @@ export default function CoachmarkTour() {
         aria-hidden="true"
       >
         <defs>
-          <mask id={maskId}>
+          <mask
+            id={maskId}
+            x={overlayBounds.x}
+            y={overlayBounds.y}
+            width={overlayBounds.width}
+            height={overlayBounds.height}
+            maskUnits="userSpaceOnUse"
+            maskContentUnits="userSpaceOnUse"
+          >
             <rect
-              x={0}
-              y={0}
-              width={viewport.width}
-              height={viewport.height}
+              x={overlayBounds.x}
+              y={overlayBounds.y}
+              width={overlayBounds.width}
+              height={overlayBounds.height}
               fill="white"
             />
             {highlightRects.map((highlight) => (
@@ -279,10 +303,10 @@ export default function CoachmarkTour() {
         </defs>
 
         <rect
-          x={0}
-          y={0}
-          width={viewport.width}
-          height={viewport.height}
+          x={overlayBounds.x}
+          y={overlayBounds.y}
+          width={overlayBounds.width}
+          height={overlayBounds.height}
           fill="rgba(0,0,0,0.58)"
           mask={`url(#${maskId})`}
         />

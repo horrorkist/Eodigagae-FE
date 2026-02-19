@@ -14,16 +14,20 @@ function readCookie(name: string): string | null {
   return null;
 }
 
-function getInitialCoachmarkActive() {
-  return readCookie(COACHMARK_COOKIE_NAME) !== COACHMARK_COOKIE_VALUE;
-}
-
 type CoachmarkState = {
+  isResolved: boolean;
   isActive: boolean;
+  resolveFromCookie: () => void;
   setActive: (active: boolean) => void;
 };
 
 export const useCoachmarkStore = create<CoachmarkState>((set) => ({
-  isActive: getInitialCoachmarkActive(),
-  setActive: (active) => set({ isActive: active }),
+  isResolved: false,
+  isActive: false,
+  resolveFromCookie: () =>
+    set({
+      isResolved: true,
+      isActive: readCookie(COACHMARK_COOKIE_NAME) !== COACHMARK_COOKIE_VALUE,
+    }),
+  setActive: (active) => set({ isResolved: true, isActive: active }),
 }));

@@ -15,11 +15,13 @@ export function useNaverMap() {
   const myPos = useMapStore((s) => s.myPos);
   const focusedPoi = useMapStore((s) => s.focusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
+  const isCoachmarkResolved = useCoachmarkStore((s) => s.isResolved);
   const isCoachmarkActive = useCoachmarkStore((s) => s.isActive);
+  const shouldDeferGeolocation = !isCoachmarkResolved || isCoachmarkActive;
 
   const { coords } = useGeolocation({
     watch: false,
-    immediate: !isCoachmarkActive,
+    immediate: !shouldDeferGeolocation,
     enableHighAccuracy: true,
   });
 
