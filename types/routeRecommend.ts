@@ -1,4 +1,4 @@
-import type { RouteResult } from "@/stores/mapStore";
+import type { RouteResult } from "@/domain/route/types";
 
 export type RouteRecommendationSource = "petpoi" | "synthetic";
 

@@ -1,5 +1,5 @@
 import type { LatLng } from "@/types/mapEvents";
-import type { RouteResult } from "@/stores/mapStore";
+import type { RouteResult } from "@/domain/route/types";
 import { extractTmapPedestrian } from "@/lib/extractTmapPedestrian";
 
 export type TmapWalkRouteFetchResult = {

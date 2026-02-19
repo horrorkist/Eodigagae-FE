@@ -11,7 +11,8 @@ import {
   subscribeWalkDebugUpdates,
   type WalkDebugEntry,
 } from "@/lib/walkDebug";
-import { useMapStore, type RouteResult } from "@/stores/mapStore";
+import { useMapStore } from "@/stores/mapStore";
+import type { RouteResult } from "@/domain/route/types";
 import { useRouteActions } from "@/hooks/useRouteActions";
 import CoordRow from "@/components/CoordRow";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";

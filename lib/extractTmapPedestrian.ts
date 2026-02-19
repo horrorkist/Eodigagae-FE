@@ -2,7 +2,7 @@ import type {
   RouteGuidanceStep,
   RouteResult,
   RouteSegment,
-} from "@/stores/mapStore";
+} from "@/domain/route/types";
 import type { TmapPedestrianPointType } from "@/types/tmapPedestrian";
 
 type UnknownRecord = Record<string, unknown>;
