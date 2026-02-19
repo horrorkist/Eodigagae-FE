@@ -13,22 +13,18 @@ import {
 import BottomSheet from "@/components/BottomSheet";
 import FocusedPoiSheet from "@/components/FocusedPoiSheet";
 import MapOverlay from "@/components/MapOverlay";
+import SheetTabs from "@/components/map-page/SheetTabs";
+import PoiTabContent from "@/components/map-page/PoiTabContent";
+import RouteTabContent from "@/components/map-page/RouteTabContent";
 import { useMapStore } from "@/stores/mapStore";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
-import DogInfoForm from "@/components/DogInfoForm";
-import { useDogStore } from "@/stores/dogStore";
+import { useDogStore, type DogInfoFormDraft } from "@/stores/dogStore";
 import { useModalStore } from "@/stores/modal";
 import { useEmit } from "@/hooks/useEventBus";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faPaw,
-  faPenToSquare,
-  faTriangleExclamation,
-} from "@fortawesome/free-solid-svg-icons";
-import { POI_STYLES } from "@/lib/poiMarker";
+import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { fromPetPoiItem } from "@/lib/focusedPoi";
-import PoiCard from "@/components/PoiCard";
 import WalkDebugPanel from "@/components/WalkDebugPanel";
 import { PetPoiItem } from "@/types/mapEvents";
 import {
@@ -40,6 +36,9 @@ import {
   appIconTrashbin,
   appIconWaterdrop,
 } from "@/components/icons/definitions.generated";
+import { useRouteRecommendStore } from "@/stores/routeRecommendStore";
+import { fetchRouteRecommendations } from "@/services/routeRecommend";
+import type { RouteRecommendation } from "@/types/routeRecommend";
 
 const NaverMapClient = dynamic(() => import("@/components/NaverMapClient"), {
   ssr: false,
@@ -47,41 +46,8 @@ const NaverMapClient = dynamic(() => import("@/components/NaverMapClient"), {
 
 type SheetContentMode = "main" | "poi";
 
-const TAB_BUTTON_BASE_CLASS =
-  "rounded-md px-3 py-2 text-sm font-medium transition-colors";
-const TAB_BUTTON_INACTIVE_CLASS = "text-gray-600 hover:text-gray-800";
-const TAB_BUTTON_ACTIVE_CLASS = "bg-white text-gray-900 shadow-sm";
 const POI_INITIAL_RENDER_COUNT = 16;
 const POI_RENDER_BATCH_COUNT = 12;
-
-function PetPoiSummary({
-  loading,
-  totalCount,
-}: {
-  loading: boolean;
-  totalCount: number | null;
-}) {
-  return (
-    <div className="border border-amber-200 bg-amber-50 rounded-md p-3 flex items-center gap-2 text-sm">
-      <FontAwesomeIcon
-        icon={faPaw}
-        className="w-3.5 h-3.5 text-amber-600 shrink-0"
-      />
-      <span className="font-semibold text-amber-800">반려동물 동반 시설</span>
-      <span className="ml-auto text-amber-700 font-bold">
-        {loading ? "..." : totalCount != null ? `${totalCount}곳` : "-"}
-      </span>
-    </div>
-  );
-}
-
-function formatDogAgeLabel(ageInMonths: number) {
-  if (ageInMonths < 12) {
-    return `${ageInMonths}개월`;
-  }
-
-  return `${Math.floor(ageInMonths / 12)}살`;
-}
 
 export default function MapPage() {
   const emit = useEmit();
@@ -95,12 +61,28 @@ export default function MapPage() {
   const focusedPoi = useMapStore((s) => s.focusedPoi);
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
+  const setPickedPos = useMapStore((s) => s.setPickedPos);
+  const setRouteState = useMapStore((s) => s.setRouteState);
 
   const dog = useDogStore((s) => s.dog);
   const clearDog = useDogStore((s) => s.clearDog);
   const openBottomSheet = useBottomSheetStore((s) => s.open);
   const closeBottomSheet = useBottomSheetStore((s) => s.close);
   const openModal = useModalStore((s) => s.open);
+  const routeRecommendations = useRouteRecommendStore((s) => s.recommendations);
+  const selectedRouteId = useRouteRecommendStore((s) => s.selectedRouteId);
+  const routeRecommendLoading = useRouteRecommendStore((s) => s.loading);
+  const routeRecommendError = useRouteRecommendStore((s) => s.error);
+  const startRouteRecommendLoading = useRouteRecommendStore(
+    (s) => s.startLoading,
+  );
+  const setRouteRecommendations = useRouteRecommendStore(
+    (s) => s.setRecommendations,
+  );
+  const setRouteRecommendError = useRouteRecommendStore((s) => s.setError);
+  const selectRouteRecommendation = useRouteRecommendStore(
+    (s) => s.selectRoute,
+  );
 
   const {
     petPoiOn,
@@ -156,13 +138,106 @@ export default function MapPage() {
     [closeBottomSheet, setFocusedPoi],
   );
 
-  const handleRouteRecommendRequested = useCallback(() => {
-    setPreferRouteRecommendSheet(true);
-    setSheetMode("main");
-    setIsRoutePlanningMode(true);
-  }, []);
+  const applyRecommendationRoute = useCallback(
+    (recommendation: RouteRecommendation) => {
+      setPickedPos({
+        lat: recommendation.waypoint.lat,
+        lng: recommendation.waypoint.lng,
+      });
+      setRouteState({
+        route: recommendation.route,
+        routeRawResponse: null,
+        routeLoading: false,
+        routeError: null,
+        drawRoute: true,
+      });
+    },
+    [setPickedPos, setRouteState],
+  );
+
+  const handleRouteRecommendRequested = useCallback(
+    async (draft: DogInfoFormDraft) => {
+      if (!myPos) {
+        openModal({
+          title: "내 위치를 확인 중이에요",
+          body: <p>현재 위치를 확인한 뒤 다시 시도해 주세요.</p>,
+        });
+        return;
+      }
+
+      setPreferRouteRecommendSheet(true);
+      setSheetMode("main");
+      startRouteRecommendLoading();
+
+      try {
+        const response = await fetchRouteRecommendations({
+          start: myPos,
+          draft,
+        });
+        setRouteRecommendations(response.recommendations, response.meta);
+
+        if (response.recommendations.length === 0) {
+          const message = "조건에 맞는 추천 경로를 찾지 못했어요.";
+          setRouteRecommendError(message);
+          setIsRoutePlanningMode(false);
+          openModal({
+            title: "추천 경로를 찾지 못했어요",
+            body: <p>{message}</p>,
+          });
+          return;
+        }
+
+        const firstRecommendation = response.recommendations[0];
+        selectRouteRecommendation(firstRecommendation.id);
+        applyRecommendationRoute(firstRecommendation);
+
+        setPreferRouteRecommendSheet(false);
+        setIsRoutePlanningMode(true);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "추천 경로를 불러오지 못했어요.";
+
+        setRouteRecommendError(message);
+        setIsRoutePlanningMode(false);
+        openModal({
+          title: "추천 경로를 불러오지 못했어요",
+          body: <p>{message}</p>,
+        });
+      }
+    },
+    [
+      applyRecommendationRoute,
+      myPos,
+      openModal,
+      selectRouteRecommendation,
+      setRouteRecommendError,
+      setRouteRecommendations,
+      startRouteRecommendLoading,
+    ],
+  );
+
+  const handleRouteRecommendationSelect = useCallback(
+    (routeId: string) => {
+      const selectedRecommendation = routeRecommendations.find(
+        (item) => item.id === routeId,
+      );
+      if (!selectedRecommendation) return;
+
+      selectRouteRecommendation(routeId);
+      applyRecommendationRoute(selectedRecommendation);
+    },
+    [applyRecommendationRoute, routeRecommendations, selectRouteRecommendation],
+  );
 
   const handleRouteEdit = useCallback(() => {
+    setPickedPos(null);
+    setRouteState({
+      drawRoute: false,
+      routeLoading: false,
+      routeError: null,
+    });
     setIsRoutePlanningMode(false);
     setPreferRouteRecommendSheet(true);
     setSheetMode("main");
@@ -170,11 +245,29 @@ export default function MapPage() {
     requestAnimationFrame(() => {
       openBottomSheet(0);
     });
-  }, [emit, openBottomSheet]);
+  }, [emit, openBottomSheet, setPickedPos, setRouteState]);
+
+  const handleMainTabClick = useCallback(() => {
+    setSheetMode("main");
+  }, []);
+
+  const handlePoiTabClick = useCallback(() => {
+    setSheetMode("poi");
+    setVisiblePoiCount(
+      Math.min(POI_INITIAL_RENDER_COUNT, petPois.length),
+    );
+  }, [petPois.length]);
 
   const handleGuideStart = useCallback(() => {
-    // 안내 시작 기능은 다음 단계에서 연결 예정
-  }, []);
+    if (routeRecommendLoading) return;
+
+    const selectedRecommendation =
+      routeRecommendations.find((item) => item.id === selectedRouteId) ??
+      routeRecommendations[0];
+    if (!selectedRecommendation) return;
+
+    emit({ channel: "map", type: "START_WALKING" });
+  }, [emit, routeRecommendLoading, routeRecommendations, selectedRouteId]);
 
   useEffect(() => {
     emit({ channel: "ui", type: "UI_HOME_ENTERED" });
@@ -284,6 +377,11 @@ export default function MapPage() {
         isRoutePlanningMode={isRoutePlanningMode}
         onRouteEdit={handleRouteEdit}
         onGuideStart={handleGuideStart}
+        routePlanningRecommendations={routeRecommendations}
+        routePlanningSelectedRouteId={selectedRouteId}
+        routePlanningLoading={routeRecommendLoading}
+        routePlanningError={routeRecommendError}
+        onRoutePlanningSelect={handleRouteRecommendationSelect}
       />
 
       {focusedPoi ? (
@@ -291,102 +389,29 @@ export default function MapPage() {
       ) : (
         <BottomSheet peekHeight={30} coverBottomNav>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
-              <button
-                type="button"
-                onClick={() => setSheetMode("main")}
-                className={[
-                  TAB_BUTTON_BASE_CLASS,
-                  activeSheetMode === "main"
-                    ? TAB_BUTTON_ACTIVE_CLASS
-                    : TAB_BUTTON_INACTIVE_CLASS,
-                ].join(" ")}
-              >
-                경로 추천
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSheetMode("poi");
-                  setVisiblePoiCount(
-                    Math.min(POI_INITIAL_RENDER_COUNT, petPois.length),
-                  );
-                }}
-                disabled={!canShowPoiTab}
-                className={[
-                  TAB_BUTTON_BASE_CLASS,
-                  "disabled:cursor-not-allowed disabled:opacity-50",
-                  activeSheetMode === "poi"
-                    ? TAB_BUTTON_ACTIVE_CLASS
-                    : TAB_BUTTON_INACTIVE_CLASS,
-                ].join(" ")}
-              >
-                장소 목록
-              </button>
-            </div>
+            <SheetTabs
+              activeMode={activeSheetMode}
+              canShowPoiTab={canShowPoiTab}
+              onMainClick={handleMainTabClick}
+              onPoiClick={handlePoiTabClick}
+            />
 
             {activeSheetMode === "poi" ? (
-              <>
-                <PetPoiSummary
-                  loading={petPoiLoading}
-                  totalCount={petPoiTotalCount}
-                />
-
-                {visiblePois.map((poi) => {
-                  const style = POI_STYLES[poi.contenttypeid];
-                  return (
-                    <PoiCard
-                      key={poi.contentid}
-                      poi={poi}
-                      style={style}
-                      onClick={() => handleFocusPetPoi(poi)}
-                    />
-                  );
-                })}
-
-                {!petPoiLoading && visiblePois.length === 0 && (
-                  <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
-                    표시할 장소가 없어요. 상단의 동반 가능 토글을 확인해 주세요.
-                  </div>
-                )}
-
-                {hasMorePois && (
-                  <div
-                    ref={poiLoadMoreRef}
-                    className="h-10 flex items-center justify-center text-xs text-gray-400"
-                  >
-                    목록 불러오는 중...
-                  </div>
-                )}
-              </>
+              <PoiTabContent
+                loading={petPoiLoading}
+                totalCount={petPoiTotalCount}
+                visiblePois={visiblePois}
+                hasMorePois={hasMorePois}
+                loadMoreRef={poiLoadMoreRef}
+                onFocusPoi={handleFocusPetPoi}
+              />
             ) : (
-              <>
-                {!dog || preferRouteRecommendSheet ? (
-                  <DogInfoForm
-                    onRouteRecommendRequested={handleRouteRecommendRequested}
-                  />
-                ) : (
-                  <div className="border rounded-md p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm">
-                      <FontAwesomeIcon
-                        icon={faPaw}
-                        className="w-3.5 h-3.5 text-blue-500"
-                      />
-                      <span className="font-semibold">{dog.name}</span>
-                      <span className="text-gray-500">
-                        {formatDogAgeLabel(dog.ageInMonths)} · {dog.breed}
-                      </span>
-                    </div>
-                    <button
-                      className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600"
-                      onClick={clearDog}
-                    >
-                      <FontAwesomeIcon icon={faPenToSquare} className="w-3 h-3" />
-                      수정
-                    </button>
-                  </div>
-                )}
-              </>
+              <RouteTabContent
+                dog={dog}
+                preferRouteRecommendSheet={preferRouteRecommendSheet}
+                onRouteRecommendRequested={handleRouteRecommendRequested}
+                onEditDog={clearDog}
+              />
             )}
 
             {showWalkDebugPanel && (
