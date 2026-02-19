@@ -1,0 +1,70 @@
+{
+  "totalDistance": 1234,
+  "totalTime": 456000,
+  "features": [
+    {
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9701, 37.5601]
+      },
+      "properties": {
+        "pointType": "SP",
+        "name": "출발지"
+      }
+    },
+    {
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [126.9701, 37.5601],
+          [126.9711, 37.5611],
+          [126.9721, 37.5621]
+        ]
+      },
+      "properties": {
+        "index": 0,
+        "lineIndex": 0,
+        "distance": 640,
+        "time": 230000,
+        "name": "구간A"
+      }
+    },
+    {
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9721, 37.5621]
+      },
+      "properties": {
+        "pointType": "PP",
+        "name": "중간지점"
+      }
+    },
+    {
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [126.9721, 37.5621],
+          [126.9731, 37.5631],
+          [126.9741, 37.5641]
+        ]
+      },
+      "properties": {
+        "index": 1,
+        "lineIndex": 1,
+        "distance": 594,
+        "time": 226000,
+        "name": "구간B"
+      }
+    },
+    {
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9741, 37.5641]
+      },
+      "properties": {
+        "pointType": "EP",
+        "name": "도착지"
+      }
+    }
+  ]
+}

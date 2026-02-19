@@ -1,0 +1,26 @@
+{
+  "totalDistance": 0,
+  "totalTime": 0,
+  "features": [
+    {
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9701, 37.5601]
+      },
+      "properties": {
+        "pointType": "SP",
+        "name": "출발지"
+      }
+    },
+    {
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.9741, 37.5641]
+      },
+      "properties": {
+        "pointType": "EP",
+        "name": "도착지"
+      }
+    }
+  ]
+}
