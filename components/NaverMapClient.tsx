@@ -17,7 +17,7 @@ export default function NaverMapClient(props: {
 
   const { mapRef, elRef, sdkReady, setSdkReady } = useNaverMap();
   useMapMyLocation(mapRef, sdkReady);
-  useMapRoute(mapRef, routeOptions);
+  useMapRoute(mapRef, routeOptions, sdkReady);
   useMapPetPoi(mapRef, sdkReady, showPetPoi, petPois);
 
   const key = process.env.NEXT_PUBLIC_NAVER_MAPS_KEY_ID;

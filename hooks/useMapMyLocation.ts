@@ -14,81 +14,27 @@ import {
   requestOrientationPermissionIfNeeded,
   useWalkHeading,
 } from "@/hooks/useWalkHeading";
+import {
+  buildUserMarkerHTML,
+  USER_MARKER_SIZE_PX,
+} from "@/adapters/map/naver/userMarker";
+import {
+  evaluateWalkSample,
+  haversineMeters,
+} from "@/features/walk/location/filters";
+import {
+  accumulatePausedTotalMs,
+  toLatLngFromCoords,
+} from "@/features/walk/location/session";
 import { useMapStore } from "@/stores/mapStore";
 import { useModalStore } from "@/stores/modal";
+import { useMapControlStore } from "@/stores/mapControlStore";
 import { getGeoErrorInfo } from "@/lib/geolocationErrors";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 import type { LatLng } from "@/types/mapEvents";
 
 const FALLBACK = { lat: 37.5665, lng: 126.978 };
-const WALK_UPDATE_INTERVAL_MS = 1000;
-const MAX_WALK_ACCURACY_M = 50;
-const MIN_WALK_MOVE_M = 1.5;
-const USER_MARKER_SIZE_PX = 44;
-const USER_DIRECTION_TRIANGLE_WIDTH_PX = 8;
-const USER_DIRECTION_TRIANGLE_HEIGHT_PX = 8;
-const USER_DIRECTION_TRIANGLE_TOP_OFFSET_PX = -1;
-const WALK_MOVE_FROM_ACCURACY_RATIO = 0.35;
-const WALK_MOVE_FROM_ACCURACY_MAX_M = 7;
-const WALK_LOW_SPEED_MPS = 0.8;
-const WALK_LOW_SPEED_MIN_MOVE_M = 5;
-const WALK_LOW_SPEED_MOVE_MAX_M = 8;
-const WALK_LOW_SPEED_MOVE_FROM_ACCURACY_RATIO = 0.6;
-const WALK_STATIONARY_DRIFT_MIN_M = 8;
-const WALK_STATIONARY_DRIFT_MAX_M = 16;
-const WALK_STATIONARY_DRIFT_FROM_ACCURACY_RATIO = 1.0;
-const WALK_SPEED_VALID_MAX_ACCURACY_M = 15;
 const PREWALK_RECENTER_MIN_MOVE_M = 3;
-
-function buildUserMarkerHTML(headingDeg: number | null, walking: boolean) {
-  const directionLayer =
-    walking && headingDeg != null
-      ? `<div style="position:absolute;inset:0;transform:rotate(${headingDeg.toFixed(1)}deg);transform-origin:50% 50%;">
-        <svg width="${USER_DIRECTION_TRIANGLE_WIDTH_PX}" height="${USER_DIRECTION_TRIANGLE_HEIGHT_PX}" viewBox="0 0 6.9282 6" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;left:50%;top:${USER_DIRECTION_TRIANGLE_TOP_OFFSET_PX}px;transform:translateX(-50%);overflow:visible;filter:drop-shadow(0 1px 1px rgba(15, 23, 42, 0.3));">
-          <path d="M3.4641 0L6.9282 6H0L3.4641 0Z" fill="#FFFFFF"/>
-        </svg>
-      </div>`
-      : "";
-
-  return `
-    <div style="width:${USER_MARKER_SIZE_PX}px;height:${USER_MARKER_SIZE_PX}px;position:relative;pointer-events:none;">
-      <svg width="${USER_MARKER_SIZE_PX}" height="${USER_MARKER_SIZE_PX}" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;inset:0;">
-        <circle cx="22" cy="22" r="22" fill="#0BDC00" fill-opacity="0.3"/>
-        <g filter="url(#user-marker-filter)">
-          <circle cx="22" cy="22" r="8" fill="#0BDC00"/>
-          <circle cx="22" cy="22" r="9.5" stroke="white" stroke-width="3"/>
-        </g>
-        <defs>
-          <filter id="user-marker-filter" x="2.2" y="2.2" width="39.6" height="39.6" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-            <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-            <feOffset/>
-            <feGaussianBlur stdDeviation="4.4"/>
-            <feComposite in2="hardAlpha" operator="out"/>
-            <feColorMatrix type="matrix" values="0 0 0 0 0.0431373 0 0 0 0 0.862745 0 0 0 0 0 0 0 0 1 0"/>
-            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_181_3"/>
-            <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_181_3" result="shape"/>
-          </filter>
-        </defs>
-      </svg>
-      ${directionLayer}
-    </div>
-    `;
-}
-function haversineMeters(a: LatLng, b: LatLng) {
-  const toRad = (v: number) => (v * Math.PI) / 180;
-  const R = 6371000;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 export function useMapMyLocation(
   mapRef: RefObject<naver.maps.Map | null>,
@@ -107,6 +53,7 @@ export function useMapMyLocation(
   const lastWalkAtRef = useRef(0);
   const lastWalkPosRef = useRef<LatLng | null>(null);
   const lowSpeedAnchorPosRef = useRef<LatLng | null>(null);
+  const handledMyLocationRequestSeqRef = useRef(0);
 
   const route = useMapStore((s) => s.route);
   const drawRoute = useMapStore((s) => s.drawRoute);
@@ -129,6 +76,11 @@ export function useMapMyLocation(
   const setWalkedDistanceM = useMapStore((s) => s.setWalkedDistanceM);
   const addWalkedDistanceM = useMapStore((s) => s.addWalkedDistanceM);
   const setHeading = useMapStore((s) => s.setHeading);
+  const markerPlacementMode = useMapControlStore((s) => s.markerPlacementMode);
+  const myLocationRequestSeq = useMapControlStore((s) => s.myLocationRequestSeq);
+  const completeMarkerPlacement = useMapControlStore(
+    (s) => s.completeMarkerPlacement,
+  );
 
   const emit = useEmit();
 
@@ -387,25 +339,29 @@ export function useMapMyLocation(
     walking,
   ]);
 
-  // REQUEST_MY_LOCATION → GPS 새로고침
-  useOn("map", "REQUEST_MY_LOCATION", () => {
+  // GPS 새로고침 요청 처리
+  useEffect(() => {
+    if (myLocationRequestSeq <= handledMyLocationRequestSeqRef.current) return;
+    handledMyLocationRequestSeqRef.current = myLocationRequestSeq;
+
     manualPosRef.current = false;
     lastGeoRef.current = null;
 
-    if (
-      typeof coords?.latitude === "number" &&
-      typeof coords?.longitude === "number"
-    ) {
+    const currentGeoPos = toLatLngFromCoords({
+      latitude: coords?.latitude,
+      longitude: coords?.longitude,
+    });
+    if (currentGeoPos) {
       emit({
         type: "MOVE_TO",
-        pos: { lat: coords.latitude, lng: coords.longitude },
+        pos: currentGeoPos,
         animate: true,
         channel: "map",
       });
     }
 
     refresh();
-  });
+  }, [coords?.latitude, coords?.longitude, emit, myLocationRequestSeq, refresh]);
 
   useOn("map", "START_WALKING", () => {
     manualPosRef.current = false;
@@ -435,10 +391,9 @@ export function useMapMyLocation(
     if (!walking || !walkingPaused) return;
 
     const now = Date.now();
-    const pausedAt = walkingPausedAt ?? now;
-    const pausedMs = Math.max(0, now - pausedAt);
-
-    setWalkingPausedTotalMs(walkingPausedTotalMs + pausedMs);
+    setWalkingPausedTotalMs(
+      accumulatePausedTotalMs(walkingPausedTotalMs, walkingPausedAt, now),
+    );
     setWalkingPausedAt(null);
     setWalkingPaused(false);
     resetWalkingIntervalRefs();
@@ -446,15 +401,10 @@ export function useMapMyLocation(
 
   useOn("map", "STOP_WALKING", () => {
     manualPosRef.current = false;
-    if (
-      typeof coords?.latitude === "number" &&
-      typeof coords?.longitude === "number"
-    ) {
-      lastGeoRef.current = { lat: coords.latitude, lng: coords.longitude };
-    } else {
-      lastGeoRef.current = null;
-    }
+    lastGeoRef.current = toLatLngFromCoords(coords);
 
+    setDrawRoute(false);
+    setPickedPos(null);
     setWalking(false);
     setWalkingPaused(false);
     setWalkingStartedAt(null);
@@ -481,82 +431,38 @@ export function useMapMyLocation(
           return;
         }
 
-        if (
-          typeof c.accuracy === "number" &&
-          c.accuracy > MAX_WALK_ACCURACY_M
-        ) {
-          return;
-        }
-
         const now = Date.now();
-        const sinceLastMs = now - lastWalkAtRef.current;
-        if (sinceLastMs < WALK_UPDATE_INTERVAL_MS) return;
-
         const nextPos = { lat: c.latitude, lng: c.longitude };
         const last = lastWalkPosRef.current;
-        const movedM = last ? haversineMeters(last, nextPos) : 0;
         const rawSpeedMps =
           typeof c.speed === "number" && Number.isFinite(c.speed)
             ? c.speed
             : null;
-        const speedMps =
-          rawSpeedMps != null &&
-          (c.accuracy ?? Number.POSITIVE_INFINITY) <=
-            WALK_SPEED_VALID_MAX_ACCURACY_M
-            ? rawSpeedMps
+        const accuracyM =
+          typeof c.accuracy === "number" && Number.isFinite(c.accuracy)
+            ? c.accuracy
             : null;
-        const lowSpeedMoveThresholdM = Math.max(
-          WALK_LOW_SPEED_MIN_MOVE_M,
-          Math.min(
-            WALK_LOW_SPEED_MOVE_MAX_M,
-            Math.max(
-              0,
-              (c.accuracy ?? 0) * WALK_LOW_SPEED_MOVE_FROM_ACCURACY_RATIO,
-            ),
-          ),
-        );
-        const accuracyMoveThresholdM = Math.min(
-          WALK_MOVE_FROM_ACCURACY_MAX_M,
-          Math.max(0, (c.accuracy ?? 0) * WALK_MOVE_FROM_ACCURACY_RATIO),
-        );
-        const moveThresholdM = Math.max(
-          MIN_WALK_MOVE_M,
-          accuracyMoveThresholdM,
-        );
-        const isLowSpeed = speedMps == null || speedMps < WALK_LOW_SPEED_MPS;
-
-        if (last && movedM < moveThresholdM) return;
-
-        if (last && isLowSpeed) {
-          const anchor = lowSpeedAnchorPosRef.current ?? last;
-          lowSpeedAnchorPosRef.current = anchor;
-
-          const stationaryDriftThresholdM = Math.max(
-            WALK_STATIONARY_DRIFT_MIN_M,
-            Math.min(
-              WALK_STATIONARY_DRIFT_MAX_M,
-              Math.max(
-                0,
-                (c.accuracy ?? 0) * WALK_STATIONARY_DRIFT_FROM_ACCURACY_RATIO,
-              ),
-            ),
-          );
-          const driftFromAnchorM = haversineMeters(anchor, nextPos);
-
-          if (
-            movedM < lowSpeedMoveThresholdM ||
-            driftFromAnchorM < stationaryDriftThresholdM
-          )
-            return;
+        const sample = evaluateWalkSample({
+          nowMs: now,
+          lastWalkAtMs: lastWalkAtRef.current,
+          accuracyM,
+          rawSpeedMps,
+          lastPos: last,
+          nextPos,
+          lowSpeedAnchorPos: lowSpeedAnchorPosRef.current,
+        });
+        if (!sample.accept) {
+          lowSpeedAnchorPosRef.current = sample.nextLowSpeedAnchorPos;
+          return;
         }
 
-        if (last && movedM <= 80) {
-          addWalkedDistanceM(movedM);
+        if (sample.distanceToAddM > 0) {
+          addWalkedDistanceM(sample.distanceToAddM);
         }
 
         lastWalkAtRef.current = now;
         lastWalkPosRef.current = nextPos;
-        lowSpeedAnchorPosRef.current = nextPos;
+        lowSpeedAnchorPosRef.current = sample.nextLowSpeedAnchorPos;
 
         updateMyPosition(nextPos);
 
@@ -567,9 +473,9 @@ export function useMapMyLocation(
         updateHeadingFromPosition({
           now,
           gpsHeading,
-          speedMps,
-          accuracyM: typeof c.accuracy === "number" ? c.accuracy : null,
-          movedM,
+          speedMps: sample.speedMps,
+          accuracyM,
+          movedM: sample.movedM,
           lastPos: last,
           nextPos,
         });
@@ -599,12 +505,12 @@ export function useMapMyLocation(
     clearWalkWatch,
   ]);
 
-  // 내 위치 수동 변경: 클릭 1회로 MOVE_TO
-  useOn("map", "MOVE_MY_MARKER_READY", () => {
-    if (!mapRef.current || !myMarkerRef.current) return;
-    if (!window.naver?.maps) return;
+  // 내 위치/도착지 수동 배치 모드 처리 (지도 클릭 1회)
+  useEffect(() => {
+    if (!sdkReady || !mapRef.current || !window.naver?.maps) return;
 
     clearMoveMarkerListener();
+    if (markerPlacementMode === "none") return;
 
     const listener = mapRef.current.addListenerOnce(
       "click",
@@ -612,47 +518,40 @@ export function useMapMyLocation(
         const lng = event.coord.x;
         const lat = event.coord.y;
 
-        manualPosRef.current = true;
-        const pos = { lat, lng };
+        if (markerPlacementMode === "my") {
+          manualPosRef.current = true;
+          emit({
+            type: "MOVE_TO",
+            pos: { lat, lng },
+            zoom: 15,
+            animate: true,
+            channel: "map",
+          });
+          completeMarkerPlacement();
+          return;
+        }
 
-        emit({ type: "MOVE_TO", pos, zoom: 15, animate: true, channel: "map" });
-        emit({ type: "MY_MARKER_MOVED", channel: "map" });
-      },
-    );
-
-    moveMarkerListenerRef.current = listener;
-  });
-
-  useOn("map", "MOVE_MY_MARKER_CANCELLED", () => {
-    clearMoveMarkerListener();
-  });
-
-  // 도착지 수동 변경: 클릭 1회로 마커 배치
-  useOn("map", "MOVE_DEST_READY", () => {
-    if (!mapRef.current) return;
-    if (!window.naver?.maps) return;
-
-    clearMoveMarkerListener();
-
-    const listener = mapRef.current.addListenerOnce(
-      "click",
-      (event: naver.maps.PointerEvent) => {
-        const lng = event.coord.x;
-        const lat = event.coord.y;
         const nextPickedPos = { lat, lng };
-
         syncDestinationMarker(nextPickedPos);
         setPickedPos(nextPickedPos);
-        emit({ type: "DEST_MOVED", channel: "map" });
+        completeMarkerPlacement();
       },
     );
 
     moveMarkerListenerRef.current = listener;
-  });
-
-  useOn("map", "MOVE_DEST_CANCELLED", () => {
-    clearMoveMarkerListener();
-  });
+    return () => {
+      clearMoveMarkerListener();
+    };
+  }, [
+    clearMoveMarkerListener,
+    completeMarkerPlacement,
+    emit,
+    mapRef,
+    markerPlacementMode,
+    sdkReady,
+    setPickedPos,
+    syncDestinationMarker,
+  ]);
 
   // MOVE_TO → 지도 이동 + 내 마커 이동 + myPos 반영
   useOn("map", "MOVE_TO", (cmd) => {

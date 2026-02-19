@@ -31,14 +31,14 @@ export function useNaverMap() {
       Number.isFinite(focusedPoi?.lat) && Number.isFinite(focusedPoi?.lng);
 
     const lat = hasFocusedPoiCenter
-      ? focusedPoi.lat
+      ? focusedPoi!.lat
       : typeof myPos?.lat === "number"
         ? myPos.lat
         : typeof coords?.latitude === "number"
           ? coords.latitude
           : FALLBACK.lat;
     const lng = hasFocusedPoiCenter
-      ? focusedPoi.lng
+      ? focusedPoi!.lng
       : typeof myPos?.lng === "number"
         ? myPos.lng
         : typeof coords?.longitude === "number"
@@ -97,10 +97,14 @@ export function useNaverMap() {
     if (!sdkReady) return;
     if (!mapRef.current || !window.naver?.maps) return;
 
-    const listener = naver.maps.Event.addListener(mapRef.current, "click", () => {
-      if (!useMapStore.getState().focusedPoi) return;
-      clearFocusedPoi();
-    });
+    const listener = naver.maps.Event.addListener(
+      mapRef.current,
+      "click",
+      () => {
+        if (!useMapStore.getState().focusedPoi) return;
+        clearFocusedPoi();
+      },
+    );
 
     return () => {
       naver.maps.Event.removeListener(listener);

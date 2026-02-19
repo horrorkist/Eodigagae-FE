@@ -74,13 +74,6 @@ export type MapEvents =
       zoom?: number;
       animate?: boolean;
     })
-  | BaseEvent<"map", "REQUEST_MY_LOCATION">
-  | BaseEvent<"map", "MOVE_MY_MARKER_READY">
-  | BaseEvent<"map", "MOVE_MY_MARKER_CANCELLED">
-  | BaseEvent<"map", "MY_MARKER_MOVED">
-  | BaseEvent<"map", "MOVE_DEST_READY">
-  | BaseEvent<"map", "MOVE_DEST_CANCELLED">
-  | BaseEvent<"map", "DEST_MOVED">
   | BaseEvent<"map", WalkingControlEventType>;
 
 /** PET domain events */
