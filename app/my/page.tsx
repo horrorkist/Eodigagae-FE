@@ -1,6 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
+import {
+  COACHMARK_COOKIE_NAME,
+  ONBOARDING_COOKIE_NAME,
+} from "@/lib/onboarding";
 import {
   isWalkDebugPanelVisible,
   setWalkDebugPanelVisible,
@@ -9,6 +13,7 @@ import {
 import { useUiChromeStore } from "@/stores/uiChrome";
 
 export default function MyPage() {
+  const [isCookieResetDone, setIsCookieResetDone] = useState(false);
   const showWalkDebugPanel = useSyncExternalStore(
     subscribeWalkDebugUpdates,
     isWalkDebugPanelVisible,
@@ -20,6 +25,26 @@ export default function MyPage() {
   const setBottomSheetCoverEnabled = useUiChromeStore(
     (s) => s.setBottomSheetCoverEnabled,
   );
+  const handleResetOnboardingAndCoachmark = () => {
+    if (typeof document === "undefined") return;
+
+    const expires = "Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = [
+      `${ONBOARDING_COOKIE_NAME}=`,
+      "Path=/",
+      "Max-Age=0",
+      `Expires=${expires}`,
+      "SameSite=Lax",
+    ].join("; ");
+    document.cookie = [
+      `${COACHMARK_COOKIE_NAME}=`,
+      "Path=/",
+      "Max-Age=0",
+      `Expires=${expires}`,
+      "SameSite=Lax",
+    ].join("; ");
+    setIsCookieResetDone(true);
+  };
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -86,6 +111,30 @@ export default function MyPage() {
                 ].join(" ")}
               />
             </button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <div className="text-sm font-semibold text-gray-900">
+                온보딩/코치마크 쿠키 삭제
+              </div>
+
+              <button
+                type="button"
+                onClick={handleResetOnboardingAndCoachmark}
+                className="h-10 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 active:bg-gray-100"
+              >
+                삭제
+              </button>
+            </div>
+
+            {isCookieResetDone ? (
+              <p className="text-xs text-dg-green-700">
+                쿠키를 삭제했어요. 홈으로 이동하면 온보딩이 다시 시작됩니다.
+              </p>
+            ) : null}
           </div>
         </div>
       </section>

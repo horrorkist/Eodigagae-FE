@@ -69,14 +69,13 @@ const TARGETS: TargetDefinition[] = [
 ];
 
 const TEXT_LEFT_MARGIN = 70;
-const TEXT_WIDTH = 360;
+const TEXT_WIDTH = 300;
 const TEXT_VERTICAL_GAP = 40;
 const TEXT_LABEL_OFFSET_X = 8;
 const TEXT_FIRST_LINE_CENTER_OFFSET_Y = 12;
 const TEXT_LINE_DOT_GAP_X = 12;
 const LINE_START_X_RATIO = 0.12;
 const CONNECTOR_CORNER_RADIUS = 10;
-const OVERLAY_BLEED_PX = 2;
 const DEFAULT_VIEWPORT: ViewportSize = { width: 390, height: 844 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -247,16 +246,6 @@ export default function CoachmarkTour() {
     }));
   }, [layouts, viewport]);
 
-  const overlayBounds = useMemo(
-    () => ({
-      x: -OVERLAY_BLEED_PX,
-      y: -OVERLAY_BLEED_PX,
-      width: viewport.width + OVERLAY_BLEED_PX * 2,
-      height: viewport.height + OVERLAY_BLEED_PX * 2,
-    }),
-    [viewport],
-  );
-
   if (!isCoachmarkResolved || !isCoachmarkActive) return null;
 
   return (
@@ -271,20 +260,12 @@ export default function CoachmarkTour() {
         aria-hidden="true"
       >
         <defs>
-          <mask
-            id={maskId}
-            x={overlayBounds.x}
-            y={overlayBounds.y}
-            width={overlayBounds.width}
-            height={overlayBounds.height}
-            maskUnits="userSpaceOnUse"
-            maskContentUnits="userSpaceOnUse"
-          >
+          <mask id={maskId}>
             <rect
-              x={overlayBounds.x}
-              y={overlayBounds.y}
-              width={overlayBounds.width}
-              height={overlayBounds.height}
+              x={0}
+              y={0}
+              width={viewport.width}
+              height={viewport.height}
               fill="white"
             />
             {highlightRects.map((highlight) => (
@@ -303,10 +284,10 @@ export default function CoachmarkTour() {
         </defs>
 
         <rect
-          x={overlayBounds.x}
-          y={overlayBounds.y}
-          width={overlayBounds.width}
-          height={overlayBounds.height}
+          x={0}
+          y={0}
+          width={viewport.width}
+          height={viewport.height}
           fill="rgba(0,0,0,0.58)"
           mask={`url(#${maskId})`}
         />
