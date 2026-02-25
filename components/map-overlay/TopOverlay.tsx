@@ -108,7 +108,7 @@ export default function TopOverlay({
           <div className="pointer-events-auto min-w-0 flex-1 max-w-140">
             <Link
               href="/search?focus=1"
-              className="flex w-full items-center gap-2 rounded-lg border bg-white/90 backdrop-blur shadow px-3 py-2"
+              className="flex w-full items-center gap-2 rounded-md border bg-white/90 backdrop-blur shadow px-3 py-2"
               aria-label="검색 페이지로 이동"
             >
               <AppIcon

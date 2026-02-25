@@ -128,11 +128,18 @@ function createRoadAddress(raw: TmapPoiUpstream) {
 function deriveBizCategory(raw: TmapPoiUpstream): string {
   if (!raw) return "";
 
-  if (typeof raw.detailBizName === "string" && raw.detailBizName !== "기타") {
-    return raw.detailBizName;
+  const detailBizName = String(raw.detailBizName ?? "")
+    .replace(/\\\//g, "/")
+    .trim();
+  const lowerBizName = String(raw.lowerBizName ?? "")
+    .replace(/\\\//g, "/")
+    .trim();
+
+  if (detailBizName && detailBizName !== "기타") {
+    return detailBizName;
   }
 
-  if (typeof raw.lowerBizName === "string") return raw.lowerBizName;
+  if (lowerBizName) return lowerBizName;
 
   return "";
 }

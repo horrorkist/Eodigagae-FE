@@ -5,7 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import formatDist from "@/lib/formatDist";
 import AppIcon from "@/components/icons/AppIcon";
-import { appIconMagnify } from "@/components/icons/definitions.generated";
+import {
+  appIconMagnify,
+  appIconPaw,
+  appIconXMark,
+} from "@/components/icons/definitions.generated";
 import { fromTmapPoi } from "@/lib/focusedPoi";
 import type {
   TmapPoi,
@@ -15,6 +19,9 @@ import type {
 import { useMapStore } from "@/stores/mapStore";
 import { useEmit } from "@/hooks/useEventBus";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
+import Divider from "@/components/Divider";
 
 const SEARCH_COUNT = 150;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -38,6 +45,10 @@ type SearchSWRKey = readonly [string, TmapPoiSearchSort];
 type SearchPagePersistedState = {
   keyword: string;
   sort: TmapPoiSearchSort;
+};
+type RecentSearchItem = {
+  keyword: string;
+  savedAt: number;
 };
 
 function isPoiSearchResponse(value: unknown): value is TmapPoiSearchResponse {
@@ -76,26 +87,64 @@ function getCurrentCenterByGeolocation(): Promise<SearchCenter> {
   });
 }
 
-function readRecentSearches(): string[] {
+function normalizeRecentSearches(value: unknown): RecentSearchItem[] {
+  if (!Array.isArray(value)) return [];
+
+  const now = Date.now();
+  const deduped = new Map<string, RecentSearchItem>();
+
+  for (let i = 0; i < value.length; i += 1) {
+    const entry = value[i];
+    const fallbackSavedAt = now - i;
+
+    if (typeof entry === "string") {
+      const keyword = entry.trim();
+      if (!keyword || deduped.has(keyword)) continue;
+      deduped.set(keyword, { keyword, savedAt: fallbackSavedAt });
+      continue;
+    }
+
+    if (!entry || typeof entry !== "object") continue;
+
+    const candidate = entry as {
+      keyword?: unknown;
+      savedAt?: unknown;
+    };
+    if (typeof candidate.keyword !== "string") continue;
+
+    const keyword = candidate.keyword.trim();
+    if (!keyword || deduped.has(keyword)) continue;
+
+    const savedAt =
+      typeof candidate.savedAt === "number" &&
+      Number.isFinite(candidate.savedAt)
+        ? candidate.savedAt
+        : fallbackSavedAt;
+
+    deduped.set(keyword, { keyword, savedAt });
+  }
+
+  return [...deduped.values()]
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, MAX_RECENT_SEARCHES);
+}
+
+function readRecentSearches(): RecentSearchItem[] {
   if (typeof window === "undefined") return [];
 
   try {
     const raw = window.localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim())
-      .filter((v) => v.length > 0)
-      .slice(0, MAX_RECENT_SEARCHES);
+    const normalized = normalizeRecentSearches(parsed);
+    writeRecentSearches(normalized);
+    return normalized;
   } catch {
     return [];
   }
 }
 
-function writeRecentSearches(items: string[]) {
+function writeRecentSearches(items: RecentSearchItem[]) {
   if (typeof window === "undefined") return;
 
   try {
@@ -106,14 +155,33 @@ function writeRecentSearches(items: string[]) {
   } catch {}
 }
 
-function saveRecentSearch(query: string): string[] {
+function clearRecentSearches() {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY);
+  } catch {}
+}
+
+function saveRecentSearch(query: string): RecentSearchItem[] {
   const normalized = query.trim();
   if (normalized.length < 2) return readRecentSearches();
 
   const prev = readRecentSearches();
-  const next = [normalized, ...prev.filter((item) => item !== normalized)];
+  const next = [
+    { keyword: normalized, savedAt: Date.now() },
+    ...prev.filter((item) => item.keyword !== normalized),
+  ];
   writeRecentSearches(next);
   return next.slice(0, MAX_RECENT_SEARCHES);
+}
+
+function formatRecentSearchDate(savedAt: number): string {
+  const date = new Date(savedAt);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}.${day}`;
 }
 
 function readSearchPageState(): SearchPagePersistedState | null {
@@ -138,10 +206,7 @@ function readSearchPageState(): SearchPagePersistedState | null {
   }
 }
 
-function writeSearchPageState(
-  keyword: string,
-  sort: TmapPoiSearchSort,
-) {
+function writeSearchPageState(keyword: string, sort: TmapPoiSearchSort) {
   if (typeof window === "undefined") return;
 
   try {
@@ -150,19 +215,6 @@ function writeSearchPageState(
       JSON.stringify({ keyword, sort }),
     );
   } catch {}
-}
-
-function getDistanceBadgeClass(distanceM: number | null) {
-  if (distanceM == null) {
-    return "border-gray-200 bg-gray-50 text-gray-600";
-  }
-  if (distanceM <= 500) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-  if (distanceM <= 1500) {
-    return "border-blue-200 bg-blue-50 text-blue-700";
-  }
-  return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
 async function requestPoiSearch(
@@ -214,19 +266,22 @@ export default function SearchPageClient() {
   );
   const [keyword, setKeyword] = useState("");
   const [searchSort, setSearchSort] = useState<TmapPoiSearchSort>("R");
+  const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]);
   const didRestoreStateRef = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittingMarkers, setSubmittingMarkers] = useState(false);
   const trimmedKeyword = useMemo(() => keyword.trim(), [keyword]);
-  const debouncedKeyword = useDebouncedValue(trimmedKeyword, SEARCH_DEBOUNCE_MS);
-  const shouldSearch = debouncedKeyword.length >= 2;
-  const searchKey: SearchSWRKey | null = shouldSearch
+  const debouncedKeyword = useDebouncedValue(
+    trimmedKeyword,
+    SEARCH_DEBOUNCE_MS,
+  );
+  const isRecentMode = trimmedKeyword.length === 0;
+  const isSearchMode = trimmedKeyword.length >= 2;
+  const isDebouncePending = isSearchMode && debouncedKeyword !== trimmedKeyword;
+  const shouldFetchSearch = debouncedKeyword.length >= 2;
+  const searchKey: SearchSWRKey | null = shouldFetchSearch
     ? [debouncedKeyword, searchSort]
     : null;
-  const recentSearches = useMemo(
-    () => (keyword.length === 0 ? readRecentSearches() : []),
-    [keyword],
-  );
 
   const resolveCenter = useCallback(async (): Promise<SearchCenter> => {
     const now = Date.now();
@@ -265,7 +320,10 @@ export default function SearchPageClient() {
     [resolveCenter],
   );
 
-  const { data, error, isLoading } = useSWR<TmapPoiSearchResponse, Error>(
+  const { data, error, isLoading, isValidating } = useSWR<
+    TmapPoiSearchResponse,
+    Error
+  >(
     searchKey,
     async (key) => {
       const [query, sort] = key as SearchSWRKey;
@@ -279,10 +337,25 @@ export default function SearchPageClient() {
   );
 
   const items: TmapPoi[] = data?.items ?? [];
-  const totalCount = data?.meta?.totalCount ?? items.length;
-  const loading = shouldSearch && isLoading;
-  const listError = shouldSearch && error ? error.message : null;
-  const visibleError = submitError ?? listError;
+  const isDataForCurrentInput =
+    Boolean(data) &&
+    data?.meta?.keyword === debouncedKeyword &&
+    debouncedKeyword === trimmedKeyword &&
+    data?.meta?.searchtypCd === searchSort;
+  const showLoading =
+    isSearchMode &&
+    (isDebouncePending || isValidating || (shouldFetchSearch && isLoading)) &&
+    !submittingMarkers;
+  const listError =
+    isSearchMode &&
+    !isDebouncePending &&
+    debouncedKeyword === trimmedKeyword &&
+    error
+      ? error.message
+      : null;
+  const visibleError = isSearchMode ? (submitError ?? listError) : null;
+  const showSearchResultList =
+    isSearchMode && !showLoading && !listError && isDataForCurrentInput;
 
   useEffect(() => {
     if (!shouldFocusInput) return;
@@ -313,8 +386,31 @@ export default function SearchPageClient() {
   }, [keyword, searchSort]);
 
   useEffect(() => {
+    if (keyword.length !== 0) return;
+    setRecentSearches(readRecentSearches());
+  }, [keyword]);
+
+  useEffect(() => {
     setSubmitError(null);
   }, [trimmedKeyword, searchSort]);
+
+  const handleClearKeyword = useCallback(() => {
+    setKeyword("");
+    inputRef.current?.focus();
+  }, []);
+
+  const handleClearRecentSearches = useCallback(() => {
+    clearRecentSearches();
+    setRecentSearches([]);
+  }, []);
+
+  const handleDeleteRecentSearch = useCallback((keywordToRemove: string) => {
+    setRecentSearches((prev) => {
+      const next = prev.filter((item) => item.keyword !== keywordToRemove);
+      writeRecentSearches(next);
+      return next;
+    });
+  }, []);
 
   const handleSubmitSearch = useCallback(async () => {
     if (submittingMarkers) return;
@@ -325,7 +421,7 @@ export default function SearchPageClient() {
     inputRef.current?.blur();
     setSubmitError(null);
     setSubmittingMarkers(true);
-    saveRecentSearch(query);
+    setRecentSearches(saveRecentSearch(query));
 
     try {
       const canReuseCurrentData =
@@ -335,9 +431,7 @@ export default function SearchPageClient() {
         data?.meta?.searchtypCd === searchSort;
 
       const response: TmapPoiSearchResponse =
-        canReuseCurrentData && data
-          ? data
-          : await fetchPois(query, searchSort);
+        canReuseCurrentData && data ? data : await fetchPois(query, searchSort);
 
       commitSubmittedSearchPois(response.items);
       clearFocusedPoi();
@@ -362,31 +456,54 @@ export default function SearchPageClient() {
   ]);
 
   return (
-    <div className="flex min-h-full flex-col bg-gray-50 px-5 pt-3 pointer-events-auto">
-      <div className="mx-auto w-full max-w-[430px]">
+    <div className="flex min-h-full flex-col bg-white pt-3 pointer-events-auto">
+      <div className="mx-auto w-full max-w-[430px] px-5">
         <form
-          className="flex w-full items-center gap-2 rounded-lg border bg-white/90 px-3 py-2 shadow backdrop-blur"
+          className="flex w-full items-center gap-2 rounded-md border border-dg-gray-500 bg-white px-3 py-2 backdrop-blur"
           onSubmit={(e) => {
             e.preventDefault();
             void handleSubmitSearch();
           }}
         >
-          <AppIcon
-            icon={appIconMagnify}
-            className="h-6 w-6 shrink-0 text-black"
-          />
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            aria-label="홈으로 이동"
+            className="w-6 h-6 flex items-center justify-center"
+          >
+            <FontAwesomeIcon
+              icon={faChevronLeft}
+              className="text-dg-gray-600 h-6 w-6"
+            />
+          </button>
           <input
             autoComplete="off"
             id="search-keyword"
             ref={inputRef}
-            type="search"
+            type="text"
+            inputMode="search"
+            enterKeyHint="search"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder="어디로 산책할까요?"
-            className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-500"
+            className="search-input-no-native-clear w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-dg-gray-500"
           />
+          {keyword.length > 0 && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleClearKeyword}
+              aria-label="검색어 지우기"
+              className="flex h-5 w-5 shrink-0 items-center justify-center"
+            >
+              <AppIcon
+                icon={appIconXMark}
+                className="w-3 h-3 text-dg-gray-600"
+              />
+            </button>
+          )}
         </form>
-        <div className="mt-2 flex w-fit rounded-lg border bg-white/90 p-1 shadow backdrop-blur place-self-end">
+        {/* <div className="mt-2 flex w-fit rounded-lg border bg-white/90 p-1 shadow backdrop-blur place-self-end">
           {SEARCH_SORT_OPTIONS.map((option) => {
             const active = searchSort === option.value;
             return (
@@ -405,29 +522,75 @@ export default function SearchPageClient() {
               </button>
             );
           })}
-        </div>
+        </div> */}
       </div>
 
-      <section className="mx-auto w-full max-w-[430px] px-1 pb-24 pt-4 space-y-4">
-        {keyword.length === 0 && recentSearches.length > 0 && (
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <div className="mb-2 text-xs font-medium text-gray-500">
-              최근 검색어
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {recentSearches.map((recent) => (
-                <button
-                  key={recent}
-                  type="button"
-                  onClick={() => setKeyword(recent)}
-                  className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-700"
-                >
-                  {recent}
-                </button>
-              ))}
-            </div>
-          </div>
+      <section className="mx-auto w-full max-w-[430px] pb-24 pt-4 flex-1 flex flex-col">
+        {isRecentMode && (
+          <>
+            <header className="px-5 flex justify-between items-center">
+              <div className="px-3 py-3.5 bg-dg-green-500 text-white rounded-full font-semibold text-base">
+                최근 검색
+              </div>
+              <button
+                type="button"
+                onClick={handleClearRecentSearches}
+                className="text-sm text-dg-gray-600 py-3.5 disabled:text-dg-gray-400"
+                disabled={recentSearches.length === 0}
+              >
+                전체 삭제
+              </button>
+            </header>
+            <Divider className="mt-3" />
+          </>
         )}
+        {isRecentMode &&
+          (recentSearches.length === 0 ? (
+            <div className="flex-1 flex justify-center items-center">
+              <div className="text-dg-gray-600">아직 검색한 기록이 없어요</div>
+            </div>
+          ) : (
+            <div className="px-5">
+              <div className="flex-col">
+                {recentSearches.map((recent) => (
+                  <div
+                    key={recent.keyword}
+                    className="w-full border-b border-b-dg-gray-400 flex justify-between py-4 text-dg-black text-base"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setKeyword(recent.keyword)}
+                      className="flex min-w-0 flex-1 items-center gap-x-4 text-left"
+                    >
+                      <div className="p-1 rounded-full bg-dg-gray-400">
+                        <AppIcon
+                          icon={appIconPaw}
+                          className="w-3 h-3 text-dg-gray-500"
+                        />
+                      </div>
+                      <span className="truncate">{recent.keyword}</span>
+                    </button>
+                    <div className="flex gap-x-3 items-center">
+                      <span className="text-dg-black">
+                        {formatRecentSearchDate(recent.savedAt)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRecentSearch(recent.keyword)}
+                        aria-label={`${recent.keyword} 삭제`}
+                        className="flex h-5 w-5 items-center justify-center"
+                      >
+                        <AppIcon
+                          icon={appIconXMark}
+                          className="w-3 h-3 text-dg-gray-600"
+                        />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
 
         {!!trimmedKeyword && trimmedKeyword.length < 2 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
@@ -441,27 +604,28 @@ export default function SearchPageClient() {
           </div>
         )}
 
-        {loading && !submittingMarkers && (
+        {showLoading && (
           <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
             검색 중...
           </div>
         )}
 
-        {submittingMarkers && (
+        {isSearchMode && submittingMarkers && (
           <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
             제출 결과를 지도에 반영 중...
           </div>
         )}
 
-        {!loading && shouldSearch && !error && (
-          <div className="rounded-xl border border-gray-200 bg-white">
-            <div className="border-b border-gray-100 px-4 py-3 text-xs font-medium text-gray-500">
+        {showSearchResultList && (
+          <div className="bg-white">
+            {/* <div className="px-5 py-3 text-xs font-medium text-dg-gray-600">
               검색 결과 {totalCount.toLocaleString()}건
             </div>
+            <Divider /> */}
             {items.length > 0 ? (
-              <ul className="divide-y divide-gray-100">
+              <ul className="px-5">
                 {items.map((poi, i) => (
-                  <li key={i + "_" + poi.id} className="px-4 py-4">
+                  <li key={i + "_" + poi.id}>
                     <button
                       type="button"
                       onClick={() => {
@@ -472,62 +636,41 @@ export default function SearchPageClient() {
                         setFocusedPoi(fromTmapPoi(poi));
                         router.push("/");
                       }}
-                      className="w-full text-left"
+                      className="flex w-full items-start justify-between gap-3 py-4 text-left"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-x-4">
+                        <div className="p-1 rounded-full bg-dg-gray-400">
+                          <AppIcon
+                            icon={appIconPaw}
+                            className="w-3 h-3 text-dg-gray-500"
+                          />
+                        </div>
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-gray-900">
+                          <div className="truncate text-base font-medium text-dg-black">
                             {poi.name}
                           </div>
-                          <div className="mt-1 text-[11px] text-gray-500">
-                            {poi.categoryPath.length > 0
-                              ? poi.categoryPath.join(" · ")
-                              : "업종 정보 없음"}
+                          <div className="mt-1 truncate text-sm text-dg-gray-600">
+                            {poi.address || poi.roadAddress || "주소 정보 없음"}
                           </div>
-                        </div>
-                        <div className="shrink-0 space-y-1 text-right">
-                          <div
-                            className={[
-                              "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                              getDistanceBadgeClass(poi.distanceM),
-                            ].join(" ")}
-                          >
-                            {poi.distanceM != null
-                              ? `직선 ${formatDist(poi.distanceM)}`
-                              : "거리 정보 없음"}
-                          </div>
-                          {poi.estimatedWalkMin != null && (
-                            <div className="text-[11px] text-gray-500">
-                              도보 약 {poi.estimatedWalkMin}분
-                            </div>
-                          )}
                         </div>
                       </div>
-
-                      {(poi.address || poi.roadAddress) && (
-                        <div className="mt-2 text-xs text-gray-700">
-                          {poi.address || poi.roadAddress}
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm text-dg-black">
+                          {poi.bizCategory || "업종 정보 없음"}
                         </div>
-                      )}
-
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {poi.hasDetailInfo === true && (
-                          <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] text-sky-700">
-                            상세정보 제공
-                          </span>
-                        )}
-                        {poi.telNo && (
-                          <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600">
-                            {poi.telNo}
-                          </span>
-                        )}
+                        <div className="mt-1 text-sm text-dg-gray-600">
+                          {poi.distanceM != null
+                            ? `${formatDist(poi.distanceM)}`
+                            : "거리 정보 없음"}
+                        </div>
                       </div>
                     </button>
+                    {i < items.length - 1 && <Divider />}
                   </li>
                 ))}
               </ul>
             ) : (
-              <div className="px-4 py-6 text-sm text-gray-500">
+              <div className="px-5 py-6 text-sm text-dg-gray-600">
                 일치하는 장소가 없습니다.
               </div>
             )}

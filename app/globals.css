@@ -26,6 +26,22 @@ body {
     sans-serif;
 }
 
+input.search-input-no-native-clear::-webkit-search-decoration,
+input.search-input-no-native-clear::-webkit-search-cancel-button,
+input.search-input-no-native-clear::-webkit-search-results-button,
+input.search-input-no-native-clear::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+input.search-input-no-native-clear::-ms-clear,
+input.search-input-no-native-clear::-ms-reveal {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 @theme {
   --color-dg-green-50: #ebfceb;
   --color-dg-green-100: #d8f9d6;
@@ -38,6 +54,7 @@ body {
   --color-dg-green-800: #066e00;
   --color-dg-green-900: #044f00;
   --color-dg-black: #2c2c2c;
+  --color-dg-gray-400: #ededed;
   --color-dg-gray-500: #cecece;
   --color-dg-gray-600: #979797;
   --color-dg-white: #ededed;
