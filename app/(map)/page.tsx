@@ -15,6 +15,7 @@ import MapOverlay from "@/components/MapOverlay";
 import SheetTabs from "@/components/map-page/SheetTabs";
 import PoiTabContent from "@/components/map-page/PoiTabContent";
 import RouteTabContent from "@/components/map-page/RouteTabContent";
+import SearchResultTabContent from "@/components/map-page/SearchResultTabContent";
 import { useMapStore } from "@/stores/mapStore";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
@@ -23,7 +24,7 @@ import { useModalStore } from "@/stores/modal";
 import { useEmit } from "@/hooks/useEventBus";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
-import { fromPetPoiItem } from "@/lib/focusedPoi";
+import { fromPetPoiItem, fromTmapPoi } from "@/lib/focusedPoi";
 import WalkDebugPanel from "@/components/WalkDebugPanel";
 import { PetPoiItem } from "@/types/mapEvents";
 import {
@@ -40,8 +41,9 @@ import {
 import { useRouteRecommendStore } from "@/stores/routeRecommendStore";
 import { fetchRouteRecommendations } from "@/services/routeRecommend";
 import type { RouteRecommendation } from "@/types/routeRecommend";
+import type { TmapPoi } from "@/types/tmapPoi";
 
-type SheetContentMode = "main" | "poi";
+type SheetContentMode = "main" | "poi" | "search";
 
 const POI_INITIAL_RENDER_COUNT = 16;
 const POI_RENDER_BATCH_COUNT = 12;
@@ -58,6 +60,11 @@ export default function MapPage() {
   const focusedPoi = useMapStore((s) => s.focusedPoi);
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
+  const submittedSearchPois = useMapStore((s) => s.submittedSearchPois);
+  const submittedSearchSeq = useMapStore((s) => s.submittedSearchSeq);
+  const consumePendingSearchResultsRevealSeq = useMapStore(
+    (s) => s.consumePendingSearchResultsRevealSeq,
+  );
   const setPickedPos = useMapStore((s) => s.setPickedPos);
   const setRouteState = useMapStore((s) => s.setRouteState);
 
@@ -101,14 +108,19 @@ export default function MapPage() {
   const [showWater, setShowWater] = useState<boolean>(false);
 
   const canShowPoiTab = petPoiOn;
+  const hasSearchResults = submittedSearchPois.length > 0;
+  const canShowSearchTab = hasSearchResults;
 
   const [sheetMode, setSheetMode] = useState<SheetContentMode>("main");
   const [isRoutePlanningMode, setIsRoutePlanningMode] = useState(false);
   const [preferRouteRecommendSheet, setPreferRouteRecommendSheet] = useState(
     () => !dog,
   );
-  const activeSheetMode: SheetContentMode =
-    canShowPoiTab || sheetMode !== "poi" ? sheetMode : "main";
+  const activeSheetMode: SheetContentMode = useMemo(() => {
+    if (sheetMode === "poi" && !canShowPoiTab) return "main";
+    if (sheetMode === "search" && !canShowSearchTab) return "main";
+    return sheetMode;
+  }, [canShowPoiTab, canShowSearchTab, sheetMode]);
   const [visiblePoiCount, setVisiblePoiCount] = useState(
     POI_INITIAL_RENDER_COUNT,
   );
@@ -131,6 +143,14 @@ export default function MapPage() {
     (poi: PetPoiItem) => {
       closeBottomSheet();
       setFocusedPoi(fromPetPoiItem(poi));
+    },
+    [closeBottomSheet, setFocusedPoi],
+  );
+
+  const handleFocusSearchPoi = useCallback(
+    (poi: TmapPoi) => {
+      closeBottomSheet();
+      setFocusedPoi(fromTmapPoi(poi));
     },
     [closeBottomSheet, setFocusedPoi],
   );
@@ -255,6 +275,10 @@ export default function MapPage() {
     );
   }, [petPois.length]);
 
+  const handleSearchTabClick = useCallback(() => {
+    setSheetMode("search");
+  }, []);
+
   const handleGuideStart = useCallback(() => {
     if (routeRecommendLoading) return;
 
@@ -272,6 +296,23 @@ export default function MapPage() {
       emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
     };
   }, [emit]);
+
+  useEffect(() => {
+    const pendingRevealSeq = consumePendingSearchResultsRevealSeq();
+    if (pendingRevealSeq == null) return;
+    if (pendingRevealSeq !== submittedSearchSeq) return;
+    if (!hasSearchResults) return;
+
+    requestAnimationFrame(() => {
+      setSheetMode("search");
+      openBottomSheet(0);
+    });
+  }, [
+    consumePendingSearchResultsRevealSeq,
+    hasSearchResults,
+    openBottomSheet,
+    submittedSearchSeq,
+  ]);
 
   useEffect(() => {
     if (isRoutePlanningMode || focusedPoi) {
@@ -388,8 +429,10 @@ export default function MapPage() {
             <SheetTabs
               activeMode={activeSheetMode}
               canShowPoiTab={canShowPoiTab}
+              canShowSearchTab={canShowSearchTab}
               onMainClick={handleMainTabClick}
               onPoiClick={handlePoiTabClick}
+              onSearchClick={handleSearchTabClick}
             />
 
             {activeSheetMode === "poi" ? (
@@ -400,6 +443,11 @@ export default function MapPage() {
                 hasMorePois={hasMorePois}
                 loadMoreRef={poiLoadMoreRef}
                 onFocusPoi={handleFocusPetPoi}
+              />
+            ) : activeSheetMode === "search" ? (
+              <SearchResultTabContent
+                items={submittedSearchPois}
+                onFocusPoi={handleFocusSearchPoi}
               />
             ) : (
               <RouteTabContent

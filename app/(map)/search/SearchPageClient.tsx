@@ -14,11 +14,14 @@ import type {
 } from "@/types/tmapPoi";
 import { useMapStore } from "@/stores/mapStore";
 import { useEmit } from "@/hooks/useEventBus";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 const SEARCH_COUNT = 150;
+const SEARCH_DEBOUNCE_MS = 350;
 const GEO_TIMEOUT_MS = 5000;
 const CENTER_CACHE_TTL_MS = 60 * 1000;
 const RECENT_SEARCHES_STORAGE_KEY = "search:recent-keywords";
+const SEARCH_PAGE_STATE_STORAGE_KEY = "search:page-state";
 const MAX_RECENT_SEARCHES = 10;
 const SEARCH_SORT_OPTIONS: Array<{ value: TmapPoiSearchSort; label: string }> =
   [
@@ -29,6 +32,12 @@ const SEARCH_SORT_OPTIONS: Array<{ value: TmapPoiSearchSort; label: string }> =
 type SearchCenter = {
   lat: number;
   lon: number;
+};
+
+type SearchSWRKey = readonly [string, TmapPoiSearchSort];
+type SearchPagePersistedState = {
+  keyword: string;
+  sort: TmapPoiSearchSort;
 };
 
 function isPoiSearchResponse(value: unknown): value is TmapPoiSearchResponse {
@@ -107,6 +116,42 @@ function saveRecentSearch(query: string): string[] {
   return next.slice(0, MAX_RECENT_SEARCHES);
 }
 
+function readSearchPageState(): SearchPagePersistedState | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(SEARCH_PAGE_STATE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    const candidate = parsed as { keyword?: unknown; sort?: unknown };
+    if (typeof candidate.keyword !== "string") return null;
+    if (candidate.sort !== "R" && candidate.sort !== "A") return null;
+
+    return {
+      keyword: candidate.keyword,
+      sort: candidate.sort,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeSearchPageState(
+  keyword: string,
+  sort: TmapPoiSearchSort,
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(
+      SEARCH_PAGE_STATE_STORAGE_KEY,
+      JSON.stringify({ keyword, sort }),
+    );
+  } catch {}
+}
+
 function getDistanceBadgeClass(distanceM: number | null) {
   if (distanceM == null) {
     return "border-gray-200 bg-gray-50 text-gray-600";
@@ -120,6 +165,39 @@ function getDistanceBadgeClass(distanceM: number | null) {
   return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
+async function requestPoiSearch(
+  query: string,
+  sort: TmapPoiSearchSort,
+  center: SearchCenter,
+) {
+  const sp = new URLSearchParams();
+  sp.set("keyword", query);
+  sp.set("searchtypCd", sort);
+  sp.set("count", String(SEARCH_COUNT));
+  sp.set("page", "1");
+  sp.set("centerLat", String(center.lat));
+  sp.set("centerLon", String(center.lon));
+
+  const res = await fetch(`/api/tmap/pois?${sp.toString()}`, {
+    cache: "no-store",
+  });
+  const payload = (await res.json()) as unknown;
+
+  if (!res.ok) {
+    const message =
+      payload && typeof payload === "object" && "error" in payload
+        ? String((payload as { error?: unknown }).error ?? "")
+        : "";
+    throw new Error(message || "검색 요청에 실패했어요.");
+  }
+
+  if (!isPoiSearchResponse(payload)) {
+    throw new Error("응답 형식이 올바르지 않아요.");
+  }
+
+  return payload;
+}
+
 export default function SearchPageClient() {
   const router = useRouter();
   const emit = useEmit();
@@ -130,15 +208,20 @@ export default function SearchPageClient() {
   const shouldFocusInput = searchParams.get("focus") === "1";
   const myPos = useMapStore((s) => s.myPos);
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
+  const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
+  const commitSubmittedSearchPois = useMapStore(
+    (s) => s.commitSubmittedSearchPois,
+  );
   const [keyword, setKeyword] = useState("");
-  const [submittedQuery, setSubmittedQuery] = useState("");
-  const [submittedSort, setSubmittedSort] = useState<TmapPoiSearchSort>("R");
-  const [submitSeq, setSubmitSeq] = useState(0);
   const [searchSort, setSearchSort] = useState<TmapPoiSearchSort>("R");
+  const didRestoreStateRef = useRef(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submittingMarkers, setSubmittingMarkers] = useState(false);
   const trimmedKeyword = useMemo(() => keyword.trim(), [keyword]);
-  const shouldSearch = submittedQuery.length >= 2;
-  const searchKey = shouldSearch
-    ? `${submitSeq}::${submittedQuery}::${submittedSort}`
+  const debouncedKeyword = useDebouncedValue(trimmedKeyword, SEARCH_DEBOUNCE_MS);
+  const shouldSearch = debouncedKeyword.length >= 2;
+  const searchKey: SearchSWRKey | null = shouldSearch
+    ? [debouncedKeyword, searchSort]
     : null;
   const recentSearches = useMemo(
     () => (keyword.length === 0 ? readRecentSearches() : []),
@@ -174,38 +257,19 @@ export default function SearchPageClient() {
     }
   }, [myPos]);
 
+  const fetchPois = useCallback(
+    async (query: string, sort: TmapPoiSearchSort) => {
+      const center = await resolveCenter();
+      return requestPoiSearch(query, sort, center);
+    },
+    [resolveCenter],
+  );
+
   const { data, error, isLoading } = useSWR<TmapPoiSearchResponse, Error>(
     searchKey,
-    async (key: string) => {
-      const [, query, sortRaw] = key.split("::");
-      const sort: TmapPoiSearchSort = sortRaw === "A" ? "A" : "R";
-      const center = await resolveCenter();
-      const sp = new URLSearchParams();
-      sp.set("keyword", query);
-      sp.set("searchtypCd", sort);
-      sp.set("count", String(SEARCH_COUNT));
-      sp.set("page", "1");
-      sp.set("centerLat", String(center.lat));
-      sp.set("centerLon", String(center.lon));
-
-      const res = await fetch(`/api/tmap/pois?${sp.toString()}`, {
-        cache: "no-store",
-      });
-      const payload = (await res.json()) as unknown;
-
-      if (!res.ok) {
-        const message =
-          payload && typeof payload === "object" && "error" in payload
-            ? String((payload as { error?: unknown }).error ?? "")
-            : "";
-        throw new Error(message || "검색 요청에 실패했어요.");
-      }
-
-      if (!isPoiSearchResponse(payload)) {
-        throw new Error("응답 형식이 올바르지 않아요.");
-      }
-
-      return payload;
+    async (key) => {
+      const [query, sort] = key as SearchSWRKey;
+      return fetchPois(query, sort);
     },
     {
       keepPreviousData: true,
@@ -217,6 +281,8 @@ export default function SearchPageClient() {
   const items: TmapPoi[] = data?.items ?? [];
   const totalCount = data?.meta?.totalCount ?? items.length;
   const loading = shouldSearch && isLoading;
+  const listError = shouldSearch && error ? error.message : null;
+  const visibleError = submitError ?? listError;
 
   useEffect(() => {
     if (!shouldFocusInput) return;
@@ -231,11 +297,69 @@ export default function SearchPageClient() {
   }, [shouldFocusInput]);
 
   useEffect(() => {
-    if (!searchKey) return;
+    if (didRestoreStateRef.current) return;
+    didRestoreStateRef.current = true;
+
+    const persisted = readSearchPageState();
+    if (!persisted) return;
+
+    setKeyword(persisted.keyword);
+    setSearchSort(persisted.sort);
+  }, []);
+
+  useEffect(() => {
+    if (!didRestoreStateRef.current) return;
+    writeSearchPageState(keyword, searchSort);
+  }, [keyword, searchSort]);
+
+  useEffect(() => {
+    setSubmitError(null);
+  }, [trimmedKeyword, searchSort]);
+
+  const handleSubmitSearch = useCallback(async () => {
+    if (submittingMarkers) return;
+
+    const query = trimmedKeyword;
+    if (query.length < 2) return;
+
     inputRef.current?.blur();
-    const [, query] = searchKey.split("::");
+    setSubmitError(null);
+    setSubmittingMarkers(true);
     saveRecentSearch(query);
-  }, [searchKey]);
+
+    try {
+      const canReuseCurrentData =
+        Boolean(data) &&
+        !isLoading &&
+        data?.meta?.keyword === query &&
+        data?.meta?.searchtypCd === searchSort;
+
+      const response: TmapPoiSearchResponse =
+        canReuseCurrentData && data
+          ? data
+          : await fetchPois(query, searchSort);
+
+      commitSubmittedSearchPois(response.items);
+      clearFocusedPoi();
+      router.push("/");
+    } catch (e: unknown) {
+      setSubmitError(
+        e instanceof Error ? e.message : "검색 요청에 실패했어요.",
+      );
+    } finally {
+      setSubmittingMarkers(false);
+    }
+  }, [
+    clearFocusedPoi,
+    commitSubmittedSearchPois,
+    data,
+    fetchPois,
+    isLoading,
+    router,
+    searchSort,
+    submittingMarkers,
+    trimmedKeyword,
+  ]);
 
   return (
     <div className="flex min-h-full flex-col bg-gray-50 px-5 pt-3 pointer-events-auto">
@@ -244,14 +368,7 @@ export default function SearchPageClient() {
           className="flex w-full items-center gap-2 rounded-lg border bg-white/90 px-3 py-2 shadow backdrop-blur"
           onSubmit={(e) => {
             e.preventDefault();
-            const query = trimmedKeyword;
-            if (query.length < 2) {
-              setSubmittedQuery("");
-              return;
-            }
-            setSubmittedQuery(query);
-            setSubmittedSort(searchSort);
-            setSubmitSeq((prev) => prev + 1);
+            void handleSubmitSearch();
           }}
         >
           <AppIcon
@@ -276,13 +393,7 @@ export default function SearchPageClient() {
               <button
                 key={option.value}
                 type="button"
-                onClick={() => {
-                  setSearchSort(option.value);
-                  if (submittedQuery.length < 2) return;
-                  if (option.value === submittedSort) return;
-                  setSubmittedSort(option.value);
-                  setSubmitSeq((prev) => prev + 1);
-                }}
+                onClick={() => setSearchSort(option.value)}
                 className={[
                   "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                   active
@@ -308,13 +419,7 @@ export default function SearchPageClient() {
                 <button
                   key={recent}
                   type="button"
-                  onClick={() => {
-                    setKeyword(recent);
-                    if (recent.length < 2) return;
-                    setSubmittedQuery(recent);
-                    setSubmittedSort(searchSort);
-                    setSubmitSeq((prev) => prev + 1);
-                  }}
+                  onClick={() => setKeyword(recent)}
                   className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-700"
                 >
                   {recent}
@@ -330,19 +435,25 @@ export default function SearchPageClient() {
           </div>
         )}
 
-        {submittedQuery.length >= 2 && error && (
+        {visibleError && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error.message}
+            {visibleError}
           </div>
         )}
 
-        {loading && (
+        {loading && !submittingMarkers && (
           <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
             검색 중...
           </div>
         )}
 
-        {!loading && submittedQuery.length >= 2 && !error && (
+        {submittingMarkers && (
+          <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
+            제출 결과를 지도에 반영 중...
+          </div>
+        )}
+
+        {!loading && shouldSearch && !error && (
           <div className="rounded-xl border border-gray-200 bg-white">
             <div className="border-b border-gray-100 px-4 py-3 text-xs font-medium text-gray-500">
               검색 결과 {totalCount.toLocaleString()}건

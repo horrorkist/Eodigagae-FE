@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type { LatLng } from "@/types/mapEvents";
 import type { FocusedPoi } from "@/types/focusedPoi";
 import type { RouteResult } from "@/domain/route/types";
+import type { TmapPoi } from "@/types/tmapPoi";
 
 export type RouteStatePatch = Partial<
   Pick<
@@ -27,6 +28,9 @@ type MapState = {
   walkingPausedTotalMs: number;
   walkedDistanceM: number;
   heading: number | null;
+  submittedSearchPois: TmapPoi[];
+  submittedSearchSeq: number;
+  pendingSearchResultsRevealSeq: number | null;
 
   // route
   route: RouteResult | null;
@@ -49,6 +53,9 @@ type MapState = {
   setWalkedDistanceM: (m: number) => void;
   addWalkedDistanceM: (deltaM: number) => void;
   setHeading: (deg: number | null) => void;
+  commitSubmittedSearchPois: (pois: TmapPoi[]) => void;
+  consumePendingSearchResultsRevealSeq: () => number | null;
+  clearSubmittedSearchPois: () => void;
   clearPicked: () => void;
   clearFocusedPoi: () => void;
 
@@ -60,7 +67,7 @@ function clampNonNegative(value: number) {
   return Math.max(0, value);
 }
 
-export const useMapStore = create<MapState>((set) => ({
+export const useMapStore = create<MapState>((set, get) => ({
   // ----------------------------
   // basic positions
   // ----------------------------
@@ -75,6 +82,9 @@ export const useMapStore = create<MapState>((set) => ({
   walkingPausedTotalMs: 0,
   walkedDistanceM: 0,
   heading: null,
+  submittedSearchPois: [],
+  submittedSearchSeq: 0,
+  pendingSearchResultsRevealSeq: null,
 
   setMyPos: (p) => set({ myPos: p }),
   setPickedPos: (p) => set({ pickedPos: p }),
@@ -91,6 +101,28 @@ export const useMapStore = create<MapState>((set) => ({
       walkedDistanceM: clampNonNegative(state.walkedDistanceM + deltaM),
     })),
   setHeading: (deg) => set({ heading: deg }),
+  commitSubmittedSearchPois: (pois) =>
+    set((state) => {
+      const nextSeq = state.submittedSearchSeq + 1;
+      return {
+        submittedSearchPois: pois,
+        submittedSearchSeq: nextSeq,
+        pendingSearchResultsRevealSeq: nextSeq,
+      };
+    }),
+  consumePendingSearchResultsRevealSeq: () => {
+    const pending = get().pendingSearchResultsRevealSeq;
+    if (pending != null) {
+      set({ pendingSearchResultsRevealSeq: null });
+    }
+    return pending;
+  },
+  clearSubmittedSearchPois: () =>
+    set({
+      submittedSearchPois: [],
+      submittedSearchSeq: 0,
+      pendingSearchResultsRevealSeq: null,
+    }),
   clearPicked: () => set({ pickedPos: null }),
   clearFocusedPoi: () => set({ focusedPoi: null }),
 
