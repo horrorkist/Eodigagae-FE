@@ -1,7 +1,6 @@
 // MapPage.tsx
 "use client";
 
-import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -32,6 +31,7 @@ import {
   subscribeWalkDebugUpdates,
 } from "@/lib/walkDebug";
 import CoachmarkTour from "@/components/CoachmarkTour";
+import HomePetPoiLayerBridge from "@/components/map-shell/HomePetPoiLayerBridge";
 import {
   appIconPuppy,
   appIconTrashbin,
@@ -40,10 +40,6 @@ import {
 import { useRouteRecommendStore } from "@/stores/routeRecommendStore";
 import { fetchRouteRecommendations } from "@/services/routeRecommend";
 import type { RouteRecommendation } from "@/types/routeRecommend";
-
-const NaverMapClient = dynamic(() => import("@/components/NaverMapClient"), {
-  ssr: false,
-});
 
 type SheetContentMode = "main" | "poi";
 
@@ -278,12 +274,11 @@ export default function MapPage() {
   }, [emit]);
 
   useEffect(() => {
-    if (isRoutePlanningMode) {
+    if (isRoutePlanningMode || focusedPoi) {
       emit({ channel: "ui", type: "UI_BOTTOM_CHROME_HIDE" });
       return;
     }
 
-    if (focusedPoi) return;
     emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
   }, [emit, focusedPoi, isRoutePlanningMode]);
 
@@ -341,8 +336,8 @@ export default function MapPage() {
   }, [clearPetPoiError, openModal, petPoiError]);
 
   return (
-    <div className="w-full h-full">
-      <NaverMapClient showPetPoi={petPoiOn} petPois={petPois} />
+    <div className="w-full h-full pointer-events-none">
+      <HomePetPoiLayerBridge showPetPoi={petPoiOn} petPois={petPois} />
 
       <MapOverlay
         toggles={[

@@ -75,7 +75,7 @@ export default function FocusedPoiSheet({
 
   return (
     <div
-      className="fixed left-0 bottom-0 z-[112] w-full max-w-[430px]"
+      className="fixed left-0 bottom-0 z-[112] w-full max-w-[430px] pointer-events-auto"
       // style={{ bottom: "calc(var(--safe-bottom) + 64px)" }}
     >
       <section className="rounded-tl-2xl rounded-tr-2xl py-9 bg-white min-h-[320px] flex flex-col space-y-2">

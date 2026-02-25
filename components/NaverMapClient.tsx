@@ -1,24 +1,29 @@
 "use client";
 
 import Script from "next/script";
+import { useEffect } from "react";
 import { useNaverMap } from "@/hooks/useNaverMap";
 import { useMapMyLocation } from "@/hooks/useMapMyLocation";
 import { useMapRoute } from "@/hooks/useMapRoute";
-import { useMapPetPoi } from "@/hooks/useMapPetPoi";
-import { PetPoiItem } from "@/types/mapEvents";
 import type { UseMapRouteOptions } from "@/hooks/useMapRoute";
+import type { MapRuntimeRegistration } from "@/components/map-shell/MapRuntimeProvider";
 
 export default function NaverMapClient(props: {
-  showPetPoi: boolean;
-  petPois: PetPoiItem[];
   routeOptions?: UseMapRouteOptions;
+  onRuntimeChange?: (runtime: MapRuntimeRegistration) => void;
 }) {
-  const { showPetPoi, petPois, routeOptions } = props;
+  const { routeOptions, onRuntimeChange } = props;
 
   const { mapRef, elRef, sdkReady, setSdkReady } = useNaverMap();
   useMapMyLocation(mapRef, sdkReady);
   useMapRoute(mapRef, routeOptions, sdkReady);
-  useMapPetPoi(mapRef, sdkReady, showPetPoi, petPois);
+
+  useEffect(() => {
+    onRuntimeChange?.({
+      mapRef,
+      sdkReady,
+    });
+  }, [mapRef, onRuntimeChange, sdkReady]);
 
   const key = process.env.NEXT_PUBLIC_NAVER_MAPS_KEY_ID;
 

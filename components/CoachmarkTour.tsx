@@ -252,7 +252,7 @@ export default function CoachmarkTour() {
     <button
       type="button"
       onClick={closeCoachmark}
-      className="fixed inset-0 z-[220] text-left"
+      className="fixed inset-0 z-[220] text-left pointer-events-auto"
       aria-label="코치마크 닫기"
     >
       <svg

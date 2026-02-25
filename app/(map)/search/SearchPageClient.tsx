@@ -238,7 +238,7 @@ export default function SearchPageClient() {
   }, [searchKey]);
 
   return (
-    <div className="flex min-h-full flex-col bg-gray-50 px-5 pt-3">
+    <div className="flex min-h-full flex-col bg-gray-50 px-5 pt-3 pointer-events-auto">
       <div className="mx-auto w-full max-w-[430px]">
         <form
           className="flex w-full items-center gap-2 rounded-lg border bg-white/90 px-3 py-2 shadow backdrop-blur"
