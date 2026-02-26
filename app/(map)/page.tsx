@@ -117,7 +117,6 @@ export default function MapPage() {
   const [showBin, setShowBin] = useState<boolean>(false);
   const [showWater, setShowWater] = useState<boolean>(false);
 
-  const canShowPoiTab = petPoiOn;
   const hasSubmittedSearchResults = submittedSearchPois.length > 0;
 
   const [homeTabMode, setHomeTabMode] = useState<HomeTabMode>("main");
@@ -126,8 +125,7 @@ export default function MapPage() {
   const [preferRouteRecommendSheet, setPreferRouteRecommendSheet] = useState(
     () => !dog,
   );
-  const activeHomeTabMode: HomeTabMode =
-    canShowPoiTab || homeTabMode !== "poi" ? homeTabMode : "main";
+  const activeHomeTabMode: HomeTabMode = homeTabMode;
   const activeSheetViewMode: SheetViewMode =
     !hasSubmittedSearchResults && sheetViewMode === "searchResults"
       ? "home"
@@ -319,10 +317,8 @@ export default function MapPage() {
 
   const handlePoiTabClick = useCallback(() => {
     setHomeTabMode("poi");
-    setVisiblePoiCount(
-      Math.min(POI_INITIAL_RENDER_COUNT, petPois.length),
-    );
-  }, [petPois.length]);
+    setVisiblePoiCount(POI_INITIAL_RENDER_COUNT);
+  }, []);
 
   const handleOpenSearchResultsSheet = useCallback(() => {
     setSheetViewMode("searchResults");
@@ -528,13 +524,13 @@ export default function MapPage() {
 
               <SheetTabs
                 activeMode={activeHomeTabMode}
-                canShowPoiTab={canShowPoiTab}
                 onMainClick={handleMainTabClick}
                 onPoiClick={handlePoiTabClick}
               />
 
               {activeHomeTabMode === "poi" ? (
                 <PoiTabContent
+                  petPoiOn={petPoiOn}
                   loading={petPoiLoading}
                   totalCount={petPoiTotalCount}
                   visiblePois={visiblePois}

@@ -25,6 +25,7 @@ import type { PetPoiItem } from "@/types/mapEvents";
 // }
 
 type PoiTabContentProps = {
+  petPoiOn: boolean;
   loading: boolean;
   totalCount: number | null;
   visiblePois: PetPoiItem[];
@@ -34,6 +35,7 @@ type PoiTabContentProps = {
 };
 
 export default function PoiTabContent({
+  petPoiOn,
   loading,
   // totalCount,
   visiblePois,
@@ -57,7 +59,14 @@ export default function PoiTabContent({
         );
       })}
 
-      {!loading && visiblePois.length === 0 && (
+      {!petPoiOn && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          상단의 <span className="font-semibold">동반 가능</span> 토글 칩을 켜면
+          장소 목록을 불러올 수 있어요.
+        </div>
+      )}
+
+      {petPoiOn && !loading && visiblePois.length === 0 && (
         <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
           표시할 장소가 없어요. 상단의 동반 가능 토글을 확인해 주세요.
         </div>

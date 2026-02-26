@@ -198,7 +198,7 @@ export default function FocusedPoiSheet({
             </div>
           )}
         </div>
-        <div className="mt-2 w-full aspect-[16/10] overflow-hidden rounded-2xl bg-dg-gray-300">
+        <div className="mt-2 h-32 w-full overflow-hidden rounded-2xl bg-dg-gray-300">
           {showThumbnail ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

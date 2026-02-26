@@ -7,14 +7,12 @@ const TAB_BUTTON_ACTIVE_CLASS = "bg-white text-gray-900 shadow-sm";
 
 type SheetTabsProps = {
   activeMode: SheetContentMode;
-  canShowPoiTab: boolean;
   onMainClick: () => void;
   onPoiClick: () => void;
 };
 
 export default function SheetTabs({
   activeMode,
-  canShowPoiTab,
   onMainClick,
   onPoiClick,
 }: SheetTabsProps) {
@@ -33,10 +31,8 @@ export default function SheetTabs({
       <button
         type="button"
         onClick={onPoiClick}
-        disabled={!canShowPoiTab}
         className={[
           TAB_BUTTON_BASE_CLASS,
-          "disabled:cursor-not-allowed disabled:opacity-50",
           activeMode === "poi"
             ? TAB_BUTTON_ACTIVE_CLASS
             : TAB_BUTTON_INACTIVE_CLASS,
