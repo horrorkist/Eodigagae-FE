@@ -99,6 +99,24 @@ export function useNaverMap() {
 
   useEffect(() => {
     if (!sdkReady) return;
+    if (!elRef.current) return;
+    if (!mapRef.current || !window.naver?.maps) return;
+    if (typeof ResizeObserver === "undefined") return;
+
+    const map = mapRef.current;
+    const target = elRef.current;
+    const observer = new ResizeObserver(() => {
+      naver.maps.Event.trigger(map, "resize");
+    });
+
+    observer.observe(target);
+    return () => {
+      observer.disconnect();
+    };
+  }, [sdkReady]);
+
+  useEffect(() => {
+    if (!sdkReady) return;
     if (!mapRef.current || !window.naver?.maps) return;
 
     const listener = naver.maps.Event.addListener(

@@ -11,7 +11,7 @@ import {
   appIconTel,
   appIconXMark,
 } from "./icons/definitions.generated";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const WALK_SPEED_M_PER_MIN = 67; // 약 4.0km/h
 
@@ -56,18 +56,64 @@ async function copyTextToClipboard(text: string) {
 export default function FocusedPoiSheet({
   poi,
   onClose,
+  onHeightChange,
 }: {
   poi: FocusedPoi;
   onClose: () => void;
+  onHeightChange?: (heightPx: number) => void;
 }) {
   const [showDetailAddress, setShowDetailAddress] = useState(false);
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const openModal = useModalStore((s) => s.open);
   const roadAddress = poi.roadAddress?.trim() ?? "";
   const jibunAddress = poi.jibunAddress?.trim() ?? "";
   const estimatedWalkMinutes = estimateWalkMinutes(poi.distanceM);
   const thumbnail = poi.thumbnail?.trim() ?? "";
   const showThumbnail = thumbnail.length > 0 && failedThumbnail !== thumbnail;
+
+  useEffect(() => {
+    if (!onHeightChange) return;
+
+    const target = rootRef.current;
+    if (!target) {
+      onHeightChange(0);
+      return;
+    }
+
+    let rafId = 0;
+    const emitHeight = () => {
+      const nextHeight = Math.max(
+        0,
+        Math.round(target.getBoundingClientRect().height),
+      );
+      onHeightChange(nextHeight);
+    };
+
+    emitHeight();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(emitHeight);
+      });
+      observer.observe(target);
+
+      return () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        observer.disconnect();
+        onHeightChange(0);
+      };
+    }
+
+    const handleWindowResize = () => emitHeight();
+    window.addEventListener("resize", handleWindowResize);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", handleWindowResize);
+      onHeightChange(0);
+    };
+  }, [onHeightChange]);
 
   const handleCopyAddress = async (address: string, label: string) => {
     const value = address.trim();
@@ -89,6 +135,7 @@ export default function FocusedPoiSheet({
 
   return (
     <div
+      ref={rootRef}
       className="fixed left-0 z-[112] w-full max-w-[430px] pointer-events-auto"
       style={{ bottom: "calc(var(--safe-bottom) + 56px)" }}
     >

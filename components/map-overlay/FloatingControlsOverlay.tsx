@@ -5,20 +5,31 @@ import { appIconLocation } from "@/components/icons/definitions.generated";
 
 type FloatingControlsOverlayProps = {
   isBottomChromeVisible: boolean;
+  bottomOffsetPx?: number;
+  bottomTransitionMs?: number;
+  bottomTransitionEasing?: "linear" | "ease-in-out" | "ease-out";
   fabItems: FABMenuItem[];
   onRequestMyLocation: () => void;
 };
 
 export default function FloatingControlsOverlay({
   isBottomChromeVisible,
+  bottomOffsetPx = 0,
+  bottomTransitionMs = 0,
+  bottomTransitionEasing = "linear",
   fabItems,
   onRequestMyLocation,
 }: FloatingControlsOverlayProps) {
+  const baseBottomPx = isBottomChromeVisible ? 108 : 24;
+
   return (
     <div
       className="pointer-events-none absolute right-3 flex flex-col items-end space-y-4"
       style={{
-        bottom: `calc(var(--safe-bottom) + ${isBottomChromeVisible ? 108 : 24}px)`,
+        bottom: `calc(var(--safe-bottom) + ${baseBottomPx + bottomOffsetPx}px)`,
+        transitionProperty: "bottom",
+        transitionDuration: `${Math.max(0, Math.round(bottomTransitionMs))}ms`,
+        transitionTimingFunction: bottomTransitionEasing,
       }}
     >
       <FloatingFABMenu items={fabItems} />

@@ -9,7 +9,9 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import BottomSheet from "@/components/BottomSheet";
+import BottomSheet, {
+  type BottomSheetHeightMotion,
+} from "@/components/BottomSheet";
 import FocusedPoiSheet from "@/components/FocusedPoiSheet";
 import MapOverlay from "@/components/MapOverlay";
 import SheetTabs from "@/components/map-page/SheetTabs";
@@ -18,6 +20,7 @@ import RouteTabContent from "@/components/map-page/RouteTabContent";
 import SearchResultsBottomSheetContent from "@/components/map-page/SearchResultsBottomSheetContent";
 import { useMapStore } from "@/stores/mapStore";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
+import { useMapViewportStore } from "@/stores/mapViewport";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
 import { useDogStore, type DogInfoFormDraft } from "@/stores/dogStore";
 import { useModalStore } from "@/stores/modal";
@@ -55,6 +58,11 @@ type FocusedEntrySnapshot = {
 const POI_INITIAL_RENDER_COUNT = 16;
 const POI_RENDER_BATCH_COUNT = 12;
 const SEARCH_RESULTS_ENTRY_SNAP_INDEX = 1;
+const HOME_BOTTOM_SHEET_PEEK_HEIGHT = 30;
+const DEFAULT_BOTTOM_SHEET_MOTION: BottomSheetHeightMotion = {
+  durationMs: 0,
+  easing: "linear",
+};
 
 export default function MapPage() {
   const emit = useEmit();
@@ -75,6 +83,22 @@ export default function MapPage() {
   );
   const setPickedPos = useMapStore((s) => s.setPickedPos);
   const setRouteState = useMapStore((s) => s.setRouteState);
+  const bottomSheetOffsetPx = useMapViewportStore((s) => s.bottomSheetOffsetPx);
+  const focusedSheetHeightPx = useMapViewportStore(
+    (s) => s.focusedSheetHeightPx,
+  );
+  const setBottomSheetOffsetPx = useMapViewportStore(
+    (s) => s.setBottomSheetOffsetPx,
+  );
+  const resetBottomSheetOffset = useMapViewportStore(
+    (s) => s.resetBottomSheetOffset,
+  );
+  const setFocusedSheetHeightPx = useMapViewportStore(
+    (s) => s.setFocusedSheetHeightPx,
+  );
+  const resetFocusedSheetHeight = useMapViewportStore(
+    (s) => s.resetFocusedSheetHeight,
+  );
 
   const dog = useDogStore((s) => s.dog);
   const clearDog = useDogStore((s) => s.clearDog);
@@ -116,6 +140,8 @@ export default function MapPage() {
 
   const [showBin, setShowBin] = useState<boolean>(false);
   const [showWater, setShowWater] = useState<boolean>(false);
+  const [bottomSheetFloatingMotion, setBottomSheetFloatingMotion] =
+    useState<BottomSheetHeightMotion>(DEFAULT_BOTTOM_SHEET_MOTION);
 
   const hasSubmittedSearchResults = submittedSearchPois.length > 0;
 
@@ -144,6 +170,11 @@ export default function MapPage() {
     [petPois, visiblePoiCount],
   );
   const hasMorePois = visiblePoiCount < petPois.length;
+  const focusedFloatingOffsetPx = useMemo(
+    () =>
+      Math.max(0, focusedSheetHeightPx - HOME_BOTTOM_SHEET_PEEK_HEIGHT),
+    [focusedSheetHeightPx],
+  );
 
   const loadMorePois = useCallback(() => {
     setVisiblePoiCount((prev) =>
@@ -199,6 +230,21 @@ export default function MapPage() {
 
     closeBottomSheet();
   }, [clearFocusedPoi, closeBottomSheet, openBottomSheet]);
+
+  const handleFocusedPoiHeightChange = useCallback(
+    (heightPx: number) => {
+      setFocusedSheetHeightPx(heightPx);
+    },
+    [setFocusedSheetHeightPx],
+  );
+
+  const handleBottomSheetVisibleHeightChange = useCallback(
+    (heightPx: number, motion?: BottomSheetHeightMotion) => {
+      setBottomSheetOffsetPx(heightPx);
+      setBottomSheetFloatingMotion(motion ?? DEFAULT_BOTTOM_SHEET_MOTION);
+    },
+    [setBottomSheetOffsetPx],
+  );
 
   const applyRecommendationRoute = useCallback(
     (recommendation: RouteRecommendation) => {
@@ -383,6 +429,22 @@ export default function MapPage() {
   }, [captureFocusedEntrySnapshot, focusedPoi]);
 
   useEffect(() => {
+    if (focusedPoi) {
+      resetBottomSheetOffset();
+      return;
+    }
+
+    resetFocusedSheetHeight();
+  }, [focusedPoi, resetBottomSheetOffset, resetFocusedSheetHeight]);
+
+  useEffect(() => {
+    return () => {
+      resetBottomSheetOffset();
+      resetFocusedSheetHeight();
+    };
+  }, [resetBottomSheetOffset, resetFocusedSheetHeight]);
+
+  useEffect(() => {
     if (isRoutePlanningMode) {
       emit({ channel: "ui", type: "UI_BOTTOM_CHROME_HIDE" });
       return;
@@ -452,10 +514,19 @@ export default function MapPage() {
   }, [clearPetPoiError, openModal, petPoiError]);
 
   return (
-    <div className="w-full h-full pointer-events-none">
+    <div className="relative w-full h-full pointer-events-none">
       <HomePetPoiLayerBridge showPetPoi={petPoiOn} petPois={petPois} />
 
       <MapOverlay
+        floatingControlsBottomOffsetPx={
+          focusedPoi ? focusedFloatingOffsetPx : bottomSheetOffsetPx
+        }
+        floatingControlsBottomTransitionMs={
+          focusedPoi ? 0 : bottomSheetFloatingMotion.durationMs
+        }
+        floatingControlsBottomTransitionEasing={
+          focusedPoi ? "linear" : bottomSheetFloatingMotion.easing
+        }
         toggles={[
           {
             key: "petpoi",
@@ -497,12 +568,19 @@ export default function MapPage() {
       />
 
       {focusedPoi ? (
-        <FocusedPoiSheet poi={focusedPoi} onClose={handleFocusedPoiClose} />
+        <FocusedPoiSheet
+          poi={focusedPoi}
+          onClose={handleFocusedPoiClose}
+          onHeightChange={handleFocusedPoiHeightChange}
+        />
       ) : (
         <BottomSheet
-          peekHeight={30}
+          peekHeight={HOME_BOTTOM_SHEET_PEEK_HEIGHT}
           coverBottomNav={activeSheetViewMode !== "searchResults"}
-          showBackdrop={activeSheetViewMode !== "searchResults"}
+          showBackdrop={
+            activeSheetViewMode === "home" && activeHomeTabMode === "main"
+          }
+          onVisibleHeightChange={handleBottomSheetVisibleHeightChange}
         >
           {activeSheetViewMode === "searchResults" ? (
             <SearchResultsBottomSheetContent

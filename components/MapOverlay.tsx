@@ -21,6 +21,9 @@ import WalkingOverlay from "@/components/map-overlay/WalkingOverlay";
 
 type MapOverlayProps = {
   topOffsetPx?: number;
+  floatingControlsBottomOffsetPx?: number;
+  floatingControlsBottomTransitionMs?: number;
+  floatingControlsBottomTransitionEasing?: "linear" | "ease-in-out" | "ease-out";
   leftSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
   toggles?: ToggleItem[];
@@ -36,6 +39,9 @@ type MapOverlayProps = {
 
 export default function MapOverlay({
   topOffsetPx = 12,
+  floatingControlsBottomOffsetPx = 0,
+  floatingControlsBottomTransitionMs = 0,
+  floatingControlsBottomTransitionEasing = "linear",
   leftSlot,
   rightSlot,
   toggles = [],
@@ -229,6 +235,9 @@ export default function MapOverlay({
       ) : (
         <FloatingControlsOverlay
           isBottomChromeVisible={isBottomChromeVisible}
+          bottomOffsetPx={floatingControlsBottomOffsetPx}
+          bottomTransitionMs={floatingControlsBottomTransitionMs}
+          bottomTransitionEasing={floatingControlsBottomTransitionEasing}
           fabItems={fabItems}
           onRequestMyLocation={onRequestMyLocation}
         />
@@ -236,4 +245,3 @@ export default function MapOverlay({
     </div>
   );
 }
-

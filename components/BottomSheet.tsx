@@ -11,6 +11,24 @@ import React, {
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { useUiChromeStore } from "@/stores/uiChrome";
 
+export type BottomSheetHeightMotion = {
+  durationMs: number;
+  easing: "linear" | "ease-in-out" | "ease-out";
+};
+
+const DRAG_MOTION: BottomSheetHeightMotion = {
+  durationMs: 0,
+  easing: "linear",
+};
+const SNAP_MOTION: BottomSheetHeightMotion = {
+  durationMs: 280,
+  easing: "ease-in-out",
+};
+const FLING_OPEN_MOTION: BottomSheetHeightMotion = {
+  durationMs: 80,
+  easing: "ease-out",
+};
+
 type Props = {
   children: React.ReactNode;
   title?: string;
@@ -18,6 +36,7 @@ type Props = {
   bottomNavHeight?: number;
   coverBottomNav?: boolean;
   showBackdrop?: boolean;
+  onVisibleHeightChange?: (heightPx: number, motion?: BottomSheetHeightMotion) => void;
   closeThreshold?: number;
   openThreshold?: number;
 };
@@ -29,6 +48,7 @@ export default function BottomSheet({
   bottomNavHeight = 56,
   coverBottomNav = false,
   showBackdrop = true,
+  onVisibleHeightChange,
   closeThreshold = 140,
   openThreshold = 40,
 }: Props) {
@@ -92,6 +112,10 @@ export default function BottomSheet({
     () => Math.max(0, vh - closedBottomInset - peekHeight),
     [vh, closedBottomInset, peekHeight],
   );
+  const firstStageMaxOffset = useMemo(
+    () => Math.max(0, Math.round(closedTop - maxSnap)),
+    [closedTop, maxSnap],
+  );
 
   const dynamicSnapPoints = useMemo(() => {
     if (vh <= 0) return [];
@@ -125,17 +149,31 @@ export default function BottomSheet({
   const rafRef = useRef(0);
   const fastOpenFlingRef = useRef(false);
   const didInitialSyncRef = useRef(false);
+  const lastVisibleHeightRef = useRef<number | null>(null);
+
+  const emitVisibleHeight = useCallback(
+    (topPx: number, motion: BottomSheetHeightMotion) => {
+      if (!onVisibleHeightChange) return;
+      const rawOffset = Math.max(0, Math.round(closedTop - topPx));
+      const nextHeight = Math.min(rawOffset, firstStageMaxOffset);
+      if (lastVisibleHeightRef.current === nextHeight) return;
+      lastVisibleHeightRef.current = nextHeight;
+      onVisibleHeightChange(nextHeight, motion);
+    },
+    [closedTop, firstStageMaxOffset, onVisibleHeightChange],
+  );
 
   /** transform + opacity 만 변경 (Layout/Paint 0회) */
   const applyTop = useCallback(
-    (px: number) => {
+    (px: number, motion: BottomSheetHeightMotion) => {
       topRef.current = px;
       if (sheetRef.current)
         sheetRef.current.style.transform = `translateY(${px}px)`;
       if (contentRef.current)
         contentRef.current.style.opacity = px <= closedTop - 8 ? "1" : "0";
+      emitVisibleHeight(px, motion);
     },
-    [closedTop],
+    [closedTop, emitVisibleHeight],
   );
 
   /** clip 경계 아래 잘리는 영역만큼 paddingBottom 보상 — settle 시에만 호출 */
@@ -147,17 +185,21 @@ export default function BottomSheet({
   // ── Store → DOM 동기화 ──
   useLayoutEffect(() => {
     const target = isOpen ? (snapPoints[index] ?? minSnap) : closedTop;
+    let motion = SNAP_MOTION;
     if (sheetRef.current) {
       if (!didInitialSyncRef.current) {
         sheetRef.current.style.transition = "none";
+        motion = DRAG_MOTION;
       } else if (fastOpenFlingRef.current) {
         sheetRef.current.style.transition = "transform 80ms ease-out";
         fastOpenFlingRef.current = false;
+        motion = FLING_OPEN_MOTION;
       } else {
         sheetRef.current.style.transition = "transform 280ms ease-in-out";
+        motion = SNAP_MOTION;
       }
     }
-    applyTop(target);
+    applyTop(target, motion);
     applyClipPadding(target);
     didInitialSyncRef.current = true;
   }, [
@@ -213,14 +255,14 @@ export default function BottomSheet({
         const lowest = nearestSnapIndex(maxSnap);
         snapTo(lowest);
         close(sheetRef);
-        applyTop(closedTop);
+        applyTop(closedTop, SNAP_MOTION);
         applyClipPadding(closedTop);
         return;
       }
 
       if (topPx > closedTop - openThreshold) {
         close(sheetRef);
-        applyTop(closedTop);
+        applyTop(closedTop, SNAP_MOTION);
         applyClipPadding(closedTop);
         return;
       }
@@ -228,7 +270,7 @@ export default function BottomSheet({
       const near = nearestSnapIndex(topPx);
       snapTo(near);
       open(near);
-      applyTop(snapPoints[near]);
+      applyTop(snapPoints[near], SNAP_MOTION);
       applyClipPadding(snapPoints[near]);
     },
     [
@@ -276,7 +318,7 @@ export default function BottomSheet({
         const dy = clientY - startYRef.current;
         const proposed = startTopRef.current + dy;
         overDragRef.current = Math.max(0, proposed - closedTop);
-        applyTop(clampTop(proposed));
+        applyTop(clampTop(proposed), DRAG_MOTION);
       });
     },
     [closedTop, clampTop, applyTop],
@@ -303,12 +345,12 @@ export default function BottomSheet({
           sheetRef.current.style.transition = "transform 80ms ease-out";
         snapTo(0);
         open(0);
-        applyTop(minSnap);
+        applyTop(minSnap, FLING_OPEN_MOTION);
       } else {
         const lowest = nearestSnapIndex(maxSnap);
         snapTo(lowest);
         close(sheetRef);
-        applyTop(closedTop);
+        applyTop(closedTop, SNAP_MOTION);
       }
       return;
     }
@@ -481,8 +523,9 @@ export default function BottomSheet({
   useEffect(
     () => () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (onVisibleHeightChange) onVisibleHeightChange(0, DRAG_MOTION);
     },
-    [],
+    [onVisibleHeightChange],
   );
 
   if (!isBottomChromeVisible) return null;
