@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
-import { POI_STYLES } from "@/lib/poiMarker";
+import { getPoiStyle } from "@/lib/poiMarker";
 import PoiCard from "@/components/PoiCard";
+import Divider from "@/components/Divider";
 import type { PetPoiItem } from "@/types/mapEvents";
 
 // function PetPoiSummary({
@@ -47,17 +48,32 @@ export default function PoiTabContent({
     <>
       {/* <PetPoiSummary loading={loading} totalCount={totalCount} /> */}
 
-      {visiblePois.map((poi) => {
-        const style = POI_STYLES[poi.contenttypeid];
-        return (
-          <PoiCard
-            key={poi.contentid}
-            poi={poi}
-            style={style}
-            onClick={() => onFocusPoi(poi)}
-          />
-        );
-      })}
+      {visiblePois.length > 0 && (
+        <ul>
+          {visiblePois.map((poi, index) => {
+            const style = getPoiStyle(poi.contenttypeid);
+            const distanceRaw = Number(poi.dist);
+            const distanceM = Number.isFinite(distanceRaw) ? distanceRaw : null;
+
+            return (
+              <li key={poi.contentid}>
+                <PoiCard
+                  item={{
+                    id: `kto:${poi.contentid}`,
+                    title: poi.title,
+                    category: style.label,
+                    address: poi.addr1,
+                    distanceM,
+                    thumbnailUrl: poi.firstimage2 || poi.firstimage,
+                  }}
+                  onClick={() => onFocusPoi(poi)}
+                />
+                {index < visiblePois.length - 1 && <Divider />}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
       {!petPoiOn && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">

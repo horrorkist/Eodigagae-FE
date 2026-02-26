@@ -1,50 +1,102 @@
 import formatDist from "@/lib/formatDist";
-import { PoiStyle } from "@/lib/poiMarker";
-import { PetPoiItem } from "@/types/mapEvents";
-import React from "react";
-import PoiThumb from "./PoiThumb";
+import { useState } from "react";
+import Image from "next/image";
+import AppIcon from "./icons/AppIcon";
+import { appIconPaw, appIconPuppy } from "./icons/definitions.generated";
+
+const WALK_SPEED_M_PER_MIN = 67; // 약 4.0km/h
+
+export type HomePoiCardItem = {
+  id: string;
+  title: string;
+  category?: string;
+  address?: string;
+  distanceM: number | null;
+  thumbnailUrl?: string | null;
+};
+
+function estimateWalkMinutes(distanceM: number | null) {
+  if (distanceM == null || !Number.isFinite(distanceM) || distanceM <= 0) {
+    return null;
+  }
+  return Math.max(1, Math.round(distanceM / WALK_SPEED_M_PER_MIN));
+}
 
 export default function PoiCard({
-  poi,
-  style,
+  item,
   onClick,
 }: {
-  poi: PetPoiItem;
-  style: PoiStyle;
+  item: HomePoiCardItem;
   onClick: () => void;
 }) {
+  const [isThumbnailFailed, setIsThumbnailFailed] = useState(false);
+  const thumbnailUrl = item.thumbnailUrl?.trim() ?? "";
+  const showThumbnail = thumbnailUrl.length > 0 && !isThumbnailFailed;
+  const address = item.address?.trim() || "주소 정보 없음";
+  const category = item.category?.trim();
+  const estimatedWalkMinutes = estimateWalkMinutes(item.distanceM);
+
   return (
     <button
       type="button"
       className="
-        group flex w-full items-stretch justify-between gap-4 text-left
-        rounded-2xl border border-gray-200 bg-white p-4
-        shadow-sm transition
-        hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md
+        group flex w-full items-stretch justify-between gap-3 bg-white py-4 text-left
+        transition-colors
+        hover:bg-dg-gray-400/30
         active:translate-y-0
       "
       onClick={onClick}
     >
-      {/* Left */}
-      <div className="min-w-0 flex-1">
-        <div className="mb-2 flex items-center gap-1 text-xs text-gray-400">
-          <span className="font-medium">{style.label}</span>
-          <span className="text-gray-300">•</span>
-          <span className="tabular-nums">{formatDist(Number(poi.dist))}</span>
+      <div className="min-w-0 flex-1 flex-col space-y-1">
+        <div className="flex min-w-0 items-center gap-x-2">
+          <div className="rounded-full bg-dg-orange-500 p-1">
+            <AppIcon icon={appIconPuppy} className="h-4 w-4 text-white" />
+          </div>
+          <div className="min-w-0 flex items-center gap-x-2">
+            <div className="truncate text-base font-semibold text-dg-black">
+              {item.title}
+            </div>
+            {category && (
+              <div className="text-sm text-dg-gray-600 text-nowrap">
+                {category}
+              </div>
+            )}
+          </div>
         </div>
-
-        <div className="text-base font-semibold leading-snug text-gray-900 line-clamp-2">
-          {poi.title}
+        <div className="truncate text-sm text-dg-gray-600">{address}</div>
+        <div className="text-sm text-dg-gray-600">
+          {item.distanceM != null
+            ? `${formatDist(item.distanceM)}${
+                estimatedWalkMinutes != null
+                  ? ` · 도보 약 ${estimatedWalkMinutes}분`
+                  : ""
+              }`
+            : "거리 정보 없음"}
         </div>
-
-        <div className="mt-2 text-xs text-gray-600 line-clamp-1 flex flex-col">
-          <span>{poi.addr1 ?? ""}</span>
+        <div className="flex">
+          <div className="rounded-full flex text-nowrap gap-x-1 items-center border border-dg-gray-500 bg-white px-2 py-1 text-xs">
+            <AppIcon icon={appIconPaw} className="w-3 h-3 text-dg-gray-600" />
+            <span className="text-dg-gray-600">길찾기</span>
+          </div>
         </div>
       </div>
 
-      {/* Right thumbnail */}
       <div className="relative h-20 w-20 flex-none overflow-hidden rounded-xl bg-gray-100 ring-1 ring-black/5">
-        <PoiThumb src={poi.firstimage2} alt={poi.title} poiStyle={style} />
+        {showThumbnail ? (
+          <Image
+            src={thumbnailUrl}
+            alt={`${item.title} 대표 이미지`}
+            fill
+            sizes="80px"
+            className="object-cover"
+            onError={() => setIsThumbnailFailed(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-y-1 bg-dg-gray-400 text-dg-gray-600">
+            <AppIcon icon={appIconPuppy} className="h-5 w-5" />
+            <span className="text-[10px] leading-none">이미지 없음</span>
+          </div>
+        )}
       </div>
     </button>
   );

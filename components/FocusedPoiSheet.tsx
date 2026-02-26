@@ -154,16 +154,6 @@ export default function FocusedPoiSheet({
               </div>
             </div>
             <div className="ml-4 flex items-center gap-x-2">
-              {/* <button
-                type="button"
-                className="rounded-full flex text-nowrap gap-x-1 items-center border border-dg-gray-500 bg-white px-2 py-1 text-xs"
-              >
-                <AppIcon
-                  icon={appIconPaw}
-                  className="w-3 h-3 text-dg-gray-600"
-                />
-                <span className="text-gray-60">길찾기</span>
-              </button> */}
               <button
                 type="button"
                 aria-label="상세 닫기"
@@ -238,9 +228,7 @@ export default function FocusedPoiSheet({
             <div className="text-dg-gray-600 text-nowrap">
               {formatDist(poi.distanceM)}
               {estimatedWalkMinutes != null && (
-                <>
-                  &nbsp;&middot;&nbsp;도보 약 {estimatedWalkMinutes}분
-                </>
+                <>&nbsp;&middot;&nbsp;도보 약 {estimatedWalkMinutes}분</>
               )}
             </div>
           )}
