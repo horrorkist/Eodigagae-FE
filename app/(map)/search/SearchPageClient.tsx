@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import formatDist from "@/lib/formatDist";
@@ -182,6 +189,33 @@ function formatRecentSearchDate(savedAt: number): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${month}.${day}`;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function renderHighlightedText(text: string, keyword: string): ReactNode {
+  const normalizedKeyword = keyword.trim();
+  if (!normalizedKeyword) return text;
+
+  const escapedKeyword = escapeRegExp(normalizedKeyword);
+  if (!escapedKeyword) return text;
+
+  const pattern = new RegExp(`(${escapedKeyword})`, "gi");
+  const chunks = text.split(pattern);
+  if (chunks.length <= 1) return text;
+
+  return chunks.map((chunk, index) => {
+    if (index % 2 === 1) {
+      return (
+        <span key={`highlight-${chunk}-${index}`} className="text-dg-green-500">
+          {chunk}
+        </span>
+      );
+    }
+    return <span key={`plain-${chunk}-${index}`}>{chunk}</span>;
+  });
 }
 
 function readSearchPageState(): SearchPagePersistedState | null {
@@ -647,7 +681,7 @@ export default function SearchPageClient() {
                         </div>
                         <div className="min-w-0">
                           <div className="truncate text-base font-medium text-dg-black">
-                            {poi.name}
+                            {renderHighlightedText(poi.name, trimmedKeyword)}
                           </div>
                           <div className="mt-1 truncate text-sm text-dg-gray-600">
                             {poi.address || poi.roadAddress || "주소 정보 없음"}
