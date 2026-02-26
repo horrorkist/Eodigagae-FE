@@ -17,6 +17,7 @@ type Props = {
   peekHeight?: number;
   bottomNavHeight?: number;
   coverBottomNav?: boolean;
+  showBackdrop?: boolean;
   closeThreshold?: number;
   openThreshold?: number;
 };
@@ -27,6 +28,7 @@ export default function BottomSheet({
   peekHeight = 72,
   bottomNavHeight = 56,
   coverBottomNav = false,
+  showBackdrop = true,
   closeThreshold = 140,
   openThreshold = 40,
 }: Props) {
@@ -487,36 +489,37 @@ export default function BottomSheet({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className={[
-          "fixed left-0 right-0 top-0 transition-opacity duration-300",
-          backdropZIndexClass,
-          isOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none",
-        ].join(" ")}
-        style={{
-          bottom: activeBottomInset,
-          backgroundColor: "rgba(0,0,0,0.35)",
-          touchAction: "none",
-        }}
-        onPointerDownCapture={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onPointerMoveCapture={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onPointerUpCapture={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (e.target !== e.currentTarget) return;
-          close(sheetRef);
-        }}
-        aria-hidden="true"
-      />
+      {showBackdrop && (
+        <div
+          className={[
+            "fixed left-0 right-0 top-0 transition-opacity duration-300",
+            backdropZIndexClass,
+            isOpen
+              ? "opacity-100 pointer-events-auto"
+              : "opacity-0 pointer-events-none",
+          ].join(" ")}
+          style={{
+            bottom: activeBottomInset,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            touchAction: "none",
+          }}
+          onPointerDownCapture={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onPointerMoveCapture={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onPointerUpCapture={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.target !== e.currentTarget) return;
+            close(sheetRef);
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Clip boundary */}
       <div

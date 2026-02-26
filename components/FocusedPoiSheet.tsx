@@ -7,13 +7,24 @@ import AppIcon from "./icons/AppIcon";
 import {
   appIconChevronDown,
   appIconCopy,
-  appIconPaw,
+  appIconPuppy,
   appIconTel,
+  appIconXMark,
 } from "./icons/definitions.generated";
 import { useState } from "react";
 
+const WALK_SPEED_M_PER_MIN = 67; // 약 4.0km/h
+
 function renderFieldValue(value: string) {
   return value.trim().length > 0 ? value : "-";
+}
+
+function estimateWalkMinutes(distanceM: number | null) {
+  if (distanceM == null || !Number.isFinite(distanceM) || distanceM <= 0) {
+    return null;
+  }
+
+  return Math.max(1, Math.round(distanceM / WALK_SPEED_M_PER_MIN));
 }
 
 async function copyTextToClipboard(text: string) {
@@ -44,16 +55,19 @@ async function copyTextToClipboard(text: string) {
 
 export default function FocusedPoiSheet({
   poi,
-  onClose: _onClose,
+  onClose,
 }: {
   poi: FocusedPoi;
   onClose: () => void;
 }) {
   const [showDetailAddress, setShowDetailAddress] = useState(false);
+  const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
   const openModal = useModalStore((s) => s.open);
-  void _onClose;
   const roadAddress = poi.roadAddress?.trim() ?? "";
   const jibunAddress = poi.jibunAddress?.trim() ?? "";
+  const estimatedWalkMinutes = estimateWalkMinutes(poi.distanceM);
+  const thumbnail = poi.thumbnail?.trim() ?? "";
+  const showThumbnail = thumbnail.length > 0 && failedThumbnail !== thumbnail;
 
   const handleCopyAddress = async (address: string, label: string) => {
     const value = address.trim();
@@ -75,13 +89,16 @@ export default function FocusedPoiSheet({
 
   return (
     <div
-      className="fixed left-0 bottom-0 z-[112] w-full max-w-[430px] pointer-events-auto"
-      // style={{ bottom: "calc(var(--safe-bottom) + 64px)" }}
+      className="fixed left-0 z-[112] w-full max-w-[430px] pointer-events-auto"
+      style={{ bottom: "calc(var(--safe-bottom) + 56px)" }}
     >
-      <section className="rounded-tl-2xl rounded-tr-2xl py-9 bg-white min-h-[320px] flex flex-col space-y-2">
-        <div className="px-4 flex flex-col space-y-2">
+      <section className="rounded-tl-2xl rounded-tr-2xl px-4 py-5 bg-white min-h-[320px] flex flex-col space-y-2">
+        <div className="flex flex-col">
           <div className="flex justify-between">
             <div className="min-w-0 flex items-center gap-x-2">
+              <div className="p-1 bg-dg-orange-500 rounded-full">
+                <AppIcon icon={appIconPuppy} className="w-5 h-5 text-white" />
+              </div>
               <div className="truncate text-xl font-semibold text-dg-black text-ellipsis">
                 {renderFieldValue(poi.name)}
               </div>
@@ -89,13 +106,26 @@ export default function FocusedPoiSheet({
                 {poi.bizCategory}
               </div>
             </div>
-            <button
-              type="button"
-              className="rounded-full flex text-nowrap gap-x-1 ml-4 items-center border border-dg-gray-500 bg-white px-2 py-1 text-xs"
-            >
-              <AppIcon icon={appIconPaw} className="w-3 h-3 text-dg-gray-600" />
-              <span className="text-gray-60">길찾기</span>
-            </button>
+            <div className="ml-4 flex items-center gap-x-2">
+              {/* <button
+                type="button"
+                className="rounded-full flex text-nowrap gap-x-1 items-center border border-dg-gray-500 bg-white px-2 py-1 text-xs"
+              >
+                <AppIcon
+                  icon={appIconPaw}
+                  className="w-3 h-3 text-dg-gray-600"
+                />
+                <span className="text-gray-60">길찾기</span>
+              </button> */}
+              <button
+                type="button"
+                aria-label="상세 닫기"
+                onClick={onClose}
+                className="flex h-7 w-7 mb-5 items-center justify-center rounded-full border-dg-gray-500 bg-white text-dg-gray-600"
+              >
+                <AppIcon icon={appIconXMark} className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           <div className="flex gap-x-2 items-center text-dg-gray-600">
             <AppIcon icon={appIconTel} className="w-4 h-4" />
@@ -110,7 +140,7 @@ export default function FocusedPoiSheet({
             {showDetailAddress && (roadAddress || jibunAddress) && (
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="absolute rounded-2xl bg-white shadow-drop top-full flex flex-col px-4 py-3 space-y-2"
+                className="absolute rounded-2xl bg-white shadow-drop top-full flex flex-col p-3 space-y-2"
               >
                 {roadAddress && (
                   <div className="flex text-xs items-center space-x-2">
@@ -157,24 +187,36 @@ export default function FocusedPoiSheet({
               </div>
             )}
           </div>
-          {poi.distanceM && (
+          {poi.distanceM != null && (
             <div className="text-dg-gray-600 text-nowrap">
               {formatDist(poi.distanceM)}
+              {estimatedWalkMinutes != null && (
+                <>
+                  &nbsp;&middot;&nbsp;도보 약 {estimatedWalkMinutes}분
+                </>
+              )}
             </div>
           )}
         </div>
-        <div className="w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
-          <div className="inline-flex gap-4 px-4">
-            {[1, 2, 3].map((e) => {
-              return (
-                <div
-                  key={e}
-                  className="w-50 aspect-video shrink-0 rounded-2xl bg-dg-gray-600"
-                ></div>
-              );
-            })}
-          </div>
+        <div className="mt-2 w-full aspect-[16/10] overflow-hidden rounded-2xl bg-dg-gray-300">
+          {showThumbnail ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbnail}
+              alt={`${poi.name} 대표 이미지`}
+              className="h-full w-full object-cover"
+              onError={() => setFailedThumbnail(thumbnail)}
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-y-2 text-dg-gray-600">
+              <AppIcon icon={appIconPuppy} className="h-8 w-8" />
+              <span className="text-sm">이미지 없음</span>
+            </div>
+          )}
         </div>
+        <button className="w-full py-2 rounded-xl bg-dg-green-500 text-white text-xl font-semibold">
+          길찾기
+        </button>
       </section>
     </div>
   );

@@ -15,7 +15,7 @@ import MapOverlay from "@/components/MapOverlay";
 import SheetTabs from "@/components/map-page/SheetTabs";
 import PoiTabContent from "@/components/map-page/PoiTabContent";
 import RouteTabContent from "@/components/map-page/RouteTabContent";
-import SearchResultTabContent from "@/components/map-page/SearchResultTabContent";
+import SearchResultsBottomSheetContent from "@/components/map-page/SearchResultsBottomSheetContent";
 import { useMapStore } from "@/stores/mapStore";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
@@ -43,10 +43,18 @@ import { fetchRouteRecommendations } from "@/services/routeRecommend";
 import type { RouteRecommendation } from "@/types/routeRecommend";
 import type { TmapPoi } from "@/types/tmapPoi";
 
-type SheetContentMode = "main" | "poi" | "search";
+type HomeTabMode = "main" | "poi";
+type SheetViewMode = "home" | "searchResults";
+type FocusedEntrySnapshot = {
+  sheetViewMode: SheetViewMode;
+  homeTabMode: HomeTabMode;
+  bottomSheetIsOpen: boolean;
+  bottomSheetIndex: number;
+};
 
 const POI_INITIAL_RENDER_COUNT = 16;
 const POI_RENDER_BATCH_COUNT = 12;
+const SEARCH_RESULTS_ENTRY_SNAP_INDEX = 1;
 
 export default function MapPage() {
   const emit = useEmit();
@@ -72,6 +80,8 @@ export default function MapPage() {
   const clearDog = useDogStore((s) => s.clearDog);
   const openBottomSheet = useBottomSheetStore((s) => s.open);
   const closeBottomSheet = useBottomSheetStore((s) => s.close);
+  const bottomSheetIndex = useBottomSheetStore((s) => s.index);
+  const bottomSheetIsOpen = useBottomSheetStore((s) => s.isOpen);
   const openModal = useModalStore((s) => s.open);
   const routeRecommendations = useRouteRecommendStore((s) => s.recommendations);
   const selectedRouteId = useRouteRecommendStore((s) => s.selectedRouteId);
@@ -108,24 +118,28 @@ export default function MapPage() {
   const [showWater, setShowWater] = useState<boolean>(false);
 
   const canShowPoiTab = petPoiOn;
-  const hasSearchResults = submittedSearchPois.length > 0;
-  const canShowSearchTab = hasSearchResults;
+  const hasSubmittedSearchResults = submittedSearchPois.length > 0;
 
-  const [sheetMode, setSheetMode] = useState<SheetContentMode>("main");
+  const [homeTabMode, setHomeTabMode] = useState<HomeTabMode>("main");
+  const [sheetViewMode, setSheetViewMode] = useState<SheetViewMode>("home");
   const [isRoutePlanningMode, setIsRoutePlanningMode] = useState(false);
   const [preferRouteRecommendSheet, setPreferRouteRecommendSheet] = useState(
     () => !dog,
   );
-  const activeSheetMode: SheetContentMode = useMemo(() => {
-    if (sheetMode === "poi" && !canShowPoiTab) return "main";
-    if (sheetMode === "search" && !canShowSearchTab) return "main";
-    return sheetMode;
-  }, [canShowPoiTab, canShowSearchTab, sheetMode]);
+  const activeHomeTabMode: HomeTabMode =
+    canShowPoiTab || homeTabMode !== "poi" ? homeTabMode : "main";
+  const activeSheetViewMode: SheetViewMode =
+    !hasSubmittedSearchResults && sheetViewMode === "searchResults"
+      ? "home"
+      : sheetViewMode;
   const [visiblePoiCount, setVisiblePoiCount] = useState(
     POI_INITIAL_RENDER_COUNT,
   );
   const poiLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastPetPoiErrorRef = useRef<string | null>(null);
+  const focusedEntrySnapshotRef = useRef<FocusedEntrySnapshot | null>(null);
+  const focusedCapturedByLocalHandlerRef = useRef(false);
+  const prevFocusedPoiIdRef = useRef<string | null>(focusedPoi?.id ?? null);
 
   const visiblePois = useMemo(
     () => petPois.slice(0, visiblePoiCount),
@@ -139,21 +153,54 @@ export default function MapPage() {
     );
   }, [petPois.length]);
 
+  const captureFocusedEntrySnapshot = useCallback(
+    (capturedByLocalHandler: boolean) => {
+      focusedEntrySnapshotRef.current = {
+        sheetViewMode: activeSheetViewMode,
+        homeTabMode: activeHomeTabMode,
+        bottomSheetIsOpen,
+        bottomSheetIndex,
+      };
+      focusedCapturedByLocalHandlerRef.current = capturedByLocalHandler;
+    },
+    [activeHomeTabMode, activeSheetViewMode, bottomSheetIndex, bottomSheetIsOpen],
+  );
+
   const handleFocusPetPoi = useCallback(
     (poi: PetPoiItem) => {
+      captureFocusedEntrySnapshot(true);
       closeBottomSheet();
       setFocusedPoi(fromPetPoiItem(poi));
     },
-    [closeBottomSheet, setFocusedPoi],
+    [captureFocusedEntrySnapshot, closeBottomSheet, setFocusedPoi],
   );
 
-  const handleFocusSearchPoi = useCallback(
+  const handleFocusSearchResultPoi = useCallback(
     (poi: TmapPoi) => {
+      captureFocusedEntrySnapshot(true);
       closeBottomSheet();
       setFocusedPoi(fromTmapPoi(poi));
     },
-    [closeBottomSheet, setFocusedPoi],
+    [captureFocusedEntrySnapshot, closeBottomSheet, setFocusedPoi],
   );
+
+  const handleFocusedPoiClose = useCallback(() => {
+    const snapshot = focusedEntrySnapshotRef.current;
+    clearFocusedPoi();
+    if (!snapshot) return;
+
+    setSheetViewMode(snapshot.sheetViewMode);
+    setHomeTabMode(snapshot.homeTabMode);
+
+    if (snapshot.bottomSheetIsOpen) {
+      requestAnimationFrame(() => {
+        openBottomSheet(snapshot.bottomSheetIndex);
+      });
+      return;
+    }
+
+    closeBottomSheet();
+  }, [clearFocusedPoi, closeBottomSheet, openBottomSheet]);
 
   const applyRecommendationRoute = useCallback(
     (recommendation: RouteRecommendation) => {
@@ -183,7 +230,8 @@ export default function MapPage() {
       }
 
       setPreferRouteRecommendSheet(true);
-      setSheetMode("main");
+      setHomeTabMode("main");
+      setSheetViewMode("home");
       startRouteRecommendLoading();
 
       try {
@@ -257,7 +305,8 @@ export default function MapPage() {
     });
     setIsRoutePlanningMode(false);
     setPreferRouteRecommendSheet(true);
-    setSheetMode("main");
+    setHomeTabMode("main");
+    setSheetViewMode("home");
     emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
     requestAnimationFrame(() => {
       openBottomSheet(0);
@@ -265,18 +314,23 @@ export default function MapPage() {
   }, [emit, openBottomSheet, setPickedPos, setRouteState]);
 
   const handleMainTabClick = useCallback(() => {
-    setSheetMode("main");
+    setHomeTabMode("main");
   }, []);
 
   const handlePoiTabClick = useCallback(() => {
-    setSheetMode("poi");
+    setHomeTabMode("poi");
     setVisiblePoiCount(
       Math.min(POI_INITIAL_RENDER_COUNT, petPois.length),
     );
   }, [petPois.length]);
 
-  const handleSearchTabClick = useCallback(() => {
-    setSheetMode("search");
+  const handleOpenSearchResultsSheet = useCallback(() => {
+    setSheetViewMode("searchResults");
+    openBottomSheet(SEARCH_RESULTS_ENTRY_SNAP_INDEX);
+  }, [openBottomSheet]);
+
+  const handleCloseSearchResultsSheet = useCallback(() => {
+    setSheetViewMode("home");
   }, []);
 
   const handleGuideStart = useCallback(() => {
@@ -301,30 +355,49 @@ export default function MapPage() {
     const pendingRevealSeq = consumePendingSearchResultsRevealSeq();
     if (pendingRevealSeq == null) return;
     if (pendingRevealSeq !== submittedSearchSeq) return;
-    if (!hasSearchResults) return;
+    if (!hasSubmittedSearchResults) return;
 
     requestAnimationFrame(() => {
-      setSheetMode("search");
-      openBottomSheet(0);
+      setSheetViewMode("searchResults");
+      openBottomSheet(SEARCH_RESULTS_ENTRY_SNAP_INDEX);
     });
   }, [
     consumePendingSearchResultsRevealSeq,
-    hasSearchResults,
+    hasSubmittedSearchResults,
     openBottomSheet,
     submittedSearchSeq,
   ]);
 
   useEffect(() => {
-    if (isRoutePlanningMode || focusedPoi) {
+    const prevFocusedPoiId = prevFocusedPoiIdRef.current;
+    const currentFocusedPoiId = focusedPoi?.id ?? null;
+    const focusedJustOpened =
+      prevFocusedPoiId == null && currentFocusedPoiId != null;
+    const focusedJustClosed =
+      prevFocusedPoiId != null && currentFocusedPoiId == null;
+
+    if (focusedJustOpened && !focusedCapturedByLocalHandlerRef.current) {
+      captureFocusedEntrySnapshot(false);
+    }
+    if (focusedJustClosed) {
+      focusedCapturedByLocalHandlerRef.current = false;
+    }
+
+    prevFocusedPoiIdRef.current = currentFocusedPoiId;
+  }, [captureFocusedEntrySnapshot, focusedPoi]);
+
+  useEffect(() => {
+    if (isRoutePlanningMode) {
       emit({ channel: "ui", type: "UI_BOTTOM_CHROME_HIDE" });
       return;
     }
 
     emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
-  }, [emit, focusedPoi, isRoutePlanningMode]);
+  }, [emit, isRoutePlanningMode]);
 
   useEffect(() => {
-    if (activeSheetMode !== "poi") return;
+    if (activeSheetViewMode !== "home") return;
+    if (activeHomeTabMode !== "poi") return;
     if (!hasMorePois) return;
 
     const target = poiLoadMoreRef.current;
@@ -348,7 +421,13 @@ export default function MapPage() {
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [activeSheetMode, hasMorePois, loadMorePois, visiblePoiCount]);
+  }, [
+    activeHomeTabMode,
+    activeSheetViewMode,
+    hasMorePois,
+    loadMorePois,
+    visiblePoiCount,
+  ]);
 
   useEffect(() => {
     if (!petPoiError) {
@@ -422,49 +501,64 @@ export default function MapPage() {
       />
 
       {focusedPoi ? (
-        <FocusedPoiSheet poi={focusedPoi} onClose={clearFocusedPoi} />
+        <FocusedPoiSheet poi={focusedPoi} onClose={handleFocusedPoiClose} />
       ) : (
-        <BottomSheet peekHeight={30} coverBottomNav>
-          <div className="space-y-4">
-            <SheetTabs
-              activeMode={activeSheetMode}
-              canShowPoiTab={canShowPoiTab}
-              canShowSearchTab={canShowSearchTab}
-              onMainClick={handleMainTabClick}
-              onPoiClick={handlePoiTabClick}
-              onSearchClick={handleSearchTabClick}
+        <BottomSheet
+          peekHeight={30}
+          coverBottomNav={activeSheetViewMode !== "searchResults"}
+          showBackdrop={activeSheetViewMode !== "searchResults"}
+        >
+          {activeSheetViewMode === "searchResults" ? (
+            <SearchResultsBottomSheetContent
+              items={submittedSearchPois}
+              onBackToHome={handleCloseSearchResultsSheet}
+              onFocusPoi={handleFocusSearchResultPoi}
             />
+          ) : (
+            <div className="space-y-4">
+              {hasSubmittedSearchResults && (
+                <button
+                  type="button"
+                  onClick={handleOpenSearchResultsSheet}
+                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-sm text-emerald-800"
+                >
+                  검색결과 {submittedSearchPois.length.toLocaleString()}건 보기
+                </button>
+              )}
 
-            {activeSheetMode === "poi" ? (
-              <PoiTabContent
-                loading={petPoiLoading}
-                totalCount={petPoiTotalCount}
-                visiblePois={visiblePois}
-                hasMorePois={hasMorePois}
-                loadMoreRef={poiLoadMoreRef}
-                onFocusPoi={handleFocusPetPoi}
+              <SheetTabs
+                activeMode={activeHomeTabMode}
+                canShowPoiTab={canShowPoiTab}
+                onMainClick={handleMainTabClick}
+                onPoiClick={handlePoiTabClick}
               />
-            ) : activeSheetMode === "search" ? (
-              <SearchResultTabContent
-                items={submittedSearchPois}
-                onFocusPoi={handleFocusSearchPoi}
-              />
-            ) : (
-              <RouteTabContent
-                dog={dog}
-                preferRouteRecommendSheet={preferRouteRecommendSheet}
-                onRouteRecommendRequested={handleRouteRecommendRequested}
-                onEditDog={clearDog}
-              />
-            )}
 
-            {showWalkDebugPanel && (
-              <>
-                <div className="border border-blue-200 bg-blue-50 rounded-md p-3 text-sm"></div>
-                <WalkDebugPanel />
-              </>
-            )}
-          </div>
+              {activeHomeTabMode === "poi" ? (
+                <PoiTabContent
+                  loading={petPoiLoading}
+                  totalCount={petPoiTotalCount}
+                  visiblePois={visiblePois}
+                  hasMorePois={hasMorePois}
+                  loadMoreRef={poiLoadMoreRef}
+                  onFocusPoi={handleFocusPetPoi}
+                />
+              ) : (
+                <RouteTabContent
+                  dog={dog}
+                  preferRouteRecommendSheet={preferRouteRecommendSheet}
+                  onRouteRecommendRequested={handleRouteRecommendRequested}
+                  onEditDog={clearDog}
+                />
+              )}
+
+              {showWalkDebugPanel && (
+                <>
+                  <div className="border border-blue-200 bg-blue-50 rounded-md p-3 text-sm"></div>
+                  <WalkDebugPanel />
+                </>
+              )}
+            </div>
+          )}
         </BottomSheet>
       )}
 

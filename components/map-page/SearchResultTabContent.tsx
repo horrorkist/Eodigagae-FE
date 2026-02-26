@@ -17,17 +17,21 @@ function getDistanceBadgeClass(distanceM: number | null) {
 type SearchResultTabContentProps = {
   items: TmapPoi[];
   onFocusPoi: (poi: TmapPoi) => void;
+  showSummary?: boolean;
 };
 
 export default function SearchResultTabContent({
   items,
   onFocusPoi,
+  showSummary = true,
 }: SearchResultTabContentProps) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white">
-      <div className="border-b border-gray-100 px-4 py-3 text-xs font-medium text-gray-500">
-        검색 결과 {items.length.toLocaleString()}건
-      </div>
+      {showSummary && (
+        <div className="border-b border-gray-100 px-4 py-3 text-xs font-medium text-gray-500">
+          검색 결과 {items.length.toLocaleString()}건
+        </div>
+      )}
       {items.length > 0 ? (
         <ul className="divide-y divide-gray-100">
           {items.map((poi, i) => (
