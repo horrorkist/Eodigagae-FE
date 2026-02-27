@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import AppIcon from "@/components/icons/AppIcon";
 import type { AppIconDefinition } from "@/components/icons/definitions.generated";
 import {
-  appIconMagnify,
   appIconMapPin,
+  appIconPaw,
   appIconUserCircle,
 } from "@/components/icons/definitions.generated";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
@@ -19,7 +19,7 @@ type Tab = {
 
 const tabs: Tab[] = [
   { href: "/", label: "홈", icon: appIconMapPin },
-  { href: "/search", label: "검색", icon: appIconMagnify },
+  { href: "/history", label: "기록", icon: appIconPaw },
   { href: "/my", label: "마이", icon: appIconUserCircle },
 ];
 

@@ -10,6 +10,7 @@
 
 ## Covered Scenarios
 - Home page check is optional (`SMOKE_STRICT_HOME=1` when strict verification is needed).
+- `/search` route compatibility should redirect to home search overlay (`/?search=1&focus=1`).
 - `/api/petpois` validation guard works for missing `lat/lng`.
 - `/api/tmap/pedestrian` validation guard works for malformed payload.
 - `extractTmapPedestrian`:

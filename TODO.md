@@ -24,6 +24,19 @@
 
 ## Search
 
+- [x] Integrate search page UX into home as an overlay panel (`/?search=1&focus=1`).
+- [x] Replace bottom nav search tab with history tab (`/history` placeholder page).
+- [x] Keep `/search` backward compatibility via redirect to `/?search=1&focus=1`.
+- [x] Remove `UI_BOTTOM_CHROME_HIDE_ON_NEXT_HOME` dead path after home-overlay integration.
+- [x] Keep map instance alive globally while hiding map visuals outside home.
+- [x] Add rollback switch for global map persist:
+  - `NEXT_PUBLIC_MAP_PERSIST_GLOBAL=1` -> global persist mode (default).
+  - `NEXT_PUBLIC_MAP_PERSIST_GLOBAL=0` -> rollback to `(map)` layout-mounted map mode.
+- [ ] QA:
+  - `/search` redirect + autofocus works.
+  - Home search overlay blocks underlying map interactions.
+  - Search submit closes overlay and reveals home search-results sheet.
+  - Search result item opens focused POI detail without bottom nav regressions.
 - [ ] Add search autocomplete suggestions (debounced input, suggestion dropdown, keyboard selection).
 - [x] Fix POI toggle chip not activating on initial app mount when `myPos` is not yet available.
 - [ ] Fix desktop/trackpad backdrop click-through while bottom sheet is open:

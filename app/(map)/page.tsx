@@ -2,6 +2,7 @@
 "use client";
 
 import {
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -9,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import BottomSheet, {
   type BottomSheetHeightMotion,
 } from "@/components/BottomSheet";
@@ -18,6 +20,7 @@ import SheetTabs from "@/components/map-page/SheetTabs";
 import PoiTabContent from "@/components/map-page/PoiTabContent";
 import RouteTabContent from "@/components/map-page/RouteTabContent";
 import SearchResultsBottomSheetContent from "@/components/map-page/SearchResultsBottomSheetContent";
+import SearchOverlayPanel from "@/components/map-page/SearchOverlayPanel";
 import { useMapStore } from "@/stores/mapStore";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { useMapViewportStore } from "@/stores/mapViewport";
@@ -59,12 +62,16 @@ const POI_INITIAL_RENDER_COUNT = 16;
 const POI_RENDER_BATCH_COUNT = 12;
 const SEARCH_RESULTS_ENTRY_SNAP_INDEX = 1;
 const HOME_BOTTOM_SHEET_PEEK_HEIGHT = 30;
+const SEARCH_QUERY_KEY = "search";
+const FOCUS_QUERY_KEY = "focus";
 const DEFAULT_BOTTOM_SHEET_MOTION: BottomSheetHeightMotion = {
   durationMs: 0,
   easing: "linear",
 };
 
-export default function MapPage() {
+function MapPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const emit = useEmit();
   const showWalkDebugPanel = useSyncExternalStore(
     subscribeWalkDebugUpdates,
@@ -148,6 +155,8 @@ export default function MapPage() {
   const [homeTabMode, setHomeTabMode] = useState<HomeTabMode>("main");
   const [sheetViewMode, setSheetViewMode] = useState<SheetViewMode>("home");
   const [isRoutePlanningMode, setIsRoutePlanningMode] = useState(false);
+  const isSearchOverlayOpen = searchParams.get(SEARCH_QUERY_KEY) === "1";
+  const shouldFocusSearchInput = searchParams.get(FOCUS_QUERY_KEY) === "1";
   const [preferRouteRecommendSheet, setPreferRouteRecommendSheet] = useState(
     () => !dog,
   );
@@ -385,6 +394,14 @@ export default function MapPage() {
 
     emit({ channel: "map", type: "START_WALKING" });
   }, [emit, routeRecommendLoading, routeRecommendations, selectedRouteId]);
+
+  const handleCloseSearchOverlay = useCallback(() => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete(SEARCH_QUERY_KEY);
+    next.delete(FOCUS_QUERY_KEY);
+    const qs = next.toString();
+    router.replace(qs ? `/?${qs}` : "/");
+  }, [router, searchParams]);
 
   useEffect(() => {
     emit({ channel: "ui", type: "UI_HOME_ENTERED" });
@@ -636,7 +653,22 @@ export default function MapPage() {
         </BottomSheet>
       )}
 
+      {isSearchOverlayOpen && (
+        <SearchOverlayPanel
+          shouldFocusInput={shouldFocusSearchInput}
+          onClose={handleCloseSearchOverlay}
+        />
+      )}
+
       <CoachmarkTour />
     </div>
+  );
+}
+
+export default function MapPage() {
+  return (
+    <Suspense fallback={null}>
+      <MapPageContent />
+    </Suspense>
   );
 }

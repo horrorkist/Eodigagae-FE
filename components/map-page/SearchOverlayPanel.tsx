@@ -8,12 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import formatDist from "@/lib/formatDist";
 import AppIcon from "@/components/icons/AppIcon";
 import {
-  appIconMagnify,
   appIconPaw,
   appIconXMark,
 } from "@/components/icons/definitions.generated";
@@ -24,7 +22,6 @@ import type {
   TmapPoiSearchSort,
 } from "@/types/tmapPoi";
 import { useMapStore } from "@/stores/mapStore";
-import { useEmit } from "@/hooks/useEventBus";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
@@ -37,11 +34,6 @@ const CENTER_CACHE_TTL_MS = 60 * 1000;
 const RECENT_SEARCHES_STORAGE_KEY = "search:recent-keywords";
 const SEARCH_PAGE_STATE_STORAGE_KEY = "search:page-state";
 const MAX_RECENT_SEARCHES = 10;
-const SEARCH_SORT_OPTIONS: Array<{ value: TmapPoiSearchSort; label: string }> =
-  [
-    { value: "R", label: "거리순" },
-    { value: "A", label: "정확도순" },
-  ];
 
 type SearchCenter = {
   lat: number;
@@ -56,6 +48,11 @@ type SearchPagePersistedState = {
 type RecentSearchItem = {
   keyword: string;
   savedAt: number;
+};
+
+type SearchOverlayPanelProps = {
+  shouldFocusInput?: boolean;
+  onClose: () => void;
 };
 
 function isPoiSearchResponse(value: unknown): value is TmapPoiSearchResponse {
@@ -284,14 +281,13 @@ async function requestPoiSearch(
   return payload;
 }
 
-export default function SearchPageClient() {
-  const router = useRouter();
-  const emit = useEmit();
+export default function SearchOverlayPanel({
+  shouldFocusInput = false,
+  onClose,
+}: SearchOverlayPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const centerRef = useRef<SearchCenter | null>(null);
   const centerUpdatedAtRef = useRef(0);
-  const searchParams = useSearchParams();
-  const shouldFocusInput = searchParams.get("focus") === "1";
   const myPos = useMapStore((s) => s.myPos);
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
@@ -469,7 +465,7 @@ export default function SearchPageClient() {
 
       commitSubmittedSearchPois(response.items);
       clearFocusedPoi();
-      router.push("/");
+      onClose();
     } catch (e: unknown) {
       setSubmitError(
         e instanceof Error ? e.message : "검색 요청에 실패했어요.",
@@ -483,14 +479,14 @@ export default function SearchPageClient() {
     data,
     fetchPois,
     isLoading,
-    router,
+    onClose,
     searchSort,
     submittingMarkers,
     trimmedKeyword,
   ]);
 
   return (
-    <div className="flex min-h-full flex-col bg-white pt-3 pointer-events-auto">
+    <div className="absolute inset-0 z-[120] flex min-h-full flex-col bg-white pt-3 pointer-events-auto">
       <div className="mx-auto w-full max-w-[430px] px-5">
         <form
           className="flex w-full items-center gap-2 rounded-md border border-dg-gray-500 bg-white px-3 py-2 backdrop-blur"
@@ -501,8 +497,8 @@ export default function SearchPageClient() {
         >
           <button
             type="button"
-            onClick={() => router.push("/")}
-            aria-label="홈으로 이동"
+            onClick={onClose}
+            aria-label="검색 닫기"
             className="w-6 h-6 flex items-center justify-center"
           >
             <FontAwesomeIcon
@@ -663,12 +659,8 @@ export default function SearchPageClient() {
                     <button
                       type="button"
                       onClick={() => {
-                        emit({
-                          channel: "ui",
-                          type: "UI_BOTTOM_CHROME_HIDE_ON_NEXT_HOME",
-                        });
                         setFocusedPoi(fromTmapPoi(poi));
-                        router.push("/");
+                        onClose();
                       }}
                       className="flex w-full items-start justify-between gap-3 py-4 text-left"
                     >

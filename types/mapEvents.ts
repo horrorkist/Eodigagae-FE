@@ -93,7 +93,6 @@ export type PetEvents =
 export type UiEvents =
   | BaseEvent<"ui", "UI_BOTTOM_CHROME_SHOW">
   | BaseEvent<"ui", "UI_BOTTOM_CHROME_HIDE">
-  | BaseEvent<"ui", "UI_BOTTOM_CHROME_HIDE_ON_NEXT_HOME">
   | BaseEvent<"ui", "UI_HOME_ENTERED">;
 
 export type AppEvent = MapEvents | PetEvents | UiEvents;

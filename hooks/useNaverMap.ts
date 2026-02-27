@@ -51,6 +51,10 @@ export function useNaverMap() {
 
     const center = new window.naver.maps.LatLng(lat, lng);
 
+    if (process.env.NODE_ENV !== "production") {
+      console.info("[map] initMapOnce", { lat, lng });
+    }
+
     mapRef.current = new window.naver.maps.Map(elRef.current, {
       center,
       zoom: 15,
