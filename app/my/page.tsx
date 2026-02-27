@@ -47,7 +47,7 @@ export default function MyPage() {
   };
 
   return (
-    <div className="min-h-full bg-gray-50">
+    <div className="min-h-full bg-gray-50 pointer-events-auto">
       <section className="mx-auto max-w-[430px] px-4 pt-5 pb-24 space-y-4">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">마이 페이지</h1>

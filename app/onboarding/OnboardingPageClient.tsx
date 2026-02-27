@@ -50,7 +50,7 @@ export default function OnboardingPageClient({
   };
 
   return (
-    <section className="flex h-full flex-col bg-gradient-to-b from-dg-green-50 to-white px-5 pb-6 pt-8 text-dg-black">
+    <section className="flex h-full flex-col bg-gradient-to-b from-dg-green-50 to-white px-5 pb-6 pt-8 text-dg-black pointer-events-auto">
       <header className="space-y-2">
         <p className="text-sm font-semibold text-dg-green-700">
           어디가개 시작하기

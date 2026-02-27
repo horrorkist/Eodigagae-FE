@@ -1,6 +1,6 @@
 export default function HistoryPage() {
   return (
-    <div className="min-h-full bg-gray-50">
+    <div className="min-h-full bg-gray-50 pointer-events-auto">
       <section className="mx-auto w-full max-w-[430px] px-5 pb-24 pt-5">
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <h1 className="text-lg font-semibold text-gray-900">기록</h1>

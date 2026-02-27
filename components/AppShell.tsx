@@ -24,10 +24,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {isGlobalPersist ? (
             <MapRuntimeProvider>
               <PersistentMapLayer />
-              <div className="relative z-10">{children}</div>
+              <div className="relative z-10 h-full pointer-events-none">
+                {children}
+              </div>
             </MapRuntimeProvider>
           ) : (
-            <div className="relative z-10">{children}</div>
+            <div className="relative z-10 h-full pointer-events-none">
+              {children}
+            </div>
           )}
         </main>
 

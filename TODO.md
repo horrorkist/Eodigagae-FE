@@ -32,6 +32,9 @@
 - [x] Add rollback switch for global map persist:
   - `NEXT_PUBLIC_MAP_PERSIST_GLOBAL=1` -> global persist mode (default).
   - `NEXT_PUBLIC_MAP_PERSIST_GLOBAL=0` -> rollback to `(map)` layout-mounted map mode.
+- [x] Add emergency rollback procedure for search layout regressions:
+  - First response: set `NEXT_PUBLIC_MAP_PERSIST_GLOBAL=0` and restart app.
+  - After hotfix verification: set `NEXT_PUBLIC_MAP_PERSIST_GLOBAL=1` and restart app.
 - [ ] QA:
   - `/search` redirect + autofocus works.
   - Home search overlay blocks underlying map interactions.
