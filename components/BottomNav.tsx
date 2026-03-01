@@ -26,14 +26,19 @@ const tabs: Tab[] = [
 export default function BottomNav() {
   const pathname = usePathname();
   const isBottomSheetOpen = useBottomSheetStore((s) => s.isOpen);
+  const isContentScrollable = useBottomSheetStore((s) => s.isContentScrollable);
+  const isContentAtBottom = useBottomSheetStore((s) => s.isContentAtBottom);
+  const showBoundaryShadow =
+    !isBottomSheetOpen ||
+    (isBottomSheetOpen && isContentScrollable && !isContentAtBottom);
 
   return (
     <nav
       className={[
         "grid grid-cols-3 h-14 items-center bg-white transition-shadow duration-200",
-        isBottomSheetOpen
-          ? "shadow-none"
-          : "shadow-[0_-6px_18px_rgba(15,23,42,0.08)]",
+        showBoundaryShadow
+          ? "shadow-[0_-6px_18px_rgba(15,23,42,0.08)]"
+          : "shadow-none",
       ].join(" ")}
     >
       {tabs.map((t) => {

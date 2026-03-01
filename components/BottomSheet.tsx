@@ -57,6 +57,12 @@ export default function BottomSheet({
   const open = useBottomSheetStore((s) => s.open);
   const close = useBottomSheetStore((s) => s.close);
   const snapTo = useBottomSheetStore((s) => s.snapTo);
+  const setContentScrollState = useBottomSheetStore(
+    (s) => s.setContentScrollState,
+  );
+  const resetContentScrollState = useBottomSheetStore(
+    (s) => s.resetContentScrollState,
+  );
   const isBottomChromeVisible = useUiChromeStore(
     (s) => s.isBottomChromeVisible,
   );
@@ -142,6 +148,42 @@ export default function BottomSheet({
   const fastOpenFlingRef = useRef(false);
   const didInitialSyncRef = useRef(false);
   const lastVisibleHeightRef = useRef<number | null>(null);
+  const lastScrollMeasureRef = useRef<{
+    isScrollable: boolean;
+    isAtBottom: boolean;
+  } | null>(null);
+
+  const updateContentScrollState = useCallback(() => {
+    if (!isOpen || index !== 0) {
+      lastScrollMeasureRef.current = null;
+      resetContentScrollState();
+      return;
+    }
+
+    const contentEl = contentRef.current;
+    if (!contentEl) {
+      lastScrollMeasureRef.current = null;
+      resetContentScrollState();
+      return;
+    }
+
+    const isScrollable = contentEl.scrollHeight - contentEl.clientHeight > 1;
+    const isAtBottom =
+      !isScrollable ||
+      contentEl.scrollTop + contentEl.clientHeight >= contentEl.scrollHeight - 2;
+    const prev = lastScrollMeasureRef.current;
+
+    if (
+      prev &&
+      prev.isScrollable === isScrollable &&
+      prev.isAtBottom === isAtBottom
+    ) {
+      return;
+    }
+
+    lastScrollMeasureRef.current = { isScrollable, isAtBottom };
+    setContentScrollState({ isScrollable, isAtBottom });
+  }, [index, isOpen, resetContentScrollState, setContentScrollState]);
 
   const emitVisibleHeight = useCallback(
     (topPx: number, motion: BottomSheetHeightMotion) => {
@@ -512,12 +554,52 @@ export default function BottomSheet({
     finishContentGesture();
   }, [finishContentGesture]);
 
+  const onContentScroll = useCallback(() => {
+    updateContentScrollState();
+  }, [updateContentScrollState]);
+
+  useEffect(() => {
+    if (!isOpen || index !== 0) {
+      lastScrollMeasureRef.current = null;
+      resetContentScrollState();
+      return;
+    }
+
+    const rafId = requestAnimationFrame(() => {
+      updateContentScrollState();
+    });
+    let resizeRafId = 0;
+    const target = contentRef.current;
+    if (!target || typeof ResizeObserver === "undefined") {
+      return () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        if (resizeRafId) cancelAnimationFrame(resizeRafId);
+      };
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (resizeRafId) cancelAnimationFrame(resizeRafId);
+      resizeRafId = requestAnimationFrame(() => {
+        updateContentScrollState();
+      });
+    });
+    observer.observe(target);
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (resizeRafId) cancelAnimationFrame(resizeRafId);
+      observer.disconnect();
+    };
+  }, [children, index, isOpen, resetContentScrollState, updateContentScrollState]);
+
   useEffect(
     () => () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (onVisibleHeightChange) onVisibleHeightChange(0, DRAG_MOTION);
+      lastScrollMeasureRef.current = null;
+      resetContentScrollState();
     },
-    [onVisibleHeightChange],
+    [onVisibleHeightChange, resetContentScrollState],
   );
 
   if (!isBottomChromeVisible) return null;
@@ -614,6 +696,7 @@ export default function BottomSheet({
             onTouchMove={onContentTouchMove}
             onTouchEnd={onContentTouchEnd}
             onTouchCancel={onContentTouchEnd}
+            onScroll={onContentScroll}
           >
             {children}
           </div>

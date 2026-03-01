@@ -7,7 +7,14 @@ type BottomSheetState = {
   snapPoints: number[];
   index: number; // 마지막 스냅 유지 (0..n-1)
   isOpen: boolean; // 열림/닫힘은 따로 관리
+  isContentScrollable: boolean;
+  isContentAtBottom: boolean;
   setSnapPoints: (points: number[]) => void;
+  setContentScrollState: (payload: {
+    isScrollable: boolean;
+    isAtBottom: boolean;
+  }) => void;
+  resetContentScrollState: () => void;
   open: (toIndex?: number) => void;
   snapTo: (toIndex: number) => void;
   close: (bottomSheetRef?: RefObject<HTMLDivElement | null>) => void;
@@ -22,11 +29,35 @@ export const useBottomSheetStore = create<BottomSheetState>((set, get) => ({
   snapPoints: DEFAULT_SNAP_POINTS,
   index: 0,
   isOpen: false,
+  isContentScrollable: false,
+  isContentAtBottom: true,
 
   setSnapPoints: (points) => {
     const sorted = [...points].sort((a, b) => a - b);
     set({ snapPoints: sorted });
     set((s) => ({ index: clamp(s.index, 0, Math.max(sorted.length - 1, 0)) }));
+  },
+  setContentScrollState: ({ isScrollable, isAtBottom }) => {
+    set((state) => {
+      if (
+        state.isContentScrollable === isScrollable &&
+        state.isContentAtBottom === isAtBottom
+      ) {
+        return state;
+      }
+      return {
+        isContentScrollable: isScrollable,
+        isContentAtBottom: isAtBottom,
+      };
+    });
+  },
+  resetContentScrollState: () => {
+    set((state) => {
+      if (!state.isContentScrollable && state.isContentAtBottom) {
+        return state;
+      }
+      return { isContentScrollable: false, isContentAtBottom: true };
+    });
   },
 
   open: (toIndex) => {
@@ -50,7 +81,11 @@ export const useBottomSheetStore = create<BottomSheetState>((set, get) => ({
     const { isOpen } = get();
     if (!isOpen) return;
 
-    set({ isOpen: false });
+    set({
+      isOpen: false,
+      isContentScrollable: false,
+      isContentAtBottom: true,
+    });
     if (bottomSheetRef && bottomSheetRef.current) {
       const elements = bottomSheetRef.current.querySelectorAll<
         HTMLInputElement | HTMLTextAreaElement
