@@ -40,6 +40,7 @@
   - Home search overlay blocks underlying map interactions.
   - Search submit closes overlay and reveals home search-results sheet.
   - Search result item opens focused POI detail without bottom nav regressions.
+- [x] Fix bottom-sheet layering policy: keep bottom nav visible while bottom/focused sheets are open (non-cover fixed policy).
 - [ ] Add search autocomplete suggestions (debounced input, suggestion dropdown, keyboard selection).
 - [x] Fix POI toggle chip not activating on initial app mount when `myPos` is not yet available.
 - [ ] Fix desktop/trackpad backdrop click-through while bottom sheet is open:

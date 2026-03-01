@@ -10,7 +10,6 @@ import {
   setWalkDebugPanelVisible,
   subscribeWalkDebugUpdates,
 } from "@/lib/walkDebug";
-import { useUiChromeStore } from "@/stores/uiChrome";
 
 export default function MyPage() {
   const [isCookieResetDone, setIsCookieResetDone] = useState(false);
@@ -18,12 +17,6 @@ export default function MyPage() {
     subscribeWalkDebugUpdates,
     isWalkDebugPanelVisible,
     () => true,
-  );
-  const isBottomSheetCoverEnabled = useUiChromeStore(
-    (s) => s.isBottomSheetCoverEnabled,
-  );
-  const setBottomSheetCoverEnabled = useUiChromeStore(
-    (s) => s.setBottomSheetCoverEnabled,
   );
   const handleResetOnboardingAndCoachmark = () => {
     if (typeof document === "undefined") return;
@@ -77,37 +70,6 @@ export default function MyPage() {
                 className={[
                   "absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform",
                   showWalkDebugPanel ? "translate-x-[20px]" : "translate-x-0",
-                ].join(" ")}
-              />
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="">
-              <div className="text-sm font-semibold text-gray-900">
-                바텀시트가 열릴 때 바텀내브 숨김
-              </div>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isBottomSheetCoverEnabled}
-              onClick={() =>
-                setBottomSheetCoverEnabled(!isBottomSheetCoverEnabled)
-              }
-              className={[
-                "relative h-7 w-12 rounded-full transition-colors",
-                isBottomSheetCoverEnabled ? "bg-dg-green-500" : "bg-gray-300",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform",
-                  isBottomSheetCoverEnabled
-                    ? "translate-x-[20px]"
-                    : "translate-x-0",
                 ].join(" ")}
               />
             </button>

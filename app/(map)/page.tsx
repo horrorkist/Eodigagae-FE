@@ -593,7 +593,6 @@ function MapPageContent() {
       ) : (
         <BottomSheet
           peekHeight={HOME_BOTTOM_SHEET_PEEK_HEIGHT}
-          coverBottomNav={activeSheetViewMode !== "searchResults"}
           showBackdrop={
             activeSheetViewMode === "home" && activeHomeTabMode === "main"
           }

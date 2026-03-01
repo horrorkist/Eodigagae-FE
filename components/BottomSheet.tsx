@@ -34,7 +34,6 @@ type Props = {
   title?: string;
   peekHeight?: number;
   bottomNavHeight?: number;
-  coverBottomNav?: boolean;
   showBackdrop?: boolean;
   onVisibleHeightChange?: (heightPx: number, motion?: BottomSheetHeightMotion) => void;
   closeThreshold?: number;
@@ -46,7 +45,6 @@ export default function BottomSheet({
   title,
   peekHeight = 72,
   bottomNavHeight = 56,
-  coverBottomNav = false,
   showBackdrop = true,
   onVisibleHeightChange,
   closeThreshold = 140,
@@ -61,9 +59,6 @@ export default function BottomSheet({
   const snapTo = useBottomSheetStore((s) => s.snapTo);
   const isBottomChromeVisible = useUiChromeStore(
     (s) => s.isBottomChromeVisible,
-  );
-  const isBottomSheetCoverEnabled = useUiChromeStore(
-    (s) => s.isBottomSheetCoverEnabled,
   );
 
   const minSnap = useMemo(() => Math.min(...snapPoints), [snapPoints]);
@@ -100,13 +95,10 @@ export default function BottomSheet({
     close();
   }, [isBottomChromeVisible, isOpen, close]);
 
-  const shouldCoverBottomNav = coverBottomNav && isBottomSheetCoverEnabled && isOpen;
   const closedBottomInset = bottomNavHeight + safeBottom;
-  const activeBottomInset = shouldCoverBottomNav
-    ? safeBottom
-    : closedBottomInset;
-  const backdropZIndexClass = shouldCoverBottomNav ? "z-[110]" : "z-100";
-  const clipZIndexClass = shouldCoverBottomNav ? "z-[111]" : "z-101";
+  const activeBottomInset = closedBottomInset;
+  const backdropZIndexClass = "z-100";
+  const clipZIndexClass = "z-101";
 
   const closedTop = useMemo(
     () => Math.max(0, vh - closedBottomInset - peekHeight),
