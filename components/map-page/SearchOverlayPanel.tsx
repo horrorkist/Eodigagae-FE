@@ -462,7 +462,7 @@ export default function SearchOverlayPanel({
   ]);
 
   return (
-    <div className="absolute inset-0 z-[120] flex min-h-full flex-col bg-white pt-3 pointer-events-auto">
+    <div className="absolute inset-0 z-[120] flex h-full min-h-0 flex-col overflow-hidden bg-white pt-3 pointer-events-auto">
       <div className="mx-auto w-full max-w-[430px] px-5">
         <form
           className="flex w-full items-center gap-2 rounded-md border border-dg-gray-500 bg-white px-3 py-2 backdrop-blur"
@@ -531,7 +531,7 @@ export default function SearchOverlayPanel({
         </div> */}
       </div>
 
-      <section className="mx-auto w-full max-w-[430px] pb-24 pt-4 flex-1 flex flex-col">
+      <section className="mx-auto flex h-full w-full max-w-[430px] flex-1 min-h-0 touch-pan-y flex-col overflow-y-auto overscroll-y-contain pb-24 pt-4 [-webkit-overflow-scrolling:touch]">
         {isRecentMode && (
           <>
             <header className="px-5 flex justify-between items-center">
