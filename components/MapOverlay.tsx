@@ -24,8 +24,12 @@ type MapOverlayProps = {
   floatingControlsBottomOffsetPx?: number;
   floatingControlsBottomTransitionMs?: number;
   floatingControlsBottomTransitionEasing?: "linear" | "ease-in-out" | "ease-out";
+  bottomLeftSlot?: React.ReactNode;
   leftSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
+  searchKeyword?: string;
+  showSearchResultClearButton?: boolean;
+  onClearSearchResults?: () => void;
   toggles?: ToggleItem[];
   isRoutePlanningMode?: boolean;
   onRouteEdit?: () => void;
@@ -42,8 +46,12 @@ export default function MapOverlay({
   floatingControlsBottomOffsetPx = 0,
   floatingControlsBottomTransitionMs = 0,
   floatingControlsBottomTransitionEasing = "linear",
+  bottomLeftSlot,
   leftSlot,
   rightSlot,
+  searchKeyword = "",
+  showSearchResultClearButton = false,
+  onClearSearchResults,
   toggles = [],
   isRoutePlanningMode = false,
   onRouteEdit,
@@ -218,6 +226,9 @@ export default function MapOverlay({
           topOffsetPx={topOffsetPx}
           leftSlot={leftSlot}
           rightSlot={rightSlot}
+          searchKeyword={searchKeyword}
+          showSearchResultClearButton={showSearchResultClearButton}
+          onClearSearchResults={onClearSearchResults}
           toggles={toggles}
         />
       )}
@@ -238,6 +249,7 @@ export default function MapOverlay({
           bottomOffsetPx={floatingControlsBottomOffsetPx}
           bottomTransitionMs={floatingControlsBottomTransitionMs}
           bottomTransitionEasing={floatingControlsBottomTransitionEasing}
+          leftSlot={bottomLeftSlot}
           fabItems={fabItems}
           onRequestMyLocation={onRequestMyLocation}
         />

@@ -463,7 +463,7 @@ export default function SearchOverlayPanel({
       const response: TmapPoiSearchResponse =
         canReuseCurrentData && data ? data : await fetchPois(query, searchSort);
 
-      commitSubmittedSearchPois(response.items);
+      commitSubmittedSearchPois(response.items, query);
       clearFocusedPoi();
       onClose();
     } catch (e: unknown) {

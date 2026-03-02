@@ -84,6 +84,7 @@ function MapPageContent() {
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
   const submittedSearchPois = useMapStore((s) => s.submittedSearchPois);
+  const submittedSearchKeyword = useMapStore((s) => s.submittedSearchKeyword);
   const submittedSearchSeq = useMapStore((s) => s.submittedSearchSeq);
   const consumePendingSearchResultsRevealSeq = useMapStore(
     (s) => s.consumePendingSearchResultsRevealSeq,
@@ -109,6 +110,7 @@ function MapPageContent() {
 
   const dog = useDogStore((s) => s.dog);
   const clearDog = useDogStore((s) => s.clearDog);
+  const clearSubmittedSearchPois = useMapStore((s) => s.clearSubmittedSearchPois);
   const openBottomSheet = useBottomSheetStore((s) => s.open);
   const closeBottomSheet = useBottomSheetStore((s) => s.close);
   const bottomSheetIndex = useBottomSheetStore((s) => s.index);
@@ -180,8 +182,7 @@ function MapPageContent() {
   );
   const hasMorePois = visiblePoiCount < petPois.length;
   const focusedFloatingOffsetPx = useMemo(
-    () =>
-      Math.max(0, focusedSheetHeightPx - HOME_BOTTOM_SHEET_PEEK_HEIGHT),
+    () => Math.max(0, focusedSheetHeightPx - HOME_BOTTOM_SHEET_PEEK_HEIGHT),
     [focusedSheetHeightPx],
   );
 
@@ -201,7 +202,12 @@ function MapPageContent() {
       };
       focusedCapturedByLocalHandlerRef.current = capturedByLocalHandler;
     },
-    [activeHomeTabMode, activeSheetViewMode, bottomSheetIndex, bottomSheetIsOpen],
+    [
+      activeHomeTabMode,
+      activeSheetViewMode,
+      bottomSheetIndex,
+      bottomSheetIsOpen,
+    ],
   );
 
   const handleFocusPetPoi = useCallback(
@@ -375,14 +381,28 @@ function MapPageContent() {
     setVisiblePoiCount(POI_INITIAL_RENDER_COUNT);
   }, []);
 
-  const handleOpenSearchResultsSheet = useCallback(() => {
+  const handleToggleSheetViewFromOverlay = useCallback(() => {
+    if (!hasSubmittedSearchResults) return;
+
+    if (activeSheetViewMode === "searchResults") {
+      setSheetViewMode("home");
+      return;
+    }
+
     setSheetViewMode("searchResults");
     openBottomSheet(SEARCH_RESULTS_ENTRY_SNAP_INDEX);
-  }, [openBottomSheet]);
+  }, [activeSheetViewMode, hasSubmittedSearchResults, openBottomSheet]);
 
-  const handleCloseSearchResultsSheet = useCallback(() => {
-    setSheetViewMode("home");
-  }, []);
+  const sheetViewToggleLabel = useMemo(() => {
+    if (activeSheetViewMode === "searchResults") {
+      return "경로 추천";
+    }
+
+    return "검색 결과";
+  }, [activeSheetViewMode]);
+
+  const shouldShowSheetViewToggle =
+    hasSubmittedSearchResults && !focusedPoi && !isRoutePlanningMode;
 
   const handleGuideStart = useCallback(() => {
     if (routeRecommendLoading) return;
@@ -394,6 +414,12 @@ function MapPageContent() {
 
     emit({ channel: "map", type: "START_WALKING" });
   }, [emit, routeRecommendLoading, routeRecommendations, selectedRouteId]);
+
+  const handleClearSearchResults = useCallback(() => {
+    clearSubmittedSearchPois();
+    setSheetViewMode("home");
+    closeBottomSheet();
+  }, [clearSubmittedSearchPois, closeBottomSheet]);
 
   const handleCloseSearchOverlay = useCallback(() => {
     const next = new URLSearchParams(searchParams.toString());
@@ -544,6 +570,20 @@ function MapPageContent() {
         floatingControlsBottomTransitionEasing={
           focusedPoi ? "linear" : bottomSheetFloatingMotion.easing
         }
+        searchKeyword={hasSubmittedSearchResults ? submittedSearchKeyword : ""}
+        showSearchResultClearButton={hasSubmittedSearchResults}
+        onClearSearchResults={handleClearSearchResults}
+        bottomLeftSlot={
+          shouldShowSheetViewToggle ? (
+            <button
+              type="button"
+              onClick={handleToggleSheetViewFromOverlay}
+              className="pointer-events-auto rounded-full bg-white/95 px-4 py-2.5 text-sm font-semibold text-dg-black shadow-lg shadow-black/15 backdrop-blur transition-colors"
+            >
+              {sheetViewToggleLabel}
+            </button>
+          ) : undefined
+        }
         toggles={[
           {
             key: "petpoi",
@@ -601,21 +641,10 @@ function MapPageContent() {
           {activeSheetViewMode === "searchResults" ? (
             <SearchResultsBottomSheetContent
               items={submittedSearchPois}
-              onBackToHome={handleCloseSearchResultsSheet}
               onFocusPoi={handleFocusSearchResultPoi}
             />
           ) : (
             <div className="space-y-4">
-              {hasSubmittedSearchResults && (
-                <button
-                  type="button"
-                  onClick={handleOpenSearchResultsSheet}
-                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-sm text-emerald-800"
-                >
-                  검색결과 {submittedSearchPois.length.toLocaleString()}건 보기
-                </button>
-              )}
-
               <SheetTabs
                 activeMode={activeHomeTabMode}
                 onMainClick={handleMainTabClick}

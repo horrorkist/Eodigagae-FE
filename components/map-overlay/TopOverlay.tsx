@@ -1,7 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import AppIcon from "@/components/icons/AppIcon";
-import { appIconMagnify } from "@/components/icons/definitions.generated";
+import {
+  appIconMagnify,
+  appIconXMark,
+} from "@/components/icons/definitions.generated";
 import type { ToggleItem, ToggleVariant } from "@/components/map-overlay/types";
 
 const TOGGLE_STYLES: Record<
@@ -88,6 +91,9 @@ type TopOverlayProps = {
   leftSlot?: ReactNode;
   rightSlot?: ReactNode;
   toggles: ToggleItem[];
+  searchKeyword?: string;
+  showSearchResultClearButton?: boolean;
+  onClearSearchResults?: () => void;
 };
 
 export default function TopOverlay({
@@ -95,7 +101,13 @@ export default function TopOverlay({
   leftSlot,
   rightSlot,
   toggles,
+  searchKeyword = "",
+  showSearchResultClearButton = false,
+  onClearSearchResults,
 }: TopOverlayProps) {
+  const normalizedSearchKeyword = searchKeyword.trim();
+  const hasSearchKeyword = normalizedSearchKeyword.length > 0;
+
   return (
     <div
       className="pointer-events-none absolute left-0 right-0"
@@ -106,18 +118,40 @@ export default function TopOverlay({
           <div className="pointer-events-auto">{leftSlot}</div>
 
           <div className="pointer-events-auto min-w-0 flex-1 max-w-140">
-            <Link
-              href="/?search=1&focus=1"
-              data-coachmark-id="search-bar"
-              className="flex w-full items-center gap-2 rounded-md border bg-white/90 backdrop-blur shadow px-3 py-2"
-              aria-label="검색 열기"
-            >
-              <AppIcon
-                icon={appIconMagnify}
-                className="h-6 w-6 shrink-0 text-black"
-              />
-              <span className="text-sm text-gray-500">어디로 산책할까요?</span>
-            </Link>
+            <div className="flex w-full items-center gap-2 rounded-md border bg-white/90 px-3 py-2 shadow backdrop-blur">
+              <Link
+                href="/?search=1&focus=1"
+                data-coachmark-id="search-bar"
+                className="flex min-w-0 flex-1 items-center gap-2"
+                aria-label="검색 열기"
+              >
+                <AppIcon
+                  icon={appIconMagnify}
+                  className="h-6 w-6 shrink-0 text-black"
+                />
+                <span
+                  className={[
+                    "truncate text-sm",
+                    hasSearchKeyword ? "text-gray-900" : "text-gray-500",
+                  ].join(" ")}
+                >
+                  {hasSearchKeyword ? normalizedSearchKeyword : "어디로 산책할까요?"}
+                </span>
+              </Link>
+              {showSearchResultClearButton && onClearSearchResults && (
+                <button
+                  type="button"
+                  onClick={onClearSearchResults}
+                  aria-label="검색결과 지우기"
+                  className="flex h-5 w-5 shrink-0 items-center justify-center"
+                >
+                  <AppIcon
+                    icon={appIconXMark}
+                    className="h-3 w-3 text-dg-gray-600"
+                  />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="pointer-events-auto">{rightSlot}</div>

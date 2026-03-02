@@ -29,6 +29,7 @@ type MapState = {
   walkedDistanceM: number;
   heading: number | null;
   submittedSearchPois: TmapPoi[];
+  submittedSearchKeyword: string;
   submittedSearchSeq: number;
   pendingSearchResultsRevealSeq: number | null;
 
@@ -53,7 +54,7 @@ type MapState = {
   setWalkedDistanceM: (m: number) => void;
   addWalkedDistanceM: (deltaM: number) => void;
   setHeading: (deg: number | null) => void;
-  commitSubmittedSearchPois: (pois: TmapPoi[]) => void;
+  commitSubmittedSearchPois: (pois: TmapPoi[], keyword: string) => void;
   consumePendingSearchResultsRevealSeq: () => number | null;
   clearSubmittedSearchPois: () => void;
   clearPicked: () => void;
@@ -83,6 +84,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   walkedDistanceM: 0,
   heading: null,
   submittedSearchPois: [],
+  submittedSearchKeyword: "",
   submittedSearchSeq: 0,
   pendingSearchResultsRevealSeq: null,
 
@@ -101,11 +103,12 @@ export const useMapStore = create<MapState>((set, get) => ({
       walkedDistanceM: clampNonNegative(state.walkedDistanceM + deltaM),
     })),
   setHeading: (deg) => set({ heading: deg }),
-  commitSubmittedSearchPois: (pois) =>
+  commitSubmittedSearchPois: (pois, keyword) =>
     set((state) => {
       const nextSeq = state.submittedSearchSeq + 1;
       return {
         submittedSearchPois: pois,
+        submittedSearchKeyword: keyword,
         submittedSearchSeq: nextSeq,
         pendingSearchResultsRevealSeq: nextSeq,
       };
@@ -120,6 +123,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   clearSubmittedSearchPois: () =>
     set({
       submittedSearchPois: [],
+      submittedSearchKeyword: "",
       submittedSearchSeq: 0,
       pendingSearchResultsRevealSeq: null,
     }),
