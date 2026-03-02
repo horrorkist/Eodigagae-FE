@@ -649,6 +649,7 @@ export default function BottomSheet({
         {/* Sheet — h-full 고정, transform으로만 이동 */}
         <div
           ref={sheetRef}
+          data-coachmark-id="bottom-sheet-root"
           role="dialog"
           aria-modal={isOpen ? "true" : "false"}
           aria-label={title ?? "bottom sheet"}

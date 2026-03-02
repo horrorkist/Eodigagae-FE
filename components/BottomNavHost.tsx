@@ -18,6 +18,7 @@ export default function BottomNavHost() {
 
   return (
     <div
+      data-coachmark-id="bottom-nav-host"
       className={[
         "fixed bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 bg-white",
         hasFocusedPoi ? "z-[113]" : "z-101",
