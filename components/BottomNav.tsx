@@ -7,6 +7,7 @@ import type { AppIconDefinition } from "@/components/icons/definitions.generated
 import {
   appIconMapPin,
   appIconPaw,
+  appIconUser,
   appIconUserCircle,
 } from "@/components/icons/definitions.generated";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
@@ -20,7 +21,7 @@ type Tab = {
 const tabs: Tab[] = [
   { href: "/", label: "홈", icon: appIconMapPin },
   { href: "/history", label: "기록", icon: appIconPaw },
-  { href: "/my", label: "마이", icon: appIconUserCircle },
+  { href: "/my", label: "마이", icon: appIconUser },
 ];
 
 export default function BottomNav() {
@@ -55,7 +56,7 @@ export default function BottomNav() {
               active ? "text-dg-green-500" : "text-dg-gray-500",
             ].join(" ")}
           >
-            <AppIcon icon={t.icon} className="w-6 h-6" />
+            <AppIcon icon={t.icon} className="w-5 h-5" />
             <span
               className={[
                 "text-[10px]",
