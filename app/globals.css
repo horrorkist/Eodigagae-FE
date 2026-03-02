@@ -58,6 +58,9 @@ input.search-input-no-native-clear::-ms-reveal {
   --color-dg-gray-600: #979797;
   --color-dg-white: #ededed;
   --color-green-sub: #0ad000;
+  --color-red-sub: #ff6868;
+  --color-yellow-sub: #ffbb00;
+  --color-violet-sub: #8082f9;
   --color-dg-orange-100: #fff1e1;
   --color-dg-orange-200: #ffe1cb;
   --color-dg-orange-300: #ffc299;
