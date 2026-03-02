@@ -3,7 +3,7 @@ import { create } from "zustand";
 import type { LatLng } from "@/types/mapEvents";
 import type { FocusedPoi } from "@/types/focusedPoi";
 import type { RouteResult } from "@/domain/route/types";
-import type { TmapPoi } from "@/types/tmapPoi";
+import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
 
 export type RouteStatePatch = Partial<
   Pick<
@@ -30,6 +30,8 @@ type MapState = {
   heading: number | null;
   submittedSearchPois: TmapPoi[];
   submittedSearchKeyword: string;
+  submittedSearchSort: TmapPoiSearchSort;
+  submittedSearchCenter: LatLng | null;
   submittedSearchSeq: number;
   pendingSearchResultsRevealSeq: number | null;
 
@@ -54,7 +56,12 @@ type MapState = {
   setWalkedDistanceM: (m: number) => void;
   addWalkedDistanceM: (deltaM: number) => void;
   setHeading: (deg: number | null) => void;
-  commitSubmittedSearchPois: (pois: TmapPoi[], keyword: string) => void;
+  commitSubmittedSearchPois: (
+    pois: TmapPoi[],
+    keyword: string,
+    sort: TmapPoiSearchSort,
+    center: LatLng,
+  ) => void;
   consumePendingSearchResultsRevealSeq: () => number | null;
   clearSubmittedSearchPois: () => void;
   clearPicked: () => void;
@@ -85,6 +92,8 @@ export const useMapStore = create<MapState>((set, get) => ({
   heading: null,
   submittedSearchPois: [],
   submittedSearchKeyword: "",
+  submittedSearchSort: "R",
+  submittedSearchCenter: null,
   submittedSearchSeq: 0,
   pendingSearchResultsRevealSeq: null,
 
@@ -103,12 +112,14 @@ export const useMapStore = create<MapState>((set, get) => ({
       walkedDistanceM: clampNonNegative(state.walkedDistanceM + deltaM),
     })),
   setHeading: (deg) => set({ heading: deg }),
-  commitSubmittedSearchPois: (pois, keyword) =>
+  commitSubmittedSearchPois: (pois, keyword, sort, center) =>
     set((state) => {
       const nextSeq = state.submittedSearchSeq + 1;
       return {
         submittedSearchPois: pois,
         submittedSearchKeyword: keyword,
+        submittedSearchSort: sort,
+        submittedSearchCenter: center,
         submittedSearchSeq: nextSeq,
         pendingSearchResultsRevealSeq: nextSeq,
       };
@@ -124,6 +135,8 @@ export const useMapStore = create<MapState>((set, get) => ({
     set({
       submittedSearchPois: [],
       submittedSearchKeyword: "",
+      submittedSearchSort: "R",
+      submittedSearchCenter: null,
       submittedSearchSeq: 0,
       pendingSearchResultsRevealSeq: null,
     }),

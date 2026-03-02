@@ -10,6 +10,7 @@ import {
 } from "react";
 import useSWR from "swr";
 import formatDist from "@/lib/formatDist";
+import type { LatLng } from "@/types/mapEvents";
 import AppIcon from "@/components/icons/AppIcon";
 import {
   appIconPaw,
@@ -23,22 +24,17 @@ import type {
 } from "@/types/tmapPoi";
 import { useMapStore } from "@/stores/mapStore";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { fetchTmapPois } from "@/services/tmapPois";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 import Divider from "@/components/Divider";
 
-const SEARCH_COUNT = 150;
 const SEARCH_DEBOUNCE_MS = 350;
 const GEO_TIMEOUT_MS = 5000;
 const CENTER_CACHE_TTL_MS = 60 * 1000;
 const RECENT_SEARCHES_STORAGE_KEY = "search:recent-keywords";
 const SEARCH_PAGE_STATE_STORAGE_KEY = "search:page-state";
 const MAX_RECENT_SEARCHES = 10;
-
-type SearchCenter = {
-  lat: number;
-  lon: number;
-};
 
 type SearchSWRKey = readonly [string, TmapPoiSearchSort];
 type SearchPagePersistedState = {
@@ -55,13 +51,7 @@ type SearchOverlayPanelProps = {
   onClose: () => void;
 };
 
-function isPoiSearchResponse(value: unknown): value is TmapPoiSearchResponse {
-  if (!value || typeof value !== "object") return false;
-  const withItems = value as { items?: unknown; meta?: unknown };
-  return Array.isArray(withItems.items) && !!withItems.meta;
-}
-
-function getCurrentCenterByGeolocation(): Promise<SearchCenter> {
+function getCurrentCenterByGeolocation(): Promise<LatLng> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
       reject(new Error("이 기기에서는 위치 기능을 사용할 수 없어요."));
@@ -72,7 +62,7 @@ function getCurrentCenterByGeolocation(): Promise<SearchCenter> {
       (position) => {
         resolve({
           lat: position.coords.latitude,
-          lon: position.coords.longitude,
+          lng: position.coords.longitude,
         });
       },
       () => {
@@ -248,54 +238,28 @@ function writeSearchPageState(keyword: string, sort: TmapPoiSearchSort) {
   } catch {}
 }
 
-async function requestPoiSearch(
-  query: string,
-  sort: TmapPoiSearchSort,
-  center: SearchCenter,
-) {
-  const sp = new URLSearchParams();
-  sp.set("keyword", query);
-  sp.set("searchtypCd", sort);
-  sp.set("count", String(SEARCH_COUNT));
-  sp.set("page", "1");
-  sp.set("centerLat", String(center.lat));
-  sp.set("centerLon", String(center.lon));
-
-  const res = await fetch(`/api/tmap/pois?${sp.toString()}`, {
-    cache: "no-store",
-  });
-  const payload = (await res.json()) as unknown;
-
-  if (!res.ok) {
-    const message =
-      payload && typeof payload === "object" && "error" in payload
-        ? String((payload as { error?: unknown }).error ?? "")
-        : "";
-    throw new Error(message || "검색 요청에 실패했어요.");
-  }
-
-  if (!isPoiSearchResponse(payload)) {
-    throw new Error("응답 형식이 올바르지 않아요.");
-  }
-
-  return payload;
-}
-
 export default function SearchOverlayPanel({
   shouldFocusInput = false,
   onClose,
 }: SearchOverlayPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const centerRef = useRef<SearchCenter | null>(null);
+  const centerRef = useRef<LatLng | null>(null);
   const centerUpdatedAtRef = useRef(0);
   const myPos = useMapStore((s) => s.myPos);
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
+  const submittedSearchKeyword = useMapStore((s) => s.submittedSearchKeyword);
+  const submittedSearchSort = useMapStore((s) => s.submittedSearchSort);
   const commitSubmittedSearchPois = useMapStore(
     (s) => s.commitSubmittedSearchPois,
   );
-  const [keyword, setKeyword] = useState("");
-  const [searchSort, setSearchSort] = useState<TmapPoiSearchSort>("R");
+  const submittedSearchKeywordRef = useRef(submittedSearchKeyword.trim());
+  const hasSubmittedSearchKeyword =
+    submittedSearchKeywordRef.current.length > 0;
+  const [keyword, setKeyword] = useState(() => submittedSearchKeywordRef.current);
+  const [searchSort, setSearchSort] = useState<TmapPoiSearchSort>(() =>
+    hasSubmittedSearchKeyword ? submittedSearchSort : "R",
+  );
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]);
   const didRestoreStateRef = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -313,7 +277,7 @@ export default function SearchOverlayPanel({
     ? [debouncedKeyword, searchSort]
     : null;
 
-  const resolveCenter = useCallback(async (): Promise<SearchCenter> => {
+  const resolveCenter = useCallback(async (): Promise<LatLng> => {
     const now = Date.now();
     const cached = centerRef.current;
     if (cached && now - centerUpdatedAtRef.current < CENTER_CACHE_TTL_MS) {
@@ -327,9 +291,9 @@ export default function SearchOverlayPanel({
       return current;
     } catch {
       if (myPos && Number.isFinite(myPos.lat) && Number.isFinite(myPos.lng)) {
-        const fallbackCenter: SearchCenter = {
+        const fallbackCenter: LatLng = {
           lat: myPos.lat,
-          lon: myPos.lng,
+          lng: myPos.lng,
         };
         centerRef.current = fallbackCenter;
         centerUpdatedAtRef.current = now;
@@ -345,7 +309,8 @@ export default function SearchOverlayPanel({
   const fetchPois = useCallback(
     async (query: string, sort: TmapPoiSearchSort) => {
       const center = await resolveCenter();
-      return requestPoiSearch(query, sort, center);
+      const response = await fetchTmapPois({ keyword: query, sort, center });
+      return { response, center };
     },
     [resolveCenter],
   );
@@ -357,7 +322,8 @@ export default function SearchOverlayPanel({
     searchKey,
     async (key) => {
       const [query, sort] = key as SearchSWRKey;
-      return fetchPois(query, sort);
+      const fetched = await fetchPois(query, sort);
+      return fetched.response;
     },
     {
       keepPreviousData: true,
@@ -406,9 +372,10 @@ export default function SearchOverlayPanel({
     const persisted = readSearchPageState();
     if (!persisted) return;
 
-    setKeyword(persisted.keyword);
-    setSearchSort(persisted.sort);
-  }, []);
+    if (!hasSubmittedSearchKeyword) {
+      setSearchSort(persisted.sort);
+    }
+  }, [hasSubmittedSearchKeyword]);
 
   useEffect(() => {
     if (!didRestoreStateRef.current) return;
@@ -460,10 +427,19 @@ export default function SearchOverlayPanel({
         data?.meta?.keyword === query &&
         data?.meta?.searchtypCd === searchSort;
 
-      const response: TmapPoiSearchResponse =
-        canReuseCurrentData && data ? data : await fetchPois(query, searchSort);
+      let response: TmapPoiSearchResponse;
+      let center: LatLng;
 
-      commitSubmittedSearchPois(response.items, query);
+      if (canReuseCurrentData && data && centerRef.current) {
+        response = data;
+        center = centerRef.current;
+      } else {
+        const fetched = await fetchPois(query, searchSort);
+        response = fetched.response;
+        center = fetched.center;
+      }
+
+      commitSubmittedSearchPois(response.items, query, searchSort, center);
       clearFocusedPoi();
       onClose();
     } catch (e: unknown) {

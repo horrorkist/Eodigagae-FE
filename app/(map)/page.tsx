@@ -46,8 +46,9 @@ import {
 } from "@/components/icons/definitions.generated";
 import { useRouteRecommendStore } from "@/stores/routeRecommendStore";
 import { fetchRouteRecommendations } from "@/services/routeRecommend";
+import { fetchTmapPois } from "@/services/tmapPois";
 import type { RouteRecommendation } from "@/types/routeRecommend";
-import type { TmapPoi } from "@/types/tmapPoi";
+import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
 
 type HomeTabMode = "main" | "poi";
 type SheetViewMode = "home" | "searchResults";
@@ -85,7 +86,12 @@ function MapPageContent() {
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
   const submittedSearchPois = useMapStore((s) => s.submittedSearchPois);
   const submittedSearchKeyword = useMapStore((s) => s.submittedSearchKeyword);
+  const submittedSearchSort = useMapStore((s) => s.submittedSearchSort);
+  const submittedSearchCenter = useMapStore((s) => s.submittedSearchCenter);
   const submittedSearchSeq = useMapStore((s) => s.submittedSearchSeq);
+  const commitSubmittedSearchPois = useMapStore(
+    (s) => s.commitSubmittedSearchPois,
+  );
   const consumePendingSearchResultsRevealSeq = useMapStore(
     (s) => s.consumePendingSearchResultsRevealSeq,
   );
@@ -151,6 +157,12 @@ function MapPageContent() {
   const [showWater, setShowWater] = useState<boolean>(false);
   const [bottomSheetFloatingMotion, setBottomSheetFloatingMotion] =
     useState<BottomSheetHeightMotion>(DEFAULT_BOTTOM_SHEET_MOTION);
+  const [searchResultSortLoading, setSearchResultSortLoading] = useState(false);
+  const [searchResultSortError, setSearchResultSortError] = useState<string | null>(
+    null,
+  );
+  const [optimisticSearchSort, setOptimisticSearchSort] =
+    useState<TmapPoiSearchSort | null>(null);
 
   const hasSubmittedSearchResults = submittedSearchPois.length > 0;
 
@@ -403,6 +415,8 @@ function MapPageContent() {
 
   const shouldShowSheetViewToggle =
     hasSubmittedSearchResults && !focusedPoi && !isRoutePlanningMode;
+  const effectiveSearchResultSort =
+    optimisticSearchSort ?? submittedSearchSort;
 
   const handleGuideStart = useCallback(() => {
     if (routeRecommendLoading) return;
@@ -415,9 +429,61 @@ function MapPageContent() {
     emit({ channel: "map", type: "START_WALKING" });
   }, [emit, routeRecommendLoading, routeRecommendations, selectedRouteId]);
 
+  const handleSearchResultSortChange = useCallback(
+    async (nextSort: TmapPoiSearchSort) => {
+      if (searchResultSortLoading) return;
+      if (!submittedSearchKeyword) return;
+      if (!submittedSearchCenter) {
+        setSearchResultSortError(
+          "검색 중심 좌표를 찾을 수 없어 정렬을 변경할 수 없어요.",
+        );
+        return;
+      }
+      if (effectiveSearchResultSort === nextSort) return;
+
+      setOptimisticSearchSort(nextSort);
+      setSearchResultSortLoading(true);
+      setSearchResultSortError(null);
+
+      try {
+        const response = await fetchTmapPois({
+          keyword: submittedSearchKeyword,
+          sort: nextSort,
+          center: submittedSearchCenter,
+        });
+
+        commitSubmittedSearchPois(
+          response.items,
+          submittedSearchKeyword,
+          nextSort,
+          submittedSearchCenter,
+        );
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "정렬을 변경하지 못했어요.";
+        setSearchResultSortError(message);
+      } finally {
+        setOptimisticSearchSort(null);
+        setSearchResultSortLoading(false);
+      }
+    },
+    [
+      commitSubmittedSearchPois,
+      effectiveSearchResultSort,
+      searchResultSortLoading,
+      submittedSearchCenter,
+      submittedSearchKeyword,
+    ],
+  );
+
   const handleClearSearchResults = useCallback(() => {
     clearSubmittedSearchPois();
     setSheetViewMode("home");
+    setSearchResultSortError(null);
+    setSearchResultSortLoading(false);
+    setOptimisticSearchSort(null);
     closeBottomSheet();
   }, [clearSubmittedSearchPois, closeBottomSheet]);
 
@@ -641,6 +707,12 @@ function MapPageContent() {
           {activeSheetViewMode === "searchResults" ? (
             <SearchResultsBottomSheetContent
               items={submittedSearchPois}
+              sort={effectiveSearchResultSort}
+              sortLoading={searchResultSortLoading}
+              sortError={searchResultSortError}
+              onSortChange={(nextSort) => {
+                void handleSearchResultSortChange(nextSort);
+              }}
               onFocusPoi={handleFocusSearchResultPoi}
             />
           ) : (
