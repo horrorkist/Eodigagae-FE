@@ -2,18 +2,65 @@ import formatDist from "@/lib/formatDist";
 import { useState } from "react";
 import Image from "next/image";
 import AppIcon from "./icons/AppIcon";
-import { appIconPaw, appIconPuppy } from "./icons/definitions.generated";
+import {
+  appIconPaw,
+  appIconPuppy,
+  appIconTrashbin,
+  appIconWaterdrop,
+  type AppIconDefinition,
+} from "./icons/definitions.generated";
 
 const WALK_SPEED_M_PER_MIN = 67; // 약 4.0km/h
 
 export type HomePoiCardItem = {
   id: string;
+  source?: "kto" | "fountain" | "trash-bin" | "tmap";
   title: string;
   category?: string;
   address?: string;
   distanceM: number | null;
   thumbnailUrl?: string | null;
+  iconOnlyThumbnail?: boolean;
 };
+
+type CardVisualStyle = {
+  leftBadgeBgClassName: string;
+  leftIcon: AppIconDefinition;
+  thumbnailBgClassName: string;
+  thumbnailIconClassName: string;
+};
+
+const DEFAULT_CARD_VISUAL_STYLE: CardVisualStyle = {
+  leftBadgeBgClassName: "bg-dg-orange-500",
+  leftIcon: appIconPuppy,
+  thumbnailBgClassName: "bg-dg-gray-400",
+  thumbnailIconClassName: "text-dg-gray-600",
+};
+
+const CARD_VISUAL_STYLES: Record<
+  NonNullable<HomePoiCardItem["source"]>,
+  CardVisualStyle
+> = {
+  kto: DEFAULT_CARD_VISUAL_STYLE,
+  tmap: DEFAULT_CARD_VISUAL_STYLE,
+  fountain: {
+    leftBadgeBgClassName: "bg-dg-blue-500",
+    leftIcon: appIconWaterdrop,
+    thumbnailBgClassName: "bg-dg-blue-300",
+    thumbnailIconClassName: "text-dg-blue-500",
+  },
+  "trash-bin": {
+    leftBadgeBgClassName: "bg-green-sub",
+    leftIcon: appIconTrashbin,
+    thumbnailBgClassName: "bg-dg-green-400",
+    thumbnailIconClassName: "text-green-sub",
+  },
+};
+
+function getCardVisualStyle(source: HomePoiCardItem["source"]) {
+  if (!source) return DEFAULT_CARD_VISUAL_STYLE;
+  return CARD_VISUAL_STYLES[source] ?? DEFAULT_CARD_VISUAL_STYLE;
+}
 
 function estimateWalkMinutes(distanceM: number | null) {
   if (distanceM == null || !Number.isFinite(distanceM) || distanceM <= 0) {
@@ -31,6 +78,8 @@ export default function PoiCard({
 }) {
   const [isThumbnailFailed, setIsThumbnailFailed] = useState(false);
   const thumbnailUrl = item.thumbnailUrl?.trim() ?? "";
+  const visualStyle = getCardVisualStyle(item.source);
+  const shouldUseIconOnlyThumbnail = item.iconOnlyThumbnail === true;
   const showThumbnail = thumbnailUrl.length > 0 && !isThumbnailFailed;
   const address = item.address?.trim() || "주소 정보 없음";
   const category = item.category?.trim();
@@ -49,8 +98,16 @@ export default function PoiCard({
     >
       <div className="min-w-0 flex-1 flex-col space-y-1">
         <div className="flex min-w-0 items-center gap-x-2">
-          <div className="rounded-full bg-dg-orange-500 p-1">
-            <AppIcon icon={appIconPuppy} className="h-4 w-4 text-white" />
+          <div
+            className={[
+              "rounded-full p-1",
+              visualStyle.leftBadgeBgClassName,
+            ].join(" ")}
+          >
+            <AppIcon
+              icon={visualStyle.leftIcon}
+              className="h-4 w-4 text-white"
+            />
           </div>
           <div className="min-w-0 flex items-center gap-x-2">
             <div className="truncate text-base font-semibold text-dg-black">
@@ -82,7 +139,20 @@ export default function PoiCard({
       </div>
 
       <div className="relative h-20 w-20 flex-none overflow-hidden rounded-xl bg-gray-100 ring-1 ring-black/5">
-        {showThumbnail ? (
+        {shouldUseIconOnlyThumbnail ? (
+          <div
+            className={[
+              "flex h-full w-full items-center justify-center",
+              visualStyle.thumbnailBgClassName,
+              visualStyle.thumbnailIconClassName,
+            ].join(" ")}
+          >
+            <AppIcon
+              icon={visualStyle.leftIcon}
+              className="h-12 w-12 text-white"
+            />
+          </div>
+        ) : showThumbnail ? (
           <Image
             src={thumbnailUrl}
             alt={`${item.title} 대표 이미지`}
@@ -93,7 +163,7 @@ export default function PoiCard({
           />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-y-1 bg-dg-gray-400 text-dg-gray-600">
-            <AppIcon icon={appIconPuppy} className="h-5 w-5" />
+            <AppIcon icon={visualStyle.leftIcon} className="h-5 w-5" />
             <span className="text-[10px] leading-none">이미지 없음</span>
           </div>
         )}

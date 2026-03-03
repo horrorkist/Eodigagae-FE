@@ -1,8 +1,7 @@
 import type { RefObject } from "react";
-import { getPoiStyle } from "@/lib/poiMarker";
 import PoiCard from "@/components/PoiCard";
 import Divider from "@/components/Divider";
-import type { PetPoiItem } from "@/types/mapEvents";
+import type { HomePoiListItem } from "@/types/homePoi";
 
 // function PetPoiSummary({
 //   loading,
@@ -26,19 +25,17 @@ import type { PetPoiItem } from "@/types/mapEvents";
 // }
 
 type PoiTabContentProps = {
-  petPoiOn: boolean;
+  hasAnySourceOn: boolean;
   loading: boolean;
-  totalCount: number | null;
-  visiblePois: PetPoiItem[];
+  visiblePois: HomePoiListItem[];
   hasMorePois: boolean;
   loadMoreRef: RefObject<HTMLDivElement | null>;
-  onFocusPoi: (poi: PetPoiItem) => void;
+  onFocusPoi: (poi: HomePoiListItem) => void;
 };
 
 export default function PoiTabContent({
-  petPoiOn,
+  hasAnySourceOn,
   loading,
-  // totalCount,
   visiblePois,
   hasMorePois,
   loadMoreRef,
@@ -46,25 +43,22 @@ export default function PoiTabContent({
 }: PoiTabContentProps) {
   return (
     <>
-      {/* <PetPoiSummary loading={loading} totalCount={totalCount} /> */}
-
       {visiblePois.length > 0 && (
         <ul>
           {visiblePois.map((poi, index) => {
-            const style = getPoiStyle(poi.contenttypeid);
-            const distanceRaw = Number(poi.dist);
-            const distanceM = Number.isFinite(distanceRaw) ? distanceRaw : null;
-
             return (
-              <li key={poi.contentid}>
+              <li key={poi.id}>
                 <PoiCard
                   item={{
-                    id: `kto:${poi.contentid}`,
+                    id: poi.id,
+                    source: poi.source,
                     title: poi.title,
-                    category: style.label,
-                    address: poi.addr1,
-                    distanceM,
-                    thumbnailUrl: poi.firstimage2 || poi.firstimage,
+                    category: poi.category,
+                    address: poi.address,
+                    distanceM: poi.distanceM,
+                    thumbnailUrl: poi.thumbnailUrl,
+                    iconOnlyThumbnail:
+                      poi.source === "fountain" || poi.source === "trash-bin",
                   }}
                   onClick={() => onFocusPoi(poi)}
                 />
@@ -75,16 +69,15 @@ export default function PoiTabContent({
         </ul>
       )}
 
-      {!petPoiOn && (
+      {!hasAnySourceOn && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          상단의 <span className="font-semibold">동반 가능</span> 토글 칩을 켜면
-          장소 목록을 불러올 수 있어요.
+          상단 토글 칩을 켜면 장소 목록을 불러올 수 있어요.
         </div>
       )}
 
-      {petPoiOn && !loading && visiblePois.length === 0 && (
+      {hasAnySourceOn && !loading && visiblePois.length === 0 && (
         <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
-          표시할 장소가 없어요. 상단의 동반 가능 토글을 확인해 주세요.
+          표시할 장소가 없어요.
         </div>
       )}
 

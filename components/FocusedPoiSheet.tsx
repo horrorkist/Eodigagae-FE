@@ -7,9 +7,13 @@ import AppIcon from "./icons/AppIcon";
 import {
   appIconChevronDown,
   appIconCopy,
+  appIconMapPin,
   appIconPuppy,
+  appIconTrashbin,
   appIconTel,
+  appIconWaterdrop,
   appIconXMark,
+  type AppIconDefinition,
 } from "./icons/definitions.generated";
 import { useEffect, useRef, useState } from "react";
 
@@ -25,6 +29,20 @@ function estimateWalkMinutes(distanceM: number | null) {
   }
 
   return Math.max(1, Math.round(distanceM / WALK_SPEED_M_PER_MIN));
+}
+
+function getSourceIcon(source: FocusedPoi["source"]): AppIconDefinition {
+  if (source === "fountain") return appIconWaterdrop;
+  if (source === "trash-bin") return appIconTrashbin;
+  if (source === "tmap") return appIconMapPin;
+  return appIconPuppy;
+}
+
+function getSourceBadgeClass(source: FocusedPoi["source"]) {
+  if (source === "fountain") return "bg-dg-blue-500";
+  if (source === "trash-bin") return "bg-green-sub";
+  if (source === "tmap") return "bg-dg-gray-600";
+  return "bg-dg-orange-500";
 }
 
 async function copyTextToClipboard(text: string) {
@@ -71,6 +89,10 @@ export default function FocusedPoiSheet({
   const estimatedWalkMinutes = estimateWalkMinutes(poi.distanceM);
   const thumbnail = poi.thumbnail?.trim() ?? "";
   const showThumbnail = thumbnail.length > 0 && failedThumbnail !== thumbnail;
+  const isFacilitySource =
+    poi.source === "fountain" || poi.source === "trash-bin";
+  const sourceIcon = getSourceIcon(poi.source);
+  const sourceBadgeClass = getSourceBadgeClass(poi.source);
 
   useEffect(() => {
     if (!onHeightChange) return;
@@ -139,12 +161,22 @@ export default function FocusedPoiSheet({
       className="fixed left-0 z-[112] w-full max-w-[430px] pointer-events-auto"
       style={{ bottom: "calc(var(--safe-bottom) + 56px)" }}
     >
-      <section className="rounded-tl-2xl rounded-tr-2xl px-4 py-5 bg-white min-h-[320px] flex flex-col space-y-2">
+      <section
+        className={[
+          "rounded-tl-2xl rounded-tr-2xl px-4 py-5 bg-white flex flex-col space-y-2",
+          isFacilitySource ? "min-h-0" : "min-h-[320px]",
+        ].join(" ")}
+      >
         <div className="flex flex-col">
           <div className="flex justify-between">
             <div className="min-w-0 flex items-center gap-x-2">
-              <div className="p-1 bg-dg-orange-500 rounded-full">
-                <AppIcon icon={appIconPuppy} className="w-5 h-5 text-white" />
+              <div
+                className={[
+                  "p-1 rounded-full",
+                  sourceBadgeClass,
+                ].join(" ")}
+              >
+                <AppIcon icon={sourceIcon} className="w-5 h-5 text-white" />
               </div>
               <div className="truncate text-xl font-semibold text-dg-black text-ellipsis">
                 {renderFieldValue(poi.name)}
@@ -164,10 +196,12 @@ export default function FocusedPoiSheet({
               </button>
             </div>
           </div>
-          <div className="flex gap-x-2 items-center text-dg-gray-600">
-            <AppIcon icon={appIconTel} className="w-4 h-4" />
-            <span>{poi.tel ? poi.tel : "제공되는 전화번호가 없습니다."}</span>
-          </div>
+          {!isFacilitySource && (
+            <div className="flex gap-x-2 items-center text-dg-gray-600">
+              <AppIcon icon={appIconTel} className="w-4 h-4" />
+              <span>{poi.tel ? poi.tel : "제공되는 전화번호가 없습니다."}</span>
+            </div>
+          )}
           <div
             onClick={() => setShowDetailAddress((prev) => !prev)}
             className="text-dg-gray-600 relative flex items-center gap-x-2"
@@ -233,22 +267,24 @@ export default function FocusedPoiSheet({
             </div>
           )}
         </div>
-        <div className="mt-2 h-32 w-full overflow-hidden rounded-2xl bg-dg-gray-300">
-          {showThumbnail ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumbnail}
-              alt={`${poi.name} 대표 이미지`}
-              className="h-full w-full object-cover"
-              onError={() => setFailedThumbnail(thumbnail)}
-            />
-          ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-y-2 text-dg-gray-600">
-              <AppIcon icon={appIconPuppy} className="h-8 w-8" />
-              <span className="text-sm">이미지 없음</span>
-            </div>
-          )}
-        </div>
+        {!isFacilitySource && (
+          <div className="mt-2 h-32 w-full overflow-hidden rounded-2xl bg-dg-gray-300">
+            {showThumbnail ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={thumbnail}
+                alt={`${poi.name} 대표 이미지`}
+                className="h-full w-full object-cover"
+                onError={() => setFailedThumbnail(thumbnail)}
+              />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-y-2 text-dg-gray-600">
+                <AppIcon icon={sourceIcon} className="h-8 w-8" />
+                <span className="text-sm">이미지 없음</span>
+              </div>
+            )}
+          </div>
+        )}
         <button className="w-full py-2 rounded-xl bg-dg-green-500 text-white text-xl font-semibold">
           길찾기
         </button>

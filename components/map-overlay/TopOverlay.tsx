@@ -1,11 +1,13 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import AppIcon from "@/components/icons/AppIcon";
 import {
   appIconMagnify,
   appIconXMark,
 } from "@/components/icons/definitions.generated";
 import type { ToggleItem, ToggleVariant } from "@/components/map-overlay/types";
+
+const LOADING_INDICATOR_DELAY_MS = 100;
 
 const TOGGLE_STYLES: Record<
   ToggleVariant,
@@ -32,55 +34,67 @@ const TOGGLE_STYLES: Record<
   },
 };
 
+function ToggleChipButton({ toggle }: { toggle: ToggleItem }) {
+  const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
+
+  useEffect(() => {
+    if (!toggle.loading) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setShowLoadingIndicator(true);
+    }, LOADING_INDICATOR_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [toggle.loading]);
+
+  const isOn = toggle.value;
+  const label = isOn ? toggle.labelOn : (toggle.labelOff ?? toggle.labelOn);
+  const style = TOGGLE_STYLES[toggle.variant];
+
+  return (
+    <button
+      key={toggle.key}
+      type="button"
+      disabled={toggle.disabled || toggle.loading}
+      onClick={() => toggle.onChange(!toggle.value)}
+      data-coachmark-id={toggle.key === "petpoi" ? "petpoi-chip" : undefined}
+      className={[
+        "pointer-events-auto shrink-0",
+        "flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm shadow backdrop-blur",
+        "active:scale-[0.98] transition",
+        isOn ? style.on : style.off,
+      ].join(" ")}
+    >
+      <AppIcon icon={toggle.icon} className={["w-4 h-4", style.text].join(" ")} />
+      <span className="relative inline-flex items-center justify-center">
+        <span className={showLoadingIndicator ? "opacity-0" : ""}>{label}</span>
+        {showLoadingIndicator && (
+          <span
+            className={[
+              "absolute w-4 h-4 animate-spin rounded-full border-2 border-t-transparent",
+              style.text,
+            ].join(" ")}
+          />
+        )}
+      </span>
+    </button>
+  );
+}
+
 function ToggleChips({ toggles }: { toggles: ToggleItem[] }) {
   if (toggles.length === 0) return null;
 
   return (
     <div className="pointer-events-auto mt-2 w-full overflow-x-auto pb-1 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="inline-flex min-w-full items-center gap-2 px-5">
-        {toggles.map((toggle) => {
-          const isOn = toggle.value;
-          const label = isOn
-            ? toggle.labelOn
-            : (toggle.labelOff ?? toggle.labelOn);
-          const style = TOGGLE_STYLES[toggle.variant];
-
-          return (
-            <button
-              key={toggle.key}
-              type="button"
-              disabled={toggle.disabled || toggle.loading}
-              onClick={() => toggle.onChange(!toggle.value)}
-              data-coachmark-id={
-                toggle.key === "petpoi" ? "petpoi-chip" : undefined
-              }
-              className={[
-                "pointer-events-auto shrink-0",
-                "flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm shadow backdrop-blur",
-                "active:scale-[0.98] transition",
-                isOn ? style.on : style.off,
-              ].join(" ")}
-            >
-              <AppIcon
-                icon={toggle.icon}
-                className={["w-4 h-4", style.text].join(" ")}
-              />
-              <span className="relative inline-flex items-center justify-center">
-                <span className={toggle.loading ? "opacity-0" : ""}>
-                  {label}
-                </span>
-                {toggle.loading && (
-                  <span
-                    className={[
-                      "absolute w-4 h-4 animate-spin rounded-full border-2 border-t-transparent",
-                      style.text,
-                    ].join(" ")}
-                  />
-                )}
-              </span>
-            </button>
-          );
-        })}
+        {toggles.map((toggle) => (
+          <ToggleChipButton
+            key={`${toggle.key}:${toggle.loading ? "loading" : "idle"}`}
+            toggle={toggle}
+          />
+        ))}
       </div>
     </div>
   );

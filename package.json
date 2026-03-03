@@ -10,8 +10,10 @@
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "test:unit:walk-location": "node --test tests/walkLocationFilters.unit.test.mjs tests/walkLocationSession.unit.test.mjs tests/userMarker.unit.test.mjs",
     "test:unit:route-tracking": "node --test tests/routeTracking.unit.test.mjs",
+    "test:unit:home-poi": "node --test tests/homePoiNormalizer.unit.test.mjs tests/facilitiesParser.unit.test.mjs",
     "test:smoke:parser": "node --test tests/extractTmapPedestrian.smoke.test.mjs",
     "test:smoke:app": "node scripts/smoke/app-smoke.mjs",
+    "test:smoke:facilities-network": "node scripts/smoke/facilities-network.smoke.mjs",
     "test:smoke": "npm run test:smoke:parser && npm run test:smoke:app"
   },
   "dependencies": {

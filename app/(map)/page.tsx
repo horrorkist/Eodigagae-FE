@@ -25,14 +25,16 @@ import { useMapStore } from "@/stores/mapStore";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { useMapViewportStore } from "@/stores/mapViewport";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
+import { useMapRuntime } from "@/hooks/useMapRuntime";
+import { useMapFacilitiesProbe } from "@/hooks/useMapFacilitiesProbe";
 import { useDogStore, type DogInfoFormDraft } from "@/stores/dogStore";
 import { useModalStore } from "@/stores/modal";
 import { useEmit } from "@/hooks/useEventBus";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
-import { fromPetPoiItem, fromTmapPoi } from "@/lib/focusedPoi";
+import { fromHomePoiListItem, fromTmapPoi } from "@/lib/focusedPoi";
+import { mergeAndSortHomePois } from "@/lib/homePoiNormalizer";
 import WalkDebugPanel from "@/components/WalkDebugPanel";
-import { PetPoiItem } from "@/types/mapEvents";
 import {
   isWalkDebugPanelVisible,
   subscribeWalkDebugUpdates,
@@ -47,6 +49,7 @@ import {
 import { useRouteRecommendStore } from "@/stores/routeRecommendStore";
 import { fetchRouteRecommendations } from "@/services/routeRecommend";
 import { fetchTmapPois } from "@/services/tmapPois";
+import type { HomePoiListItem } from "@/types/homePoi";
 import type { RouteRecommendation } from "@/types/routeRecommend";
 import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
 
@@ -79,6 +82,7 @@ function MapPageContent() {
     isWalkDebugPanelVisible,
     () => true,
   );
+  const { mapRef, sdkReady } = useMapRuntime();
 
   const myPos = useMapStore((s) => s.myPos);
   const focusedPoi = useMapStore((s) => s.focusedPoi);
@@ -140,7 +144,6 @@ function MapPageContent() {
   const {
     petPoiOn,
     petPois,
-    petPoiTotalCount,
     petPoiLoading,
     petPoiError,
     setPetPoiOn,
@@ -155,6 +158,12 @@ function MapPageContent() {
 
   const [showBin, setShowBin] = useState<boolean>(false);
   const [showWater, setShowWater] = useState<boolean>(false);
+  const facilitiesProbe = useMapFacilitiesProbe({
+    mapRef,
+    sdkReady,
+    waterEnabled: showWater,
+    trashEnabled: showBin,
+  });
   const [bottomSheetFloatingMotion, setBottomSheetFloatingMotion] =
     useState<BottomSheetHeightMotion>(DEFAULT_BOTTOM_SHEET_MOTION);
   const [searchResultSortLoading, setSearchResultSortLoading] = useState(false);
@@ -184,15 +193,45 @@ function MapPageContent() {
   );
   const poiLoadMoreRef = useRef<HTMLDivElement | null>(null);
   const lastPetPoiErrorRef = useRef<string | null>(null);
+  const lastWaterErrorRef = useRef<string | null>(null);
+  const lastTrashErrorRef = useRef<string | null>(null);
   const focusedEntrySnapshotRef = useRef<FocusedEntrySnapshot | null>(null);
   const focusedCapturedByLocalHandlerRef = useRef(false);
   const prevFocusedPoiIdRef = useRef<string | null>(focusedPoi?.id ?? null);
-
-  const visiblePois = useMemo(
-    () => petPois.slice(0, visiblePoiCount),
-    [petPois, visiblePoiCount],
+  const hasAnyPoiSourceOn = petPoiOn || showWater || showBin;
+  const referencePos = myPos ?? facilitiesProbe.referenceCenter;
+  const mergedPoiList = useMemo(
+    () =>
+      mergeAndSortHomePois({
+        petPois,
+        fountains: facilitiesProbe.water.items,
+        trashBins: facilitiesProbe.trash.items,
+        enabledSources: {
+          kto: petPoiOn,
+          fountain: showWater,
+          "trash-bin": showBin,
+        },
+        referencePos,
+      }),
+    [
+      facilitiesProbe.trash.items,
+      facilitiesProbe.water.items,
+      petPoiOn,
+      petPois,
+      referencePos,
+      showBin,
+      showWater,
+    ],
   );
-  const hasMorePois = visiblePoiCount < petPois.length;
+  const visiblePois = useMemo(
+    () => mergedPoiList.slice(0, visiblePoiCount),
+    [mergedPoiList, visiblePoiCount],
+  );
+  const hasMorePois = visiblePoiCount < mergedPoiList.length;
+  const poiListLoading =
+    (petPoiOn && petPoiLoading) ||
+    (showWater && facilitiesProbe.water.loading) ||
+    (showBin && facilitiesProbe.trash.loading);
   const focusedFloatingOffsetPx = useMemo(
     () => Math.max(0, focusedSheetHeightPx - HOME_BOTTOM_SHEET_PEEK_HEIGHT),
     [focusedSheetHeightPx],
@@ -200,9 +239,9 @@ function MapPageContent() {
 
   const loadMorePois = useCallback(() => {
     setVisiblePoiCount((prev) =>
-      Math.min(prev + POI_RENDER_BATCH_COUNT, petPois.length),
+      Math.min(prev + POI_RENDER_BATCH_COUNT, mergedPoiList.length),
     );
-  }, [petPois.length]);
+  }, [mergedPoiList.length]);
 
   const captureFocusedEntrySnapshot = useCallback(
     (capturedByLocalHandler: boolean) => {
@@ -222,11 +261,11 @@ function MapPageContent() {
     ],
   );
 
-  const handleFocusPetPoi = useCallback(
-    (poi: PetPoiItem) => {
+  const handleFocusHomePoi = useCallback(
+    (poi: HomePoiListItem) => {
       captureFocusedEntrySnapshot(true);
       closeBottomSheet();
-      setFocusedPoi(fromPetPoiItem(poi));
+      setFocusedPoi(fromHomePoiListItem(poi));
     },
     [captureFocusedEntrySnapshot, closeBottomSheet, setFocusedPoi],
   );
@@ -622,6 +661,56 @@ function MapPageContent() {
     });
   }, [clearPetPoiError, openModal, petPoiError]);
 
+  useEffect(() => {
+    const waterError = facilitiesProbe.water.error;
+    if (!waterError) {
+      lastWaterErrorRef.current = null;
+      return;
+    }
+    if (lastWaterErrorRef.current === waterError) return;
+
+    lastWaterErrorRef.current = waterError;
+    openModal({
+      title: "음수대 정보를 불러오지 못했어요",
+      icon: (
+        <FontAwesomeIcon
+          icon={faTriangleExclamation}
+          className="w-8 h-8 text-red-400"
+        />
+      ),
+      body: (
+        <p className="whitespace-pre-line">
+          {"일시적인 오류가 발생했어요.\n잠시 후 다시 시도해 주세요."}
+        </p>
+      ),
+    });
+  }, [facilitiesProbe.water.error, openModal]);
+
+  useEffect(() => {
+    const trashError = facilitiesProbe.trash.error;
+    if (!trashError) {
+      lastTrashErrorRef.current = null;
+      return;
+    }
+    if (lastTrashErrorRef.current === trashError) return;
+
+    lastTrashErrorRef.current = trashError;
+    openModal({
+      title: "쓰레기통 정보를 불러오지 못했어요",
+      icon: (
+        <FontAwesomeIcon
+          icon={faTriangleExclamation}
+          className="w-8 h-8 text-red-400"
+        />
+      ),
+      body: (
+        <p className="whitespace-pre-line">
+          {"일시적인 오류가 발생했어요.\n잠시 후 다시 시도해 주세요."}
+        </p>
+      ),
+    });
+  }, [facilitiesProbe.trash.error, openModal]);
+
   return (
     <div className="relative w-full h-full pointer-events-none">
       <HomePetPoiLayerBridge showPetPoi={petPoiOn} petPois={petPois} />
@@ -664,20 +753,22 @@ function MapPageContent() {
           {
             key: "bin",
             labelOn: "쓰레기통",
+            labelOff: "쓰레기통",
             value: showBin,
             onChange: setShowBin,
-            disabled: !myPos,
             variant: "green",
             icon: appIconTrashbin,
+            loading: facilitiesProbe.trash.loading,
           },
           {
             key: "water",
             labelOn: "음수대",
+            labelOff: "음수대",
             value: showWater,
             onChange: setShowWater,
-            disabled: !myPos,
             variant: "blue",
             icon: appIconWaterdrop,
+            loading: facilitiesProbe.water.loading,
           },
         ]}
         isRoutePlanningMode={isRoutePlanningMode}
@@ -725,13 +816,12 @@ function MapPageContent() {
 
               {activeHomeTabMode === "poi" ? (
                 <PoiTabContent
-                  petPoiOn={petPoiOn}
-                  loading={petPoiLoading}
-                  totalCount={petPoiTotalCount}
+                  hasAnySourceOn={hasAnyPoiSourceOn}
+                  loading={poiListLoading}
                   visiblePois={visiblePois}
                   hasMorePois={hasMorePois}
                   loadMoreRef={poiLoadMoreRef}
-                  onFocusPoi={handleFocusPetPoi}
+                  onFocusPoi={handleFocusHomePoi}
                 />
               ) : (
                 <RouteTabContent

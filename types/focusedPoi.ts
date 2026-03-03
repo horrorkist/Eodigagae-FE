@@ -1,4 +1,4 @@
-export type FocusedPoiSource = "kto" | "tmap";
+export type FocusedPoiSource = "kto" | "tmap" | "fountain" | "trash-bin";
 
 export type FocusedPoi = {
   id: string;
@@ -13,4 +13,8 @@ export type FocusedPoi = {
   roadAddress?: string;
   tel: string;
   thumbnail: string;
+  managedBy?: string;
+  binType?: string;
+  locationDesc?: string;
+  cityName?: string;
 };
