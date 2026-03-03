@@ -41,6 +41,7 @@ import {
 } from "@/lib/walkDebug";
 import CoachmarkTour from "@/components/CoachmarkTour";
 import HomePetPoiLayerBridge from "@/components/map-shell/HomePetPoiLayerBridge";
+import HomeFacilitiesPoiLayerBridge from "@/components/map-shell/HomeFacilitiesPoiLayerBridge";
 import {
   appIconPuppy,
   appIconTrashbin,
@@ -49,7 +50,7 @@ import {
 import { useRouteRecommendStore } from "@/stores/routeRecommendStore";
 import { fetchRouteRecommendations } from "@/services/routeRecommend";
 import { fetchTmapPois } from "@/services/tmapPois";
-import type { HomePoiListItem } from "@/types/homePoi";
+import type { FacilityHomePoiListItem, HomePoiListItem } from "@/types/homePoi";
 import type { RouteRecommendation } from "@/types/routeRecommend";
 import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
 
@@ -226,6 +227,14 @@ function MapPageContent() {
   const visiblePois = useMemo(
     () => mergedPoiList.slice(0, visiblePoiCount),
     [mergedPoiList, visiblePoiCount],
+  );
+  const facilityMarkerPois = useMemo(
+    () =>
+      mergedPoiList.filter(
+        (poi): poi is FacilityHomePoiListItem =>
+          poi.source === "fountain" || poi.source === "trash-bin",
+      ),
+    [mergedPoiList],
   );
   const hasMorePois = visiblePoiCount < mergedPoiList.length;
   const poiListLoading =
@@ -714,6 +723,7 @@ function MapPageContent() {
   return (
     <div className="relative w-full h-full pointer-events-none">
       <HomePetPoiLayerBridge showPetPoi={petPoiOn} petPois={petPois} />
+      <HomeFacilitiesPoiLayerBridge facilityPois={facilityMarkerPois} />
 
       <MapOverlay
         floatingControlsBottomOffsetPx={

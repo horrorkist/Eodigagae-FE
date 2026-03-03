@@ -10,6 +10,7 @@ import {
   faPaw,
 } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import { buildMarkerShellHTML } from "./markerShell.ts";
 
 // Register icons so icon() lookup works
 library.add(
@@ -52,54 +53,39 @@ export function getPoiStyle(contenttypeid: string): PoiStyle {
 /** Render an FA icon to an SVG string (no React needed) */
 function renderIconSvg(
   def: IconDefinition,
-  fill: string,
-  size: number,
-): string {
+): { viewBox: string; body: string } {
   const result = faIcon(def);
-  if (!result) return "";
+  if (!result) {
+    return {
+      viewBox: "0 0 16 16",
+      body: "",
+    };
+  }
   // result.html returns ['<svg ...>...</svg>']
-  // We need to inject fill color and size
   const [w, h] = result.icon;
   const svgPath = result.icon[4]; // the 'd' path string (could be string or string[])
   const pathData =
     typeof svgPath === "string" ? svgPath : (svgPath as string[]).join(" ");
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${size}" height="${size}" fill="${fill}"><path d="${pathData}"/></svg>`;
+  return {
+    viewBox: `0 0 ${w} ${h}`,
+    body: `<path d="${pathData}" fill="currentColor"/>`,
+  };
 }
 
 /**
- * Build the HTML string for a POI pin marker.
- * Renders as a colored circle with an icon + a pointer triangle beneath.
+ * Build the HTML string for a POI pin marker using the marker.svg wrapper.
  */
 export function buildPinMarkerHTML(contenttypeid: string): string {
   const style = getPoiStyle(contenttypeid);
-  const iconSvg = renderIconSvg(style.icon, "#ffffff", 16);
+  const innerIcon = renderIconSvg(style.icon);
 
-  // Pin size
-  const size = 36;
-  const half = size / 2;
-  const triH = 6;
-
-  return `<div style="
-    display:flex;flex-direction:column;align-items:center;
-    transform:translate(-${half}px,-${size + triH}px);
-    filter:drop-shadow(0 2px 4px rgba(0,0,0,.25));
-    pointer-events:auto;cursor:pointer;
-  ">
-    <div style="
-      width:${size}px;height:${size}px;border-radius:50%;
-      background:${style.bg};
-      display:flex;align-items:center;justify-content:center;
-      border:2.5px solid #fff;
-    ">${iconSvg}</div>
-    <div style="
-      width:0;height:0;
-      border-left:${triH}px solid transparent;
-      border-right:${triH}px solid transparent;
-      border-top:${triH}px solid ${style.bg};
-      margin-top:-1px;
-    "></div>
-  </div>`;
+  return buildMarkerShellHTML({
+    wrapperColor: style.bg,
+    innerIconBody: innerIcon.body,
+    innerIconViewBox: innerIcon.viewBox,
+    innerIconColor: "#ffffff",
+  });
 }
 
 /**

@@ -4,6 +4,10 @@ import { MutableRefObject, useCallback, useEffect, useRef } from "react";
 import { PetPoiItem } from "@/types/mapEvents";
 import { buildPinMarkerHTML, buildLabelMarkerHTML } from "@/lib/poiMarker";
 import { fromPetPoiItem } from "@/lib/focusedPoi";
+import {
+  createOrUpdateClusterer,
+  disposeClusterer,
+} from "@/lib/naverMarkerCluster";
 import { useMapStore } from "@/stores/mapStore";
 
 type MarkerEntry = {
@@ -51,7 +55,10 @@ export function useMapPetPoi(
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
   const markerEntriesRef = useRef<Map<string, MarkerEntry>>(new Map());
-  const mapListenerRef = useRef<naver.maps.MapEventListener | null>(null);
+  const clustererRef = useRef<MarkerClustering | null>(null);
+  const mapClickListenerRef = useRef<naver.maps.MapEventListener | null>(null);
+  const mapZoomListenerRef = useRef<naver.maps.MapEventListener | null>(null);
+  const mapDragListenerRef = useRef<naver.maps.MapEventListener | null>(null);
   const activeKeyRef = useRef<string | null>(null);
   const pendingSyncRef = useRef(false);
 
@@ -87,31 +94,61 @@ export function useMapPetPoi(
       removeEntry(key);
     }
 
-    if (mapListenerRef.current) {
-      naver.maps.Event.removeListener(mapListenerRef.current);
-      mapListenerRef.current = null;
+    disposeClusterer(clustererRef);
+
+    if (mapClickListenerRef.current) {
+      naver.maps.Event.removeListener(mapClickListenerRef.current);
+      mapClickListenerRef.current = null;
+    }
+    if (mapZoomListenerRef.current) {
+      naver.maps.Event.removeListener(mapZoomListenerRef.current);
+      mapZoomListenerRef.current = null;
+    }
+    if (mapDragListenerRef.current) {
+      naver.maps.Event.removeListener(mapDragListenerRef.current);
+      mapDragListenerRef.current = null;
     }
 
     activeKeyRef.current = null;
   }, [removeEntry]);
 
-  const ensureMapClickListener = useCallback(
+  const ensureMapInteractionListeners = useCallback(
     (map: naver.maps.Map) => {
-      if (mapListenerRef.current) return;
+      if (!mapClickListenerRef.current) {
+        mapClickListenerRef.current = naver.maps.Event.addListener(
+          map,
+          "click",
+          () => {
+            hideActiveLabel();
+          },
+        );
+      }
 
-      mapListenerRef.current = naver.maps.Event.addListener(
-        map,
-        "click",
-        () => {
-          hideActiveLabel();
-        },
-      );
+      if (!mapZoomListenerRef.current) {
+        mapZoomListenerRef.current = naver.maps.Event.addListener(
+          map,
+          "zoom_changed",
+          () => {
+            hideActiveLabel();
+          },
+        );
+      }
+
+      if (!mapDragListenerRef.current) {
+        mapDragListenerRef.current = naver.maps.Event.addListener(
+          map,
+          "dragstart",
+          () => {
+            hideActiveLabel();
+          },
+        );
+      }
     },
     [hideActiveLabel],
   );
 
   const updateExistingEntry = useCallback(
-    (entry: MarkerEntry, next: NormalizedPoi, map: naver.maps.Map) => {
+    (entry: MarkerEntry, next: NormalizedPoi) => {
       const moved = entry.lat !== next.lat || entry.lng !== next.lng;
       const titleChanged = entry.item.title !== next.item.title;
       const typeChanged = entry.item.contenttypeid !== next.item.contenttypeid;
@@ -138,10 +175,6 @@ export function useMapPetPoi(
           ),
           anchor: new window.naver.maps.Point(0, 0),
         });
-      }
-
-      if (entry.pin.getMap() !== map) {
-        entry.pin.setMap(map);
       }
 
       entry.item = next.item;
@@ -224,7 +257,7 @@ export function useMapPetPoi(
     }
 
     const map = mapRef.current;
-    ensureMapClickListener(map);
+    ensureMapInteractionListeners(map);
 
     const normalized: NormalizedPoi[] = [];
     const nextKeySet = new Set<string>();
@@ -247,7 +280,7 @@ export function useMapPetPoi(
     for (const next of normalized) {
       const existing = markerEntriesRef.current.get(next.key);
       if (existing) {
-        updateExistingEntry(existing, next, map);
+        updateExistingEntry(existing, next);
         continue;
       }
 
@@ -255,13 +288,23 @@ export function useMapPetPoi(
       markerEntriesRef.current.set(created.key, created);
     }
 
+    createOrUpdateClusterer({
+      clustererRef,
+      map,
+      markers: Array.from(markerEntriesRef.current.values()).map(
+        (entry) => entry.pin,
+      ),
+      source: "kto",
+      zIndex: 1050,
+    });
+
     pendingSyncRef.current = false;
   }, [
     sdkReady,
     showPetPoi,
     clearAllMarkers,
     mapRef,
-    ensureMapClickListener,
+    ensureMapInteractionListeners,
     petPois,
     removeEntry,
     updateExistingEntry,
@@ -284,4 +327,3 @@ export function useMapPetPoi(
     };
   }, [clearAllMarkers]);
 }
-

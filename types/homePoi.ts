@@ -49,3 +49,8 @@ export type HomePoiListItem =
         item: TrashBinItem;
       };
     };
+
+export type FacilityHomePoiListItem = Extract<
+  HomePoiListItem,
+  { source: "fountain" | "trash-bin" }
+>;

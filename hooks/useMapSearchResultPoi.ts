@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import type { RefObject } from "react";
+import { appIconMapPin } from "@/components/icons/definitions.generated";
 import { fromTmapPoi } from "@/lib/focusedPoi";
+import { buildMarkerShellHTML } from "@/lib/markerShell";
+import {
+  createOrUpdateClusterer,
+  disposeClusterer,
+} from "@/lib/naverMarkerCluster";
 import { useMapStore } from "@/stores/mapStore";
 import type { TmapPoi } from "@/types/tmapPoi";
 
@@ -21,6 +27,18 @@ type NormalizedPoi = {
   lat: number;
   lng: number;
 };
+
+const SEARCH_RESULT_MARKER_COLOR = "#4b5563";
+
+function buildSearchResultMarkerHTML(title = "") {
+  return buildMarkerShellHTML({
+    wrapperColor: SEARCH_RESULT_MARKER_COLOR,
+    innerIconBody: appIconMapPin.body,
+    innerIconViewBox: appIconMapPin.viewBox,
+    innerIconColor: "#ffffff",
+    title,
+  });
+}
 
 function toPoiKey(poi: TmapPoi) {
   const id = String(poi.id ?? "").trim();
@@ -64,6 +82,7 @@ export function useMapSearchResultPoi(
 ) {
   const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const markerEntriesRef = useRef<Map<string, MarkerEntry>>(new Map());
+  const clustererRef = useRef<MarkerClustering | null>(null);
   const pendingMarkerSyncRef = useRef(false);
   const pendingCameraSyncRef = useRef(false);
   const lastCameraSeqRef = useRef(0);
@@ -81,10 +100,11 @@ export function useMapSearchResultPoi(
     for (const key of markerEntriesRef.current.keys()) {
       removeEntry(key);
     }
+    disposeClusterer(clustererRef);
   }, [removeEntry]);
 
   const updateExistingEntry = useCallback(
-    (entry: MarkerEntry, next: NormalizedPoi, map: naver.maps.Map) => {
+    (entry: MarkerEntry, next: NormalizedPoi) => {
       const moved = entry.lat !== next.lat || entry.lng !== next.lng;
       const titleChanged = entry.poi.name !== next.poi.name;
 
@@ -94,10 +114,10 @@ export function useMapSearchResultPoi(
 
       if (titleChanged) {
         entry.marker.setTitle(next.poi.name ?? "");
-      }
-
-      if (entry.marker.getMap() !== map) {
-        entry.marker.setMap(map);
+        entry.marker.setIcon({
+          content: buildSearchResultMarkerHTML(next.poi.name ?? ""),
+          anchor: new window.naver.maps.Point(0, 0),
+        });
       }
 
       entry.poi = next.poi;
@@ -113,6 +133,10 @@ export function useMapSearchResultPoi(
         map,
         position: new window.naver.maps.LatLng(next.lat, next.lng),
         title: next.poi.name ?? "",
+        icon: {
+          content: buildSearchResultMarkerHTML(next.poi.name ?? ""),
+          anchor: new window.naver.maps.Point(0, 0),
+        },
         zIndex: 1100,
       });
 
@@ -156,13 +180,23 @@ export function useMapSearchResultPoi(
     for (const next of normalized) {
       const existing = markerEntriesRef.current.get(next.key);
       if (existing) {
-        updateExistingEntry(existing, next, map);
+        updateExistingEntry(existing, next);
         continue;
       }
 
       const created = createEntry(next, map);
       markerEntriesRef.current.set(created.key, created);
     }
+
+    createOrUpdateClusterer({
+      clustererRef,
+      map,
+      markers: Array.from(markerEntriesRef.current.values()).map(
+        (entry) => entry.marker,
+      ),
+      source: "tmap",
+      zIndex: 1090,
+    });
 
     pendingMarkerSyncRef.current = false;
   }, [
