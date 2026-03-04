@@ -8,7 +8,6 @@ import {
   appIconMapPin,
   appIconPaw,
   appIconUser,
-  appIconUserCircle,
 } from "@/components/icons/definitions.generated";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 
@@ -20,8 +19,8 @@ type Tab = {
 
 const tabs: Tab[] = [
   { href: "/", label: "홈", icon: appIconMapPin },
-  { href: "/history", label: "기록", icon: appIconPaw },
-  { href: "/my", label: "마이", icon: appIconUser },
+  { href: "/history", label: "산책일지", icon: appIconPaw },
+  { href: "/my", label: "마이페이지", icon: appIconUser },
 ];
 
 export default function BottomNav() {

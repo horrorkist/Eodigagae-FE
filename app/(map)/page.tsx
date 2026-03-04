@@ -102,6 +102,7 @@ function MapPageContent() {
   );
   const setPickedPos = useMapStore((s) => s.setPickedPos);
   const setRouteState = useMapStore((s) => s.setRouteState);
+  const walking = useMapStore((s) => s.walking);
   const bottomSheetOffsetPx = useMapViewportStore((s) => s.bottomSheetOffsetPx);
   const focusedSheetHeightPx = useMapViewportStore(
     (s) => s.focusedSheetHeightPx,
@@ -602,13 +603,15 @@ function MapPageContent() {
   }, [resetBottomSheetOffset, resetFocusedSheetHeight]);
 
   useEffect(() => {
-    if (isRoutePlanningMode) {
+    const shouldHideBottomChrome = isRoutePlanningMode || walking;
+
+    if (shouldHideBottomChrome) {
       emit({ channel: "ui", type: "UI_BOTTOM_CHROME_HIDE" });
       return;
     }
 
     emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
-  }, [emit, isRoutePlanningMode]);
+  }, [emit, isRoutePlanningMode, walking]);
 
   useEffect(() => {
     if (activeSheetViewMode !== "home") return;

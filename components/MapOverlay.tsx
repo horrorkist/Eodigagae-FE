@@ -19,11 +19,34 @@ import RoutePlanningOverlay from "@/components/map-overlay/RoutePlanningOverlay"
 import FloatingControlsOverlay from "@/components/map-overlay/FloatingControlsOverlay";
 import WalkingOverlay from "@/components/map-overlay/WalkingOverlay";
 
+function formatElapsed(totalSec: number) {
+  if (!Number.isFinite(totalSec) || totalSec < 0) return "00:00";
+  const sec = Math.floor(totalSec);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+
+  if (h > 0) {
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function formatDistance(meter: number) {
+  if (!Number.isFinite(meter) || meter <= 0) return "0 m";
+  if (meter >= 1000) return `${(meter / 1000).toFixed(2)} km`;
+  return `${Math.round(meter)} m`;
+}
+
 type MapOverlayProps = {
   topOffsetPx?: number;
   floatingControlsBottomOffsetPx?: number;
   floatingControlsBottomTransitionMs?: number;
-  floatingControlsBottomTransitionEasing?: "linear" | "ease-in-out" | "ease-out";
+  floatingControlsBottomTransitionEasing?:
+    | "linear"
+    | "ease-in-out"
+    | "ease-out";
   bottomLeftSlot?: React.ReactNode;
   leftSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
@@ -142,13 +165,6 @@ export default function MapOverlay({
     });
   }, [canStartWalking, emit, walking]);
 
-  const onTogglePauseWalking = useCallback(() => {
-    emit({
-      type: walkingPaused ? "RESUME_WALKING" : "PAUSE_WALKING",
-      channel: "map",
-    });
-  }, [emit, walkingPaused]);
-
   const onStopWalking = useCallback(() => {
     emit({ type: "STOP_WALKING", channel: "map" });
   }, [emit]);
@@ -208,13 +224,32 @@ export default function MapOverlay({
   if (walking) {
     return (
       <div className="pointer-events-none absolute inset-0 z-50">
-        <WalkingOverlay
-          elapsedSec={elapsedSec}
-          walkedDistanceM={walkedDistanceM}
-          walkingPaused={walkingPaused}
-          onTogglePause={onTogglePauseWalking}
-          onStop={onStopWalking}
+        <FloatingControlsOverlay
+          isBottomChromeVisible={false}
+          bottomOffsetPx={floatingControlsBottomOffsetPx + 72}
+          bottomTransitionMs={floatingControlsBottomTransitionMs}
+          bottomTransitionEasing={floatingControlsBottomTransitionEasing}
+          leftSlot={
+            <div className="rounded-xl bg-white px-3 py-4 flex flex-col text-dg-black space-y-4 shadow-lg shadow-black/20 backdrop-blur">
+              <div className="flex space-x-2 items-center">
+                <div className="leading-none">산책 시간</div>
+                <div className="border-l border-dg-gray-400 h-3.5"></div>
+                <div className="tabular-nums">{formatElapsed(elapsedSec)}</div>
+              </div>
+              <div className="flex space-x-2 items-center">
+                <div className="leading-none">이동 거리</div>
+                <div className="border-l border-dg-gray-400 h-3.5"></div>
+                <div className="tabular-nums">
+                  {formatDistance(walkedDistanceM)}
+                </div>
+              </div>
+            </div>
+          }
+          showFabMenu={false}
+          fabItems={[]}
+          onRequestMyLocation={onRequestMyLocation}
         />
+        <WalkingOverlay onStop={onStopWalking} />
       </div>
     );
   }
