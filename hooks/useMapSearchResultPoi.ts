@@ -6,17 +6,21 @@ import { appIconMapPin } from "@/components/icons/definitions.generated";
 import { fromTmapPoi } from "@/lib/focusedPoi";
 import { buildMarkerShellHTML } from "@/lib/markerShell";
 import {
+  CLUSTER_MAX_ZOOM,
   createOrUpdateClusterer,
   disposeClusterer,
 } from "@/lib/naverMarkerCluster";
+import { buildSearchResultMarkerLayout } from "@/lib/searchResultMarkerLayout";
 import { useMapStore } from "@/stores/mapStore";
 import type { TmapPoi } from "@/types/tmapPoi";
 
 type MarkerEntry = {
   key: string;
   poi: TmapPoi;
-  lat: number;
-  lng: number;
+  baseLat: number;
+  baseLng: number;
+  renderLat: number;
+  renderLng: number;
   marker: naver.maps.Marker;
   listener: naver.maps.MapEventListener;
 };
@@ -86,6 +90,101 @@ export function useMapSearchResultPoi(
   const pendingMarkerSyncRef = useRef(false);
   const pendingCameraSyncRef = useRef(false);
   const lastCameraSeqRef = useRef(0);
+  const mapZoomListenerRef = useRef<naver.maps.MapEventListener | null>(null);
+  const mapIdleListenerRef = useRef<naver.maps.MapEventListener | null>(null);
+  const listenerMapRef = useRef<naver.maps.Map | null>(null);
+
+  const syncRenderLayout = useCallback(() => {
+    if (!sdkReady || !window.naver?.maps) return;
+    if (!mapRef.current) return;
+
+    const map = mapRef.current;
+    const zoom = Number(map.getZoom());
+    const spiderfy = Number.isFinite(zoom) && zoom > CLUSTER_MAX_ZOOM;
+    const entries = Array.from(markerEntriesRef.current.values());
+    if (entries.length === 0) return;
+
+    const layout = buildSearchResultMarkerLayout(
+      entries.map((entry) => ({
+        key: entry.key,
+        baseLat: entry.baseLat,
+        baseLng: entry.baseLng,
+      })),
+      { spiderfy },
+    );
+    const renderByKey = new Map(layout.map((item) => [item.key, item]));
+
+    let changed = false;
+
+    for (const entry of entries) {
+      const render = renderByKey.get(entry.key);
+      if (!render) continue;
+
+      if (
+        entry.renderLat === render.renderLat &&
+        entry.renderLng === render.renderLng
+      ) {
+        continue;
+      }
+
+      entry.marker.setPosition(
+        new window.naver.maps.LatLng(render.renderLat, render.renderLng),
+      );
+      entry.renderLat = render.renderLat;
+      entry.renderLng = render.renderLng;
+      changed = true;
+    }
+
+    if (changed && typeof clustererRef.current?.redraw === "function") {
+      clustererRef.current.redraw();
+    }
+  }, [mapRef, sdkReady]);
+
+  const clearMapListeners = useCallback(() => {
+    if (mapZoomListenerRef.current) {
+      naver.maps.Event.removeListener(mapZoomListenerRef.current);
+      mapZoomListenerRef.current = null;
+    }
+
+    if (mapIdleListenerRef.current) {
+      naver.maps.Event.removeListener(mapIdleListenerRef.current);
+      mapIdleListenerRef.current = null;
+    }
+
+    listenerMapRef.current = null;
+  }, []);
+
+  const ensureMapListeners = useCallback(
+    (map: naver.maps.Map) => {
+      if (
+        listenerMapRef.current === map &&
+        mapZoomListenerRef.current &&
+        mapIdleListenerRef.current
+      ) {
+        return;
+      }
+
+      clearMapListeners();
+      listenerMapRef.current = map;
+
+      mapZoomListenerRef.current = naver.maps.Event.addListener(
+        map,
+        "zoom_changed",
+        () => {
+          syncRenderLayout();
+        },
+      );
+
+      mapIdleListenerRef.current = naver.maps.Event.addListener(
+        map,
+        "idle",
+        () => {
+          syncRenderLayout();
+        },
+      );
+    },
+    [clearMapListeners, syncRenderLayout],
+  );
 
   const removeEntry = useCallback((key: string) => {
     const entry = markerEntriesRef.current.get(key);
@@ -100,17 +199,17 @@ export function useMapSearchResultPoi(
     for (const key of markerEntriesRef.current.keys()) {
       removeEntry(key);
     }
+
     disposeClusterer(clustererRef);
-  }, [removeEntry]);
+    clearMapListeners();
+    pendingMarkerSyncRef.current = false;
+    pendingCameraSyncRef.current = false;
+  }, [clearMapListeners, removeEntry]);
 
   const updateExistingEntry = useCallback(
     (entry: MarkerEntry, next: NormalizedPoi) => {
-      const moved = entry.lat !== next.lat || entry.lng !== next.lng;
+      const moved = entry.baseLat !== next.lat || entry.baseLng !== next.lng;
       const titleChanged = entry.poi.name !== next.poi.name;
-
-      if (moved) {
-        entry.marker.setPosition(new window.naver.maps.LatLng(next.lat, next.lng));
-      }
 
       if (titleChanged) {
         entry.marker.setTitle(next.poi.name ?? "");
@@ -121,8 +220,11 @@ export function useMapSearchResultPoi(
       }
 
       entry.poi = next.poi;
-      entry.lat = next.lat;
-      entry.lng = next.lng;
+
+      if (moved) {
+        entry.baseLat = next.lat;
+        entry.baseLng = next.lng;
+      }
     },
     [],
   );
@@ -150,8 +252,10 @@ export function useMapSearchResultPoi(
       return {
         key,
         poi: next.poi,
-        lat: next.lat,
-        lng: next.lng,
+        baseLat: next.lat,
+        baseLng: next.lng,
+        renderLat: next.lat,
+        renderLng: next.lng,
         marker,
         listener,
       };
@@ -168,6 +272,8 @@ export function useMapSearchResultPoi(
     }
 
     const map = mapRef.current;
+    ensureMapListeners(map);
+
     const normalized = normalizePois(submittedSearchPois);
     const nextKeySet = new Set(normalized.map((item) => item.key));
 
@@ -198,13 +304,16 @@ export function useMapSearchResultPoi(
       zIndex: 1090,
     });
 
+    syncRenderLayout();
     pendingMarkerSyncRef.current = false;
   }, [
     createEntry,
+    ensureMapListeners,
     mapRef,
     removeEntry,
     sdkReady,
     submittedSearchPois,
+    syncRenderLayout,
     updateExistingEntry,
   ]);
 
