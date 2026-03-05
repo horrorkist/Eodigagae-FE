@@ -29,6 +29,11 @@ import {
   WalkDistanceSelector,
   WalkDurationSelector,
 } from "@/components/dog-form/WalkFormFields";
+import {
+  resolveDogInfoFormSubmitLabel,
+  shouldRequestRouteRecommendation,
+  type DogInfoFormMode,
+} from "@/components/dog-form/mode";
 
 type FormValues = {
   name?: string;
@@ -39,11 +44,15 @@ type FormValues = {
 };
 
 type Props = {
+  mode?: DogInfoFormMode;
+  submitLabel?: string;
   onSubmitSuccess?: (data: DogInfo) => void;
   onRouteRecommendRequested?: (draft: DogInfoFormDraft) => void;
 };
 
 export default function DogInfoForm({
+  mode = "route",
+  submitLabel,
   onSubmitSuccess,
   onRouteRecommendRequested,
 }: Props) {
@@ -98,6 +107,8 @@ export default function DogInfoForm({
   });
 
   const selectedBreed = watchedBreed || undefined;
+  const isRouteMode = shouldRequestRouteRecommendation(mode);
+  const resolvedSubmitLabel = resolveDogInfoFormSubmitLabel(mode, submitLabel);
   const normalizedAge =
     watchedAge === "" || watchedAge == null ? null : Number(watchedAge);
   const hasAgeValue = normalizedAge !== null && !Number.isNaN(normalizedAge);
@@ -195,7 +206,9 @@ export default function DogInfoForm({
     setDog(dogInfo);
     setFormDraft(nextFormDraft);
     onSubmitSuccess?.(dogInfo);
-    onRouteRecommendRequested?.(nextFormDraft);
+    if (isRouteMode) {
+      onRouteRecommendRequested?.(nextFormDraft);
+    }
   };
 
   const ageMax = ageUnit === "months" ? 11 : 30;
@@ -240,9 +253,19 @@ export default function DogInfoForm({
       className="flex h-full flex-col space-y-6 text-dg-black"
     >
       <header className="flex items-center text-lg font-semibold">
-        몇 가지만 알려주시면
-        <br />
-        맞춤 산책 경로를 추천해드릴게요.
+        {isRouteMode ? (
+          <>
+            몇 가지만 알려주시면
+            <br />
+            맞춤 산책 경로를 추천해드릴게요.
+          </>
+        ) : (
+          <>
+            함께하는 반려견 정보를
+            <br />
+            등록하거나 수정해 주세요.
+          </>
+        )}
       </header>
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -372,7 +395,7 @@ export default function DogInfoForm({
           </fieldset>
 
           <AnimatePresence>
-            {walkRec && (
+            {isRouteMode && walkRec && (
               <motion.div
                 key="recommendation"
                 initial={{ opacity: 0, y: 6 }}
@@ -453,12 +476,35 @@ export default function DogInfoForm({
                         : "bg-gray-300 text-gray-500 cursor-not-allowed"
                     }`}
                   >
-                    경로 추천
+                    {resolvedSubmitLabel}
                   </button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
+
+          {!isRouteMode && (
+            <div className="grid grid-cols-[0.7fr_1.3fr] items-center gap-3 pt-6 text-lg">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="rounded-xl bg-dg-white py-4 font-semibold text-dg-black transition-colors hover:bg-gray-50"
+              >
+                초기화
+              </button>
+              <button
+                type="submit"
+                disabled={!isValid}
+                className={`rounded-xl py-4 font-semibold transition-colors ${
+                  isValid
+                    ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                {resolvedSubmitLabel}
+              </button>
+            </div>
+          )}
         </div>
       </form>
     </div>

@@ -1,5 +1,6 @@
 import SearchResultTabContent from "@/components/map-page/SearchResultTabContent";
 import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
+import Divider from "../Divider";
 
 type SearchResultsBottomSheetContentProps = {
   items: TmapPoi[];
@@ -75,6 +76,8 @@ export default function SearchResultsBottomSheetContent({
           </div>
         </fieldset>
       </div>
+
+      <Divider className="-mx-4" />
 
       {sortLoading && (
         <div className="flex items-center justify-center bg-white px-3 py-5">

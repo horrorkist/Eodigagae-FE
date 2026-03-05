@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { DogBreed, DogInfo } from "@/types/dog";
 
 export type DogInfoFormDraft = {
@@ -18,10 +19,32 @@ type DogState = {
   clearDog: () => void;
 };
 
-export const useDogStore = create<DogState>((set) => ({
-  dog: null,
-  formDraft: null,
-  setDog: (dog) => set({ dog }),
-  setFormDraft: (draft) => set({ formDraft: draft }),
-  clearDog: () => set({ dog: null, formDraft: null }),
-}));
+const DOG_STORE_STORAGE_KEY = "dog:profile:v1";
+
+const noopStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
+
+export const useDogStore = create<DogState>()(
+  persist(
+    (set) => ({
+      dog: null,
+      formDraft: null,
+      setDog: (dog) => set({ dog }),
+      setFormDraft: (draft) => set({ formDraft: draft }),
+      clearDog: () => set({ dog: null, formDraft: null }),
+    }),
+    {
+      name: DOG_STORE_STORAGE_KEY,
+      storage: createJSONStorage(() =>
+        typeof window === "undefined" ? noopStorage : localStorage,
+      ),
+      partialize: (state) => ({
+        dog: state.dog,
+        formDraft: state.formDraft,
+      }),
+    },
+  ),
+);
