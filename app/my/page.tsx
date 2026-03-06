@@ -257,7 +257,7 @@ export default function MyPage() {
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-dg-gray-400 text-dg-gray-600">
             <AppIcon icon={appIconPlus} className="h-4 w-4" />
           </span>
-          <span className="text-base text-dg-gray-600">반려동물 등록하기</span>
+          <span className="text-xs text-dg-gray-600">반려동물 등록하기</span>
         </button>
       </div>
     </div>
@@ -330,7 +330,6 @@ export default function MyPage() {
           className="hidden"
           onChange={handlePetPhotoChange}
         />
-
       </div>
     );
   };

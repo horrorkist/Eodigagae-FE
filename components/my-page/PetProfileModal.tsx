@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import AppIcon from "@/components/icons/AppIcon";
 import {
   appIconAsterisk,
@@ -137,11 +138,10 @@ export default function PetProfileModal({
     });
   };
 
-  return (
+  const modalContent = (
     <div
       className="fixed inset-0 z-[210] bg-black/45 p-4"
       onClick={onClose}
-      aria-hidden="true"
     >
       <div className="flex h-full items-center justify-center">
         <div
@@ -299,4 +299,7 @@ export default function PetProfileModal({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(modalContent, document.body);
 }

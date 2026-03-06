@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import AppIcon from "@/components/icons/AppIcon";
 import {
@@ -53,11 +54,10 @@ export default function PetPhotoPreviewOverlay({
     };
   }, [onClose]);
 
-  return (
+  const overlayContent = (
     <div
       className="fixed inset-0 z-[220] bg-black/55 p-4"
       onClick={onClose}
-      aria-hidden="true"
     >
       <div className="flex h-full items-center justify-center">
         <div
@@ -129,4 +129,7 @@ export default function PetPhotoPreviewOverlay({
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(overlayContent, document.body);
 }
