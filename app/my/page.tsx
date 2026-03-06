@@ -34,6 +34,11 @@ import {
   setWalkDebugPanelVisible,
   subscribeWalkDebugUpdates,
 } from "@/lib/walkDebug";
+import {
+  deleteDogPhoto,
+  requestDirectUpload,
+  uploadFileToDirectUrl,
+} from "@/services/dogPhoto";
 import { useDogStore } from "@/stores/dogStore";
 import { useModalStore } from "@/stores/modal";
 import { useMySettingsStore } from "@/stores/mySettingsStore";
@@ -61,19 +66,26 @@ function formatDogAgeLabel(ageInMonths: number) {
   return `${Math.floor(ageInMonths / 12)}살`;
 }
 
+function toErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return fallback;
+}
+
 export default function MyPage() {
   const [isPetModalOpen, setIsPetModalOpen] = useState(false);
   const [isPetPhotoOverlayOpen, setIsPetPhotoOverlayOpen] = useState(false);
   const [isCookieResetDone, setIsCookieResetDone] = useState(false);
-  const [petPhotoPreviewUrl, setPetPhotoPreviewUrl] = useState<string | null>(
-    null,
-  );
   const [pendingPetPhotoUrl, setPendingPetPhotoUrl] = useState<string | null>(
     null,
   );
+  const [pendingPetPhotoFile, setPendingPetPhotoFile] = useState<File | null>(
+    null,
+  );
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const [petPhotoError, setPetPhotoError] = useState<string | null>(null);
   const petPhotoInputRef = useRef<HTMLInputElement | null>(null);
-  const petPhotoCommittedObjectUrlRef = useRef<string | null>(null);
   const pendingPetPhotoObjectUrlRef = useRef<string | null>(null);
 
   const dog = useDogStore((s) => s.dog);
@@ -96,14 +108,7 @@ export default function MyPage() {
   );
 
   const dogDisplayName = dog?.name?.trim() ? dog.name.trim() : "이름";
-
-  const clearCommittedPetPhoto = () => {
-    if (petPhotoCommittedObjectUrlRef.current) {
-      URL.revokeObjectURL(petPhotoCommittedObjectUrlRef.current);
-      petPhotoCommittedObjectUrlRef.current = null;
-    }
-    setPetPhotoPreviewUrl(null);
-  };
+  const petPhotoUrl = dog?.photo?.variantUrl ?? null;
 
   const clearPendingPetPhoto = () => {
     if (pendingPetPhotoObjectUrlRef.current) {
@@ -111,9 +116,11 @@ export default function MyPage() {
       pendingPetPhotoObjectUrlRef.current = null;
     }
     setPendingPetPhotoUrl(null);
+    setPendingPetPhotoFile(null);
   };
 
   const closePetPhotoOverlay = () => {
+    if (isPhotoUploading) return;
     clearPendingPetPhoto();
     setPetPhotoError(null);
     setIsPetPhotoOverlayOpen(false);
@@ -121,9 +128,6 @@ export default function MyPage() {
 
   useEffect(() => {
     return () => {
-      if (petPhotoCommittedObjectUrlRef.current) {
-        URL.revokeObjectURL(petPhotoCommittedObjectUrlRef.current);
-      }
       if (pendingPetPhotoObjectUrlRef.current) {
         URL.revokeObjectURL(pendingPetPhotoObjectUrlRef.current);
       }
@@ -131,12 +135,14 @@ export default function MyPage() {
   }, []);
 
   const handleOpenPetPhotoPicker = () => {
+    if (isPhotoUploading) return;
     setPetPhotoError(null);
     setIsPetPhotoOverlayOpen(true);
     petPhotoInputRef.current?.click();
   };
 
   const handleReselectPetPhoto = () => {
+    if (isPhotoUploading) return;
     setPetPhotoError(null);
     petPhotoInputRef.current?.click();
   };
@@ -149,6 +155,10 @@ export default function MyPage() {
       setPetPhotoError("이미지 파일만 업로드할 수 있어요.");
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      setPetPhotoError("10MB 이하의 이미지 파일만 업로드할 수 있어요.");
+      return;
+    }
 
     setPetPhotoError(null);
     if (pendingPetPhotoObjectUrlRef.current) {
@@ -158,24 +168,60 @@ export default function MyPage() {
     const nextObjectUrl = URL.createObjectURL(file);
     pendingPetPhotoObjectUrlRef.current = nextObjectUrl;
     setPendingPetPhotoUrl(nextObjectUrl);
+    setPendingPetPhotoFile(file);
   };
 
-  const handleConfirmPetPhoto = () => {
-    if (!pendingPetPhotoUrl || !pendingPetPhotoObjectUrlRef.current) return;
-
-    if (petPhotoCommittedObjectUrlRef.current) {
-      URL.revokeObjectURL(petPhotoCommittedObjectUrlRef.current);
+  const handleConfirmPetPhoto = async () => {
+    if (isPhotoUploading) return;
+    if (!dog) {
+      setPetPhotoError("반려동물 정보를 먼저 등록해 주세요.");
+      return;
     }
-    petPhotoCommittedObjectUrlRef.current = pendingPetPhotoObjectUrlRef.current;
-    pendingPetPhotoObjectUrlRef.current = null;
-    setPetPhotoPreviewUrl(pendingPetPhotoUrl);
-    setPendingPetPhotoUrl(null);
+    if (!pendingPetPhotoFile || !pendingPetPhotoUrl) {
+      setPetPhotoError("변경할 사진을 먼저 선택해 주세요.");
+      return;
+    }
+
+    setIsPhotoUploading(true);
     setPetPhotoError(null);
-    setIsPetPhotoOverlayOpen(false);
+
+    const previousImageId = dog.photo?.imageId ?? null;
+
+    try {
+      const { imageId, uploadURL, variantUrl } = await requestDirectUpload();
+      await uploadFileToDirectUrl(uploadURL, pendingPetPhotoFile);
+
+      setDog({
+        ...dog,
+        photo: {
+          imageId,
+          variantUrl,
+          uploadedAt: new Date().toISOString(),
+        },
+      });
+
+      clearPendingPetPhoto();
+      setIsPetPhotoOverlayOpen(false);
+
+      if (previousImageId && previousImageId !== imageId) {
+        deleteDogPhoto(previousImageId).catch((error) => {
+          console.error("Failed to delete previous dog photo", error);
+        });
+      }
+    } catch (error) {
+      setPetPhotoError(
+        toErrorMessage(error, "사진 업로드에 실패했어요. 다시 시도해 주세요."),
+      );
+    } finally {
+      setIsPhotoUploading(false);
+    }
   };
 
   const handlePetSave = (nextDog: DogInfo) => {
-    setDog(nextDog);
+    setDog({
+      ...nextDog,
+      photo: dog?.photo,
+    });
     setFormDraft(null);
     setPetPhotoError(null);
     setIsPetModalOpen(false);
@@ -222,11 +268,16 @@ export default function MyPage() {
   };
 
   const handleConfirmPetDelete = () => {
+    const previousImageId = dog?.photo?.imageId ?? null;
     clearDog();
-    clearCommittedPetPhoto();
     clearPendingPetPhoto();
     setPetPhotoError(null);
     setIsPetPhotoOverlayOpen(false);
+    if (previousImageId) {
+      deleteDogPhoto(previousImageId).catch((error) => {
+        console.error("Failed to delete dog photo", error);
+      });
+    }
   };
 
   const handleOpenPetDeleteModal = () => {
@@ -274,9 +325,9 @@ export default function MyPage() {
 
         <div className="mx-auto mt-5 w-full max-w-[300px] overflow-hidden rounded-2xl bg-dg-gray-400">
           <div className="relative h-[340px] w-full">
-            {petPhotoPreviewUrl ? (
+            {petPhotoUrl ? (
               <Image
-                src={petPhotoPreviewUrl}
+                src={petPhotoUrl}
                 alt="반려동물 사진"
                 fill
                 sizes="430px"
@@ -529,9 +580,10 @@ export default function MyPage() {
 
       {isPetPhotoOverlayOpen ? (
         <PetPhotoPreviewOverlay
-          previewUrl={pendingPetPhotoUrl ?? petPhotoPreviewUrl}
+          previewUrl={pendingPetPhotoUrl ?? petPhotoUrl}
           error={petPhotoError}
-          canConfirm={Boolean(pendingPetPhotoUrl)}
+          canConfirm={Boolean(pendingPetPhotoUrl && pendingPetPhotoFile)}
+          isUploading={isPhotoUploading}
           onClose={closePetPhotoOverlay}
           onReselect={handleReselectPetPhoto}
           onConfirm={handleConfirmPetPhoto}

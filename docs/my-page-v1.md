@@ -3,7 +3,6 @@
 ## IA
 - `/my`: 마이페이지 허브
 - `/my/support/notices`: 공지사항 목록
-- `/my/support/notices/[id]`: 공지사항 상세
 - `/my/support/report`: 잘못된 정보 신고
 - `/my/support/feedback`: 의견 남기기
 
@@ -17,12 +16,15 @@
 
 ## 고객지원 데이터 정책
 - 공지사항: `lib/mock/notices.ts` 정적 데이터 사용
-- 잘못된 정보 신고: 로컬 검증 후 성공 모달 노출(서버 미연동)
-- 의견 남기기: 로컬 검증 후 성공 모달 노출(서버 미연동)
+- 잘못된 정보 신고: 개발중 placeholder 노출
+- 의견 남기기: 개발중 placeholder 노출
 
 ## 반려동물 입력 정책
 - 반려동물 등록/수정은 `/my` 내부 전용 모달에서 처리
 - 입력 필드: 이름(선택), 나이(필수), 단위(년/개월), 크기(소형/중형/대형)
+- 프로필 사진은 Cloudflare Images direct upload로 업로드
+- 저장 정보: `imageId`, `variantUrl`, `uploadedAt` (dog store에 로컬 영속)
+- 사진 교체/반려동물 삭제 시 기존 Cloudflare 이미지 삭제 시도(best-effort)
 
 ## 백엔드 연동 계획 (후속)
 - 알림 설정 서버 동기화 API

@@ -6,7 +6,10 @@ const nextConfig: NextConfig = {
   /* config options here */
   ...(distDir ? { distDir } : {}),
   images: {
-    remotePatterns: [new URL("http://tong.visitkorea.or.kr/**")],
+    remotePatterns: [
+      new URL("http://tong.visitkorea.or.kr/**"),
+      new URL("https://imagedelivery.net/**"),
+    ],
   },
 };
 

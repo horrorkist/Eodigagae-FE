@@ -193,6 +193,7 @@ export default function DogInfoForm({
       name: normalizedName ? normalizedName : undefined,
       ageInMonths,
       breed: data.breed,
+      photo: currentDog?.photo,
     };
     const nextFormDraft: DogInfoFormDraft = {
       name: normalizedName ? normalizedName : undefined,

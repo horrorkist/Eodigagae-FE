@@ -13,6 +13,7 @@ type PetPhotoPreviewOverlayProps = {
   previewUrl: string | null;
   error: string | null;
   canConfirm: boolean;
+  isUploading: boolean;
   onClose: () => void;
   onReselect: () => void;
   onConfirm: () => void;
@@ -22,6 +23,7 @@ export default function PetPhotoPreviewOverlay({
   previewUrl,
   error,
   canConfirm,
+  isUploading,
   onClose,
   onReselect,
   onConfirm,
@@ -41,6 +43,7 @@ export default function PetPhotoPreviewOverlay({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (isUploading) return;
         event.preventDefault();
         onClose();
       }
@@ -52,12 +55,15 @@ export default function PetPhotoPreviewOverlay({
       window.removeEventListener("keydown", handleKeyDown);
       lastActiveElementRef.current?.focus();
     };
-  }, [onClose]);
+  }, [isUploading, onClose]);
 
   const overlayContent = (
     <div
       className="fixed inset-0 z-[220] bg-black/55 p-4"
-      onClick={onClose}
+      onClick={() => {
+        if (isUploading) return;
+        onClose();
+      }}
     >
       <div className="flex h-full items-center justify-center">
         <div
@@ -73,9 +79,16 @@ export default function PetPhotoPreviewOverlay({
             </h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                if (isUploading) return;
+                onClose();
+              }}
               aria-label="닫기"
-              className="rounded-full p-1 text-gray-400 active:bg-gray-100"
+              disabled={isUploading}
+              className={[
+                "rounded-full p-1 text-gray-400 active:bg-gray-100",
+                isUploading ? "cursor-not-allowed opacity-50" : "",
+              ].join(" ")}
             >
               <AppIcon icon={appIconXMark} className="h-4 w-4" />
             </button>
@@ -107,22 +120,28 @@ export default function PetPhotoPreviewOverlay({
               ref={firstButtonRef}
               type="button"
               onClick={onReselect}
-              className="h-11 rounded-xl border border-gray-300 text-sm font-semibold text-dg-black active:bg-gray-100"
+              disabled={isUploading}
+              className={[
+                "h-11 rounded-xl border border-gray-300 text-sm font-semibold text-dg-black",
+                isUploading
+                  ? "cursor-not-allowed bg-gray-100 opacity-50"
+                  : "active:bg-gray-100",
+              ].join(" ")}
             >
               재선택
             </button>
             <button
               type="button"
               onClick={onConfirm}
-              disabled={!canConfirm}
+              disabled={!canConfirm || isUploading}
               className={[
                 "h-11 rounded-xl text-sm font-semibold text-white",
-                canConfirm
+                canConfirm && !isUploading
                   ? "bg-dg-green-500 active:bg-dg-green-600"
                   : "cursor-not-allowed bg-gray-300",
               ].join(" ")}
             >
-              완료
+              {isUploading ? "업로드 중..." : "완료"}
             </button>
           </div>
         </div>
