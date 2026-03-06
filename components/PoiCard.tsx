@@ -50,10 +50,10 @@ const CARD_VISUAL_STYLES: Record<
     thumbnailIconClassName: "text-dg-blue-500",
   },
   "trash-bin": {
-    leftBadgeBgClassName: "bg-green-sub",
+    leftBadgeBgClassName: "bg-dg-green-sub",
     leftIcon: appIconTrashbin,
     thumbnailBgClassName: "bg-dg-green-400",
-    thumbnailIconClassName: "text-green-sub",
+    thumbnailIconClassName: "text-dg-green-sub",
   },
 };
 

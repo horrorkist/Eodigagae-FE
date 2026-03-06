@@ -20,7 +20,7 @@ test("buildFacilityPinMarkerHTML renders trash-bin marker style", () => {
   const html = buildFacilityPinMarkerHTML("trash-bin", "강남역 쓰레기통");
 
   assert.match(html, /data-source="trash-bin"/);
-  assert.match(html, /var\(--color-green-sub\)/);
+  assert.match(html, /var\(--color-dg-green-sub\)/);
 });
 
 test("getFacilityMarkerStyle throws for unsupported source", () => {

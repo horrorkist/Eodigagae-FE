@@ -13,19 +13,21 @@ type FacilityMarkerStyle = {
   iconColor: string;
 };
 
-const FACILITY_MARKER_STYLES: Record<FacilityMarkerSource, FacilityMarkerStyle> =
-  {
-    fountain: {
-      icon: appIconWaterdrop,
-      bg: "#3b82f6",
-      iconColor: "#ffffff",
-    },
-    "trash-bin": {
-      icon: appIconTrashbin,
-      bg: "var(--color-green-sub)",
-      iconColor: "#ffffff",
-    },
-  };
+const FACILITY_MARKER_STYLES: Record<
+  FacilityMarkerSource,
+  FacilityMarkerStyle
+> = {
+  fountain: {
+    icon: appIconWaterdrop,
+    bg: "#3b82f6",
+    iconColor: "#ffffff",
+  },
+  "trash-bin": {
+    icon: appIconTrashbin,
+    bg: "var(--color-dg-green-sub)",
+    iconColor: "#ffffff",
+  },
+};
 
 export function getFacilityMarkerStyle(
   source: FacilityMarkerSource,

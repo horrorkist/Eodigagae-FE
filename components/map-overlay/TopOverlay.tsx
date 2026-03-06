@@ -23,7 +23,7 @@ const TOGGLE_STYLES: Record<
     text: "text-dg-orange-500",
   },
   green: {
-    on: "bg-dg-green-100 border border-green-sub",
+    on: "bg-dg-green-100 border border-dg-green-sub",
     off: "bg-white border border-white",
     text: "text-dg-green-sub",
   },
