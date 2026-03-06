@@ -25,7 +25,7 @@ const TOGGLE_STYLES: Record<
   green: {
     on: "bg-dg-green-100 border border-green-sub",
     off: "bg-white border border-white",
-    text: "text-green-sub",
+    text: "text-dg-green-sub",
   },
   blue: {
     on: "bg-dg-blue-100 border border-dg-blue-500",
@@ -67,7 +67,10 @@ function ToggleChipButton({ toggle }: { toggle: ToggleItem }) {
         isOn ? style.on : style.off,
       ].join(" ")}
     >
-      <AppIcon icon={toggle.icon} className={["w-4 h-4", style.text].join(" ")} />
+      <AppIcon
+        icon={toggle.icon}
+        className={["w-4 h-4", style.text].join(" ")}
+      />
       <span className="relative inline-flex items-center justify-center">
         <span className={showLoadingIndicator ? "opacity-0" : ""}>{label}</span>
         {showLoadingIndicator && (
@@ -149,7 +152,9 @@ export default function TopOverlay({
                     hasSearchKeyword ? "text-gray-900" : "text-gray-500",
                   ].join(" ")}
                 >
-                  {hasSearchKeyword ? normalizedSearchKeyword : "어디로 산책할까요?"}
+                  {hasSearchKeyword
+                    ? normalizedSearchKeyword
+                    : "어디로 산책할까요?"}
                 </span>
               </Link>
               {showSearchResultClearButton && onClearSearchResults && (

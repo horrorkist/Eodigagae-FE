@@ -13,8 +13,14 @@ export default function BottomNavHost() {
   );
   const isOnboardingRoute =
     pathname === "/onboarding" || pathname.startsWith("/onboarding/");
+  const isSupportSubRoute =
+    pathname === "/my/support/notices" ||
+    pathname === "/my/support/report" ||
+    pathname === "/my/support/feedback";
 
-  if (!isBottomChromeVisible || isOnboardingRoute) return null;
+  if (!isBottomChromeVisible || isOnboardingRoute || isSupportSubRoute) {
+    return null;
+  }
 
   return (
     <div

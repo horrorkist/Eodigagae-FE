@@ -23,6 +23,7 @@ import {
   appIconTrashbin,
 } from "@/components/icons/definitions.generated";
 import PetProfileModal from "@/components/my-page/PetProfileModal";
+import PetPhotoPreviewOverlay from "@/components/my-page/PetPhotoPreviewOverlay";
 import {
   COACHMARK_COOKIE_NAME,
   ONBOARDING_COOKIE_NAME,
@@ -62,13 +63,18 @@ function formatDogAgeLabel(ageInMonths: number) {
 
 export default function MyPage() {
   const [isPetModalOpen, setIsPetModalOpen] = useState(false);
+  const [isPetPhotoOverlayOpen, setIsPetPhotoOverlayOpen] = useState(false);
   const [isCookieResetDone, setIsCookieResetDone] = useState(false);
   const [petPhotoPreviewUrl, setPetPhotoPreviewUrl] = useState<string | null>(
     null,
   );
+  const [pendingPetPhotoUrl, setPendingPetPhotoUrl] = useState<string | null>(
+    null,
+  );
   const [petPhotoError, setPetPhotoError] = useState<string | null>(null);
   const petPhotoInputRef = useRef<HTMLInputElement | null>(null);
-  const petPhotoObjectUrlRef = useRef<string | null>(null);
+  const petPhotoCommittedObjectUrlRef = useRef<string | null>(null);
+  const pendingPetPhotoObjectUrlRef = useRef<string | null>(null);
 
   const dog = useDogStore((s) => s.dog);
   const setDog = useDogStore((s) => s.setDog);
@@ -91,23 +97,47 @@ export default function MyPage() {
 
   const dogDisplayName = dog?.name?.trim() ? dog.name.trim() : "이름";
 
-  const clearPetPhotoPreview = () => {
-    if (petPhotoObjectUrlRef.current) {
-      URL.revokeObjectURL(petPhotoObjectUrlRef.current);
-      petPhotoObjectUrlRef.current = null;
+  const clearCommittedPetPhoto = () => {
+    if (petPhotoCommittedObjectUrlRef.current) {
+      URL.revokeObjectURL(petPhotoCommittedObjectUrlRef.current);
+      petPhotoCommittedObjectUrlRef.current = null;
     }
     setPetPhotoPreviewUrl(null);
   };
 
+  const clearPendingPetPhoto = () => {
+    if (pendingPetPhotoObjectUrlRef.current) {
+      URL.revokeObjectURL(pendingPetPhotoObjectUrlRef.current);
+      pendingPetPhotoObjectUrlRef.current = null;
+    }
+    setPendingPetPhotoUrl(null);
+  };
+
+  const closePetPhotoOverlay = () => {
+    clearPendingPetPhoto();
+    setPetPhotoError(null);
+    setIsPetPhotoOverlayOpen(false);
+  };
+
   useEffect(() => {
     return () => {
-      if (petPhotoObjectUrlRef.current) {
-        URL.revokeObjectURL(petPhotoObjectUrlRef.current);
+      if (petPhotoCommittedObjectUrlRef.current) {
+        URL.revokeObjectURL(petPhotoCommittedObjectUrlRef.current);
+      }
+      if (pendingPetPhotoObjectUrlRef.current) {
+        URL.revokeObjectURL(pendingPetPhotoObjectUrlRef.current);
       }
     };
   }, []);
 
   const handleOpenPetPhotoPicker = () => {
+    setPetPhotoError(null);
+    setIsPetPhotoOverlayOpen(true);
+    petPhotoInputRef.current?.click();
+  };
+
+  const handleReselectPetPhoto = () => {
+    setPetPhotoError(null);
     petPhotoInputRef.current?.click();
   };
 
@@ -121,13 +151,27 @@ export default function MyPage() {
     }
 
     setPetPhotoError(null);
-    if (petPhotoObjectUrlRef.current) {
-      URL.revokeObjectURL(petPhotoObjectUrlRef.current);
+    if (pendingPetPhotoObjectUrlRef.current) {
+      URL.revokeObjectURL(pendingPetPhotoObjectUrlRef.current);
     }
 
     const nextObjectUrl = URL.createObjectURL(file);
-    petPhotoObjectUrlRef.current = nextObjectUrl;
-    setPetPhotoPreviewUrl(nextObjectUrl);
+    pendingPetPhotoObjectUrlRef.current = nextObjectUrl;
+    setPendingPetPhotoUrl(nextObjectUrl);
+  };
+
+  const handleConfirmPetPhoto = () => {
+    if (!pendingPetPhotoUrl || !pendingPetPhotoObjectUrlRef.current) return;
+
+    if (petPhotoCommittedObjectUrlRef.current) {
+      URL.revokeObjectURL(petPhotoCommittedObjectUrlRef.current);
+    }
+    petPhotoCommittedObjectUrlRef.current = pendingPetPhotoObjectUrlRef.current;
+    pendingPetPhotoObjectUrlRef.current = null;
+    setPetPhotoPreviewUrl(pendingPetPhotoUrl);
+    setPendingPetPhotoUrl(null);
+    setPetPhotoError(null);
+    setIsPetPhotoOverlayOpen(false);
   };
 
   const handlePetSave = (nextDog: DogInfo) => {
@@ -179,8 +223,10 @@ export default function MyPage() {
 
   const handleConfirmPetDelete = () => {
     clearDog();
-    clearPetPhotoPreview();
+    clearCommittedPetPhoto();
+    clearPendingPetPhoto();
     setPetPhotoError(null);
+    setIsPetPhotoOverlayOpen(false);
   };
 
   const handleOpenPetDeleteModal = () => {
@@ -285,9 +331,6 @@ export default function MyPage() {
           onChange={handlePetPhotoChange}
         />
 
-        {petPhotoError ? (
-          <p className="mt-3 text-xs text-red-600">{petPhotoError}</p>
-        ) : null}
       </div>
     );
   };
@@ -482,6 +525,17 @@ export default function MyPage() {
           dog={dog}
           onClose={() => setIsPetModalOpen(false)}
           onSave={handlePetSave}
+        />
+      ) : null}
+
+      {isPetPhotoOverlayOpen ? (
+        <PetPhotoPreviewOverlay
+          previewUrl={pendingPetPhotoUrl ?? petPhotoPreviewUrl}
+          error={petPhotoError}
+          canConfirm={Boolean(pendingPetPhotoUrl)}
+          onClose={closePetPhotoOverlay}
+          onReselect={handleReselectPetPhoto}
+          onConfirm={handleConfirmPetPhoto}
         />
       ) : null}
     </div>
