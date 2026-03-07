@@ -1,31 +1,55 @@
 "use client";
 
+import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
+import AppIcon from "@/components/icons/AppIcon";
+import { appIconPaw } from "@/components/icons/definitions.generated";
 import {
   ONBOARDING_COOKIE_MAX_AGE_SECONDS,
   ONBOARDING_COOKIE_NAME,
   ONBOARDING_COOKIE_VALUE,
 } from "@/lib/onboarding";
 
+type TitleSegment = {
+  text: string;
+  highlight?: boolean;
+};
+
 type OnboardingStep = {
-  title: string;
+  titleSegments: TitleSegment[];
   description: string;
+  illustrationSrc?: string;
+  illustrationAlt?: string;
 };
 
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
-    title: "반려동물에게는 맞춤형 산책이 필요하니까",
+    titleSegments: [
+      { text: "반려동물에게는 " },
+      { text: "맞춤형 산책", highlight: true },
+      { text: "이 필요하니까" },
+    ],
     description:
-      "나이와 체형을 고려해 반려동물에게 부담없는 맞춤형 산책 경로를 제안해요.",
+      "나이와 체형을 고려해 반려동물이 부담없이\n즐길 수 있는 맞춤형 산책 경로를 제안해요.",
+    illustrationSrc: "/images/onboarding/step-1.svg",
+    illustrationAlt: "맞춤형 산책 온보딩 일러스트",
   },
   {
-    title: "산책 중 필요한 정보를 한눈에!",
+    titleSegments: [{ text: "산책 중 필요한 정보를 한 눈에!" }],
     description:
-      "반려동물 동반 가능 공간부터 쓰레기통, 음수대 위치까지 지도 위에서 쉽게 확인하세요.",
+      "반려동물 동반 가능 공간부터 쓰레기통, 음수대\n위치까지 지도 위에서 쉽게 확인하세요.",
+    illustrationSrc: "/images/onboarding/step-2.svg",
+    illustrationAlt: "산책 정보 온보딩 일러스트",
   },
   {
-    title: "오늘은 새로운 길로 걸어볼까요?",
-    description: "매번 다른 경로를 추천해 새로운 산책 경험을 만들어드려요.",
+    titleSegments: [
+      { text: "오늘은 " },
+      { text: "새로운 길", highlight: true },
+      { text: "로 걸어볼까요?" },
+    ],
+    description:
+      "매번 같은 길이 아닌, 세 가지 경로를 새롭게\n추천해 더욱 즐거운 산책 경험을 만들어드려요.",
   },
 ];
 
@@ -37,6 +61,11 @@ export default function OnboardingPageClient({
   destination,
 }: OnboardingPageClientProps) {
   const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(0);
+  const totalSteps = ONBOARDING_STEPS.length;
+  const isFirstStep = currentStep === 0;
+  const isLastStep = currentStep === totalSteps - 1;
+  const step = ONBOARDING_STEPS[currentStep];
 
   const completeOnboarding = () => {
     document.cookie = [
@@ -49,43 +78,79 @@ export default function OnboardingPageClient({
     router.replace(destination);
   };
 
+  const goToNextStep = () => {
+    setCurrentStep((prev) => Math.min(prev + 1, totalSteps - 1));
+  };
+
+  const goToPreviousStep = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 0));
+  };
+
   return (
-    <section className="flex h-full flex-col bg-gradient-to-b from-dg-green-50 to-white px-5 pb-6 pt-8 text-dg-black pointer-events-auto">
-      <header className="space-y-2">
-        <p className="text-sm font-semibold text-dg-green-700">
-          어디가개 시작하기
-        </p>
-        <h1 className="text-2xl font-bold leading-tight">
-          산책 준비를
-          <br />
-          1분 안에 끝내볼까요?
-        </h1>
-      </header>
-
-      <ol className="mt-8 flex flex-1 flex-col gap-3">
-        {ONBOARDING_STEPS.map((step, index) => (
-          <li
-            key={step.title}
-            className="rounded-2xl border border-dg-green-100 bg-white/90 p-4 shadow-[0_6px_20px_rgba(11,220,0,0.08)]"
+    <section className="flex h-full flex-col px-5 py-6 text-dg-black pointer-events-auto">
+      <div className="flex flex-col flex-1 justify-center">
+        <article className="w-full text-center">
+          <div className="relative mx-auto mb-6 h-[220px] w-full max-w-[350px]">
+            {step.illustrationSrc ? (
+              <Image
+                src={step.illustrationSrc}
+                alt={step.illustrationAlt ?? ""}
+                width={350}
+                height={220}
+                unoptimized
+                priority={currentStep === 0}
+                className="h-full w-full object-contain"
+              />
+            ) : null}
+          </div>
+          <h2 className="text-xl font-semibold text-nowrap">
+            {step.titleSegments.map((segment, index) => (
+              <span
+                key={`${segment.text}-${index}`}
+                className={segment.highlight ? "text-dg-green-500" : undefined}
+              >
+                {segment.text}
+              </span>
+            ))}
+          </h2>
+          <p className="mt-2 text-base font-medium leading-relaxed text-dg-black whitespace-pre-line">
+            {step.description}
+          </p>
+        </article>
+      </div>
+      <div className="flex justify-center pb-12 items-center gap-8">
+        {ONBOARDING_STEPS.map((_, index) => (
+          <div
+            key={`step-indicator-${index}`}
+            className={[
+              "rounded-full w-8 h-8 flex justify-center items-center",
+              currentStep === index ? "bg-dg-green-500" : "bg-dg-gray-400",
+            ].join(" ")}
           >
-            <p className="text-xs font-semibold text-dg-green-700">
-              STEP {index + 1}
-            </p>
-            <h2 className="mt-1 text-base font-semibold">{step.title}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-dg-gray-600">
-              {step.description}
-            </p>
-          </li>
+            <AppIcon
+              icon={appIconPaw}
+              className={["h-4 w-4 text-white"].join(" ")}
+            />
+          </div>
         ))}
-      </ol>
+      </div>
 
-      <div className="space-y-2">
+      <div className="flex gap-2">
+        {!isFirstStep ? (
+          <button
+            type="button"
+            onClick={goToPreviousStep}
+            className="h-12 flex-1 rounded-xl bg-dg-gray-400 text-base font-semibold text-dg-black"
+          >
+            이전
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={completeOnboarding}
-          className="h-12 w-full rounded-xl bg-dg-green-600 text-base font-semibold text-white active:bg-dg-green-700"
+          onClick={isLastStep ? completeOnboarding : goToNextStep}
+          className="h-12 flex-[1.5] rounded-xl bg-dg-green-500 text-base font-semibold text-white"
         >
-          시작하기
+          {isLastStep ? "시작하기" : "다음"}
         </button>
       </div>
     </section>
