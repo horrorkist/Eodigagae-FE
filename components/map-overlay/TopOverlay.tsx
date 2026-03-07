@@ -135,10 +135,12 @@ export default function TopOverlay({
           <div className="pointer-events-auto">{leftSlot}</div>
 
           <div className="pointer-events-auto min-w-0 flex-1 max-w-140">
-            <div className="flex w-full items-center gap-2 rounded-md border bg-white/90 px-3 py-2 shadow backdrop-blur">
+            <div
+              data-coachmark-id="search-bar"
+              className="flex w-full items-center gap-2 rounded-md border bg-white/90 px-3 py-2 shadow backdrop-blur"
+            >
               <Link
                 href="/?search=1&focus=1"
-                data-coachmark-id="search-bar"
                 className="flex min-w-0 flex-1 items-center gap-2"
                 aria-label="검색 열기"
               >
