@@ -16,14 +16,14 @@ type RouteTabContentProps = {
   dog: DogInfo | null;
   preferRouteRecommendSheet: boolean;
   onRouteRecommendRequested: (draft: DogInfoFormDraft) => void;
-  onEditDog: () => void;
+  onRequestDogEdit: () => void;
 };
 
 export default function RouteTabContent({
   dog,
   preferRouteRecommendSheet,
   onRouteRecommendRequested,
-  onEditDog,
+  onRequestDogEdit,
 }: RouteTabContentProps) {
   if (!dog || preferRouteRecommendSheet) {
     return (
@@ -46,7 +46,7 @@ export default function RouteTabContent({
       </div>
       <button
         className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600"
-        onClick={onEditDog}
+        onClick={onRequestDogEdit}
       >
         <FontAwesomeIcon icon={faPenToSquare} className="w-3 h-3" />
         수정

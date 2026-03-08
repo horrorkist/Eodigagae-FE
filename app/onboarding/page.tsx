@@ -3,9 +3,7 @@ import OnboardingPageClient from "./OnboardingPageClient";
 type SearchParamValue = string | string[] | undefined;
 
 type OnboardingPageProps = {
-  searchParams?:
-    | Promise<Record<string, SearchParamValue>>
-    | Record<string, SearchParamValue>;
+  searchParams?: Promise<Record<string, SearchParamValue>>;
 };
 
 function getSafeDestination(nextPath: string | null | undefined): string {

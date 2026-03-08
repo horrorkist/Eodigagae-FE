@@ -35,7 +35,8 @@ import {
   subscribeWalkDebugUpdates,
 } from "@/lib/walkDebug";
 import {
-  deleteDogPhoto,
+  deleteDogPhotoWithFallbackQueue,
+  drainPendingDogPhotoDeletes,
   requestDirectUpload,
   uploadFileToDirectUrl,
 } from "@/services/dogPhoto";
@@ -134,6 +135,10 @@ export default function MyPage() {
     };
   }, []);
 
+  useEffect(() => {
+    void drainPendingDogPhotoDeletes({ context: "my-page-entry-drain" });
+  }, []);
+
   const handleOpenPetPhotoPicker = () => {
     if (isPhotoUploading) return;
     setPetPhotoError(null);
@@ -204,8 +209,8 @@ export default function MyPage() {
       setIsPetPhotoOverlayOpen(false);
 
       if (previousImageId && previousImageId !== imageId) {
-        deleteDogPhoto(previousImageId).catch((error) => {
-          console.error("Failed to delete previous dog photo", error);
+        void deleteDogPhotoWithFallbackQueue(previousImageId, {
+          context: "my-page-photo-replace",
         });
       }
     } catch (error) {
@@ -274,8 +279,8 @@ export default function MyPage() {
     setPetPhotoError(null);
     setIsPetPhotoOverlayOpen(false);
     if (previousImageId) {
-      deleteDogPhoto(previousImageId).catch((error) => {
-        console.error("Failed to delete dog photo", error);
+      void deleteDogPhotoWithFallbackQueue(previousImageId, {
+        context: "my-page-delete",
       });
     }
   };

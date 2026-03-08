@@ -75,6 +75,18 @@ const DEFAULT_BOTTOM_SHEET_MOTION: BottomSheetHeightMotion = {
   easing: "linear",
 };
 
+function isLatLngCoord(
+  coord: naver.maps.Coord | null | undefined,
+): coord is naver.maps.LatLng {
+  if (!coord) return false;
+  return (
+    "lat" in coord &&
+    "lng" in coord &&
+    typeof coord.lat === "function" &&
+    typeof coord.lng === "function"
+  );
+}
+
 function MapPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -122,7 +134,6 @@ function MapPageContent() {
   );
 
   const dog = useDogStore((s) => s.dog);
-  const clearDog = useDogStore((s) => s.clearDog);
   const clearSubmittedSearchPois = useMapStore((s) => s.clearSubmittedSearchPois);
   const openBottomSheet = useBottomSheetStore((s) => s.open);
   const closeBottomSheet = useBottomSheetStore((s) => s.close);
@@ -362,6 +373,15 @@ function MapPageContent() {
     });
   }, [openBottomSheet]);
 
+  const handleRequestDogEdit = useCallback(() => {
+    setPreferRouteRecommendSheet(true);
+    setHomeTabMode("main");
+    setSheetViewMode("home");
+    setIsRoutePlanningMode(false);
+    setIsStartPointSelectionMode(false);
+    setPendingRouteRecommendDraft(null);
+  }, []);
+
   const handleRouteRecommendRequested = useCallback(
     (draft: DogInfoFormDraft) => {
       setPendingRouteRecommendDraft(draft);
@@ -392,10 +412,8 @@ function MapPageContent() {
     }
 
     const center = mapRef.current?.getCenter();
-    const centerLat =
-      center && typeof center.lat === "function" ? center.lat() : NaN;
-    const centerLng =
-      center && typeof center.lng === "function" ? center.lng() : NaN;
+    const centerLat = isLatLngCoord(center) ? center.lat() : NaN;
+    const centerLng = isLatLngCoord(center) ? center.lng() : NaN;
 
     if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
       openModal({
@@ -941,7 +959,7 @@ function MapPageContent() {
                   dog={dog}
                   preferRouteRecommendSheet={preferRouteRecommendSheet}
                   onRouteRecommendRequested={handleRouteRecommendRequested}
-                  onEditDog={clearDog}
+                  onRequestDogEdit={handleRequestDogEdit}
                 />
               )}
 
