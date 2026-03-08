@@ -20,7 +20,10 @@ import FloatingControlsOverlay from "@/components/map-overlay/FloatingControlsOv
 import WalkingOverlay from "@/components/map-overlay/WalkingOverlay";
 import StartPointCenterMarker from "@/components/map-overlay/StartPointCenterMarker";
 import StartPointPromptSheet from "@/components/map-overlay/StartPointPromptSheet";
-import { START_POINT_FLOATING_CONTROLS_EXTRA_BOTTOM_PX } from "@/lib/bottomChromeMetrics";
+import {
+  BOTTOM_CHROME_HEIGHT_PX,
+  FLOATING_CONTROLS_BASE_BOTTOM_WITH_CHROME_PX,
+} from "@/lib/bottomChromeMetrics";
 
 function formatElapsed(totalSec: number) {
   if (!Number.isFinite(totalSec) || totalSec < 0) return "00:00";
@@ -109,6 +112,15 @@ export default function MapOverlay({
   const walkingPausedTotalMs = useMapStore((s) => s.walkingPausedTotalMs);
   const walkedDistanceM = useMapStore((s) => s.walkedDistanceM);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [startPointPromptSheetHeightPx, setStartPointPromptSheetHeightPx] =
+    useState(0);
+  const startPointFloatingControlsExtraBottomPx = useMemo(() => {
+    const floatingBaseGapPx =
+      FLOATING_CONTROLS_BASE_BOTTOM_WITH_CHROME_PX - BOTTOM_CHROME_HEIGHT_PX;
+    const requiredExtraPx =
+      startPointPromptSheetHeightPx - floatingBaseGapPx + 12;
+    return Math.max(0, requiredExtraPx);
+  }, [startPointPromptSheetHeightPx]);
 
   const canStartWalking = useMemo(
     () => !!route?.path && route.path.length > 1,
@@ -279,7 +291,7 @@ export default function MapOverlay({
             isBottomChromeVisible={isBottomChromeVisible}
             bottomOffsetPx={
               floatingControlsBottomOffsetPx +
-              START_POINT_FLOATING_CONTROLS_EXTRA_BOTTOM_PX
+              startPointFloatingControlsExtraBottomPx
             }
             bottomTransitionMs={floatingControlsBottomTransitionMs}
             bottomTransitionEasing={floatingControlsBottomTransitionEasing}
@@ -288,7 +300,10 @@ export default function MapOverlay({
             onRequestMyLocation={onRequestMyLocation}
           />
           <StartPointCenterMarker />
-          <StartPointPromptSheet addressText="서울특별시 중구 세종대로 110" />
+          <StartPointPromptSheet
+            addressText="서울특별시 중구 세종대로 110"
+            onHeightChange={setStartPointPromptSheetHeightPx}
+          />
         </>
       ) : isRoutePlanningMode ? (
         <RoutePlanningOverlay
