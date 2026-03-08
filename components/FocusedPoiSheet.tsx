@@ -3,6 +3,7 @@
 import formatDist from "@/lib/formatDist";
 import type { FocusedPoi } from "@/types/focusedPoi";
 import { useModalStore } from "@/stores/modal";
+import { BOTTOM_CHROME_HEIGHT_PX } from "@/lib/bottomChromeMetrics";
 import AppIcon from "./icons/AppIcon";
 import {
   appIconChevronDown,
@@ -159,7 +160,9 @@ export default function FocusedPoiSheet({
     <div
       ref={rootRef}
       className="fixed left-0 z-[112] w-full max-w-[430px] pointer-events-auto"
-      style={{ bottom: "calc(var(--safe-bottom) + 56px)" }}
+      style={{
+        bottom: `calc(var(--safe-bottom) + ${BOTTOM_CHROME_HEIGHT_PX}px)`,
+      }}
     >
       <section
         className={[

@@ -9,7 +9,6 @@ import {
   appIconPaw,
   appIconUser,
 } from "@/components/icons/definitions.generated";
-import { useBottomSheetStore } from "@/stores/bottomSheet";
 
 type Tab = {
   href: string;
@@ -25,22 +24,9 @@ const tabs: Tab[] = [
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const isBottomSheetOpen = useBottomSheetStore((s) => s.isOpen);
-  const isContentScrollable = useBottomSheetStore((s) => s.isContentScrollable);
-  const isContentAtBottom = useBottomSheetStore((s) => s.isContentAtBottom);
-  const showBoundaryShadow =
-    !isBottomSheetOpen ||
-    (isBottomSheetOpen && isContentScrollable && !isContentAtBottom);
 
   return (
-    <nav
-      className={[
-        "grid grid-cols-3 h-14 items-center bg-white transition-shadow duration-200",
-        showBoundaryShadow
-          ? "shadow-[0_-6px_18px_rgba(15,23,42,0.08)]"
-          : "shadow-none",
-      ].join(" ")}
-    >
+    <nav className="grid grid-cols-3 h-16 items-center bg-white">
       {tabs.map((t) => {
         const active =
           t.href === "/"
@@ -51,7 +37,7 @@ export default function BottomNav() {
             key={t.href}
             href={t.href}
             className={[
-              "flex flex-col h-14 items-center justify-center gap-1",
+              "flex flex-col h-16 items-center justify-center gap-1",
               active ? "text-dg-green-500" : "text-dg-gray-500",
             ].join(" ")}
           >

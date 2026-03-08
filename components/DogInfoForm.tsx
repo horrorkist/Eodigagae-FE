@@ -8,6 +8,8 @@ import type { DogInfoFormDraft } from "@/stores/dogStore";
 import { AnimatePresence, motion } from "framer-motion";
 import { getWalkRecommendation } from "@/lib/walkRecommendation";
 import { getJosa } from "@/lib/utils";
+import { useBottomNavOverrideStore } from "@/stores/bottomNavOverride";
+import { useBottomSheetStore } from "@/stores/bottomSheet";
 import {
   AGE_UNIT_LABEL,
   BREED_OPTIONS,
@@ -43,8 +45,11 @@ type FormValues = {
   walkDurationHours: number;
 };
 
+const ROUTE_RECOMMEND_FORM_ID = "route-recommend-form";
+
 type Props = {
   mode?: DogInfoFormMode;
+  useBottomNavCta?: boolean;
   submitLabel?: string;
   onSubmitSuccess?: (data: DogInfo) => void;
   onRouteRecommendRequested?: (draft: DogInfoFormDraft) => void;
@@ -52,6 +57,7 @@ type Props = {
 
 export default function DogInfoForm({
   mode = "route",
+  useBottomNavCta = false,
   submitLabel,
   onSubmitSuccess,
   onRouteRecommendRequested,
@@ -60,6 +66,14 @@ export default function DogInfoForm({
   const currentDog = useDogStore((s) => s.dog);
   const currentFormDraft = useDogStore((s) => s.formDraft);
   const setFormDraft = useDogStore((s) => s.setFormDraft);
+  const isBottomSheetOpen = useBottomSheetStore((s) => s.isOpen);
+  const showRouteFormCta = useBottomNavOverrideStore((s) => s.showRouteFormCta);
+  const setRouteFormCanSubmit = useBottomNavOverrideStore(
+    (s) => s.setRouteFormCanSubmit,
+  );
+  const clearBottomNavOverride = useBottomNavOverrideStore(
+    (s) => s.clearOverride,
+  );
   const formRootRef = useRef<HTMLDivElement | null>(null);
   const wasWalkRecVisibleRef = useRef(false);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -108,6 +122,8 @@ export default function DogInfoForm({
 
   const selectedBreed = watchedBreed || undefined;
   const isRouteMode = shouldRequestRouteRecommendation(mode);
+  const shouldUseBottomNavCta = isRouteMode && useBottomNavCta;
+  const shouldActivateBottomNavCta = shouldUseBottomNavCta && isBottomSheetOpen;
   const resolvedSubmitLabel = resolveDogInfoFormSubmitLabel(mode, submitLabel);
   const normalizedAge =
     watchedAge === "" || watchedAge == null ? null : Number(watchedAge);
@@ -139,6 +155,31 @@ export default function DogInfoForm({
       shouldValidate: true,
     });
   }, [recommendedWalkDistanceKm, setValue, isDurationPriority, hasSavedDraft]);
+
+  useEffect(() => {
+    if (!shouldActivateBottomNavCta) return;
+
+    showRouteFormCta({
+      formId: ROUTE_RECOMMEND_FORM_ID,
+      submitLabel: resolvedSubmitLabel,
+      canSubmit: false,
+    });
+
+    return () => {
+      clearBottomNavOverride();
+    };
+  }, [
+    clearBottomNavOverride,
+    isBottomSheetOpen,
+    resolvedSubmitLabel,
+    shouldActivateBottomNavCta,
+    showRouteFormCta,
+  ]);
+
+  useEffect(() => {
+    if (!shouldActivateBottomNavCta) return;
+    setRouteFormCanSubmit(isValid);
+  }, [isValid, setRouteFormCanSubmit, shouldActivateBottomNavCta]);
 
   useEffect(() => {
     const isWalkRecVisible = Boolean(walkRec);
@@ -269,6 +310,8 @@ export default function DogInfoForm({
         )}
       </header>
       <form
+        id={shouldUseBottomNavCta ? ROUTE_RECOMMEND_FORM_ID : undefined}
+        onReset={handleReset}
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col justify-between"
         ref={formRef}
@@ -460,26 +503,28 @@ export default function DogInfoForm({
                     )}
                   />
                 </div>
-                <div className="grid grid-cols-[0.7fr_1.3fr] items-center gap-3 pt-6 text-lg">
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="rounded-xl bg-dg-white py-4 font-semibold text-dg-black transition-colors hover:bg-gray-50"
-                  >
-                    초기화
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!isValid}
-                    className={`rounded-xl py-4 font-semibold transition-colors ${
-                      walkRec
-                        ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    {resolvedSubmitLabel}
-                  </button>
-                </div>
+                {!shouldUseBottomNavCta && (
+                  <div className="grid grid-cols-[0.7fr_1.3fr] items-center gap-3 pt-6 text-lg">
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      className="rounded-xl bg-dg-white py-4 font-semibold text-dg-black transition-colors hover:bg-gray-50"
+                    >
+                      초기화
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!isValid}
+                      className={`rounded-xl py-4 font-semibold transition-colors ${
+                        walkRec
+                          ? "bg-dg-green-500 text-white hover:bg-dg-green-600"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
+                    >
+                      {resolvedSubmitLabel}
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

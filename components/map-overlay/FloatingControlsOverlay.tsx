@@ -2,6 +2,7 @@ import FloatingFABMenu from "@/components/FloatingFABMenu";
 import type { FABMenuItem } from "@/components/FloatingFABMenu";
 import AppIcon from "@/components/icons/AppIcon";
 import { appIconLocation } from "@/components/icons/definitions.generated";
+import { FLOATING_CONTROLS_BASE_BOTTOM_WITH_CHROME_PX } from "@/lib/bottomChromeMetrics";
 
 type FloatingControlsOverlayProps = {
   isBottomChromeVisible: boolean;
@@ -24,7 +25,9 @@ export default function FloatingControlsOverlay({
   fabItems,
   onRequestMyLocation,
 }: FloatingControlsOverlayProps) {
-  const baseBottomPx = isBottomChromeVisible ? 108 : 24;
+  const baseBottomPx = isBottomChromeVisible
+    ? FLOATING_CONTROLS_BASE_BOTTOM_WITH_CHROME_PX
+    : 24;
 
   return (
     <div

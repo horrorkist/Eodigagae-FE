@@ -18,6 +18,9 @@ import TopOverlay from "@/components/map-overlay/TopOverlay";
 import RoutePlanningOverlay from "@/components/map-overlay/RoutePlanningOverlay";
 import FloatingControlsOverlay from "@/components/map-overlay/FloatingControlsOverlay";
 import WalkingOverlay from "@/components/map-overlay/WalkingOverlay";
+import StartPointCenterMarker from "@/components/map-overlay/StartPointCenterMarker";
+import StartPointPromptSheet from "@/components/map-overlay/StartPointPromptSheet";
+import { START_POINT_FLOATING_CONTROLS_EXTRA_BOTTOM_PX } from "@/lib/bottomChromeMetrics";
 
 function formatElapsed(totalSec: number) {
   if (!Number.isFinite(totalSec) || totalSec < 0) return "00:00";
@@ -62,6 +65,7 @@ type MapOverlayProps = {
   routePlanningLoading?: boolean;
   routePlanningError?: string | null;
   onRoutePlanningSelect?: (routeId: string) => void;
+  isStartPointSelectionMode?: boolean;
 };
 
 export default function MapOverlay({
@@ -84,6 +88,7 @@ export default function MapOverlay({
   routePlanningLoading = false,
   routePlanningError = null,
   onRoutePlanningSelect,
+  isStartPointSelectionMode = false,
 }: MapOverlayProps) {
   const emit = useEmit();
   const isBottomChromeVisible = useUiChromeStore(
@@ -256,7 +261,7 @@ export default function MapOverlay({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-50">
-      {!isRoutePlanningMode && (
+      {!isRoutePlanningMode && !isStartPointSelectionMode && (
         <TopOverlay
           topOffsetPx={topOffsetPx}
           leftSlot={leftSlot}
@@ -268,7 +273,24 @@ export default function MapOverlay({
         />
       )}
 
-      {isRoutePlanningMode ? (
+      {isStartPointSelectionMode ? (
+        <>
+          <FloatingControlsOverlay
+            isBottomChromeVisible={isBottomChromeVisible}
+            bottomOffsetPx={
+              floatingControlsBottomOffsetPx +
+              START_POINT_FLOATING_CONTROLS_EXTRA_BOTTOM_PX
+            }
+            bottomTransitionMs={floatingControlsBottomTransitionMs}
+            bottomTransitionEasing={floatingControlsBottomTransitionEasing}
+            showFabMenu={false}
+            fabItems={[]}
+            onRequestMyLocation={onRequestMyLocation}
+          />
+          <StartPointCenterMarker />
+          <StartPointPromptSheet addressText="서울특별시 중구 세종대로 110" />
+        </>
+      ) : isRoutePlanningMode ? (
         <RoutePlanningOverlay
           recommendations={routePlanningRecommendations}
           selectedRouteId={routePlanningSelectedRouteId}

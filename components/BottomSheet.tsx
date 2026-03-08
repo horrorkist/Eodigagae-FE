@@ -10,6 +10,7 @@ import React, {
 } from "react";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { useUiChromeStore } from "@/stores/uiChrome";
+import { BOTTOM_CHROME_HEIGHT_PX } from "@/lib/bottomChromeMetrics";
 
 export type BottomSheetHeightMotion = {
   durationMs: number;
@@ -44,7 +45,7 @@ export default function BottomSheet({
   children,
   title,
   peekHeight = 72,
-  bottomNavHeight = 56,
+  bottomNavHeight = BOTTOM_CHROME_HEIGHT_PX,
   showBackdrop = true,
   onVisibleHeightChange,
   closeThreshold = 140,

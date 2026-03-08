@@ -1,5 +1,6 @@
 import SearchResultTabContent from "@/components/map-page/SearchResultTabContent";
 import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
+import { BOTTOM_CHROME_HEIGHT_PX } from "@/lib/bottomChromeMetrics";
 import Divider from "../Divider";
 
 type SearchResultsBottomSheetContentProps = {
@@ -20,7 +21,12 @@ export default function SearchResultsBottomSheetContent({
   onFocusPoi,
 }: SearchResultsBottomSheetContentProps) {
   return (
-    <div className="space-y-3 pb-[calc(var(--safe-bottom)+56px)]">
+    <div
+      className="space-y-3"
+      style={{
+        paddingBottom: `calc(var(--safe-bottom) + ${BOTTOM_CHROME_HEIGHT_PX}px)`,
+      }}
+    >
       <div className="space-y-2">
         <fieldset
           className="flex items-center gap-4 bg-white py-2"

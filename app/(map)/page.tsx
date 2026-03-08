@@ -24,6 +24,7 @@ import SearchOverlayPanel from "@/components/map-page/SearchOverlayPanel";
 import { useMapStore } from "@/stores/mapStore";
 import { useBottomSheetStore } from "@/stores/bottomSheet";
 import { useMapViewportStore } from "@/stores/mapViewport";
+import { useBottomNavOverrideStore } from "@/stores/bottomNavOverride";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
 import { useMapRuntime } from "@/hooks/useMapRuntime";
 import { useMapFacilitiesProbe } from "@/hooks/useMapFacilitiesProbe";
@@ -142,6 +143,15 @@ function MapPageContent() {
   const selectRouteRecommendation = useRouteRecommendStore(
     (s) => s.selectRoute,
   );
+  const showStartPointCta = useBottomNavOverrideStore(
+    (s) => s.showStartPointCta,
+  );
+  const setStartPointConfirmDisabled = useBottomNavOverrideStore(
+    (s) => s.setStartPointConfirmDisabled,
+  );
+  const clearBottomNavOverride = useBottomNavOverrideStore(
+    (s) => s.clearOverride,
+  );
 
   const {
     petPoiOn,
@@ -180,6 +190,10 @@ function MapPageContent() {
   const [homeTabMode, setHomeTabMode] = useState<HomeTabMode>("main");
   const [sheetViewMode, setSheetViewMode] = useState<SheetViewMode>("home");
   const [isRoutePlanningMode, setIsRoutePlanningMode] = useState(false);
+  const [isStartPointSelectionMode, setIsStartPointSelectionMode] =
+    useState(false);
+  const [pendingRouteRecommendDraft, setPendingRouteRecommendDraft] =
+    useState<DogInfoFormDraft | null>(null);
   const isSearchOverlayOpen = searchParams.get(SEARCH_QUERY_KEY) === "1";
   const shouldFocusSearchInput = searchParams.get(FOCUS_QUERY_KEY) === "1";
   const [preferRouteRecommendSheet, setPreferRouteRecommendSheet] = useState(
@@ -339,69 +353,151 @@ function MapPageContent() {
     [setPickedPos, setRouteState],
   );
 
+  const reopenRouteRecommendForm = useCallback(() => {
+    setPreferRouteRecommendSheet(true);
+    setHomeTabMode("main");
+    setSheetViewMode("home");
+    requestAnimationFrame(() => {
+      openBottomSheet(0);
+    });
+  }, [openBottomSheet]);
+
   const handleRouteRecommendRequested = useCallback(
-    async (draft: DogInfoFormDraft) => {
-      if (!myPos) {
+    (draft: DogInfoFormDraft) => {
+      setPendingRouteRecommendDraft(draft);
+      setPreferRouteRecommendSheet(true);
+      setHomeTabMode("main");
+      setSheetViewMode("home");
+      setIsRoutePlanningMode(false);
+      setIsStartPointSelectionMode(true);
+      closeBottomSheet();
+    },
+    [closeBottomSheet],
+  );
+
+  const handleStartPointBack = useCallback(() => {
+    setIsStartPointSelectionMode(false);
+    setPendingRouteRecommendDraft(null);
+    reopenRouteRecommendForm();
+  }, [reopenRouteRecommendForm]);
+
+  const handleStartPointConfirm = useCallback(async () => {
+    if (routeRecommendLoading) return;
+    if (!pendingRouteRecommendDraft) {
+      openModal({
+        title: "추천 정보를 확인할 수 없어요",
+        body: <p>반려견 정보를 다시 입력한 뒤 시도해 주세요.</p>,
+      });
+      return;
+    }
+
+    const center = mapRef.current?.getCenter();
+    const centerLat =
+      center && typeof center.lat === "function" ? center.lat() : NaN;
+    const centerLng =
+      center && typeof center.lng === "function" ? center.lng() : NaN;
+
+    if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
+      openModal({
+        title: "지도 중심 좌표를 확인할 수 없어요",
+        body: <p>지도가 로드된 뒤 다시 시도해 주세요.</p>,
+      });
+      return;
+    }
+
+    startRouteRecommendLoading();
+
+    try {
+      const response = await fetchRouteRecommendations({
+        start: { lat: centerLat, lng: centerLng },
+        draft: pendingRouteRecommendDraft,
+      });
+      setRouteRecommendations(response.recommendations, response.meta);
+
+      if (response.recommendations.length === 0) {
+        const message = "조건에 맞는 추천 경로를 찾지 못했어요.";
+        setRouteRecommendError(message);
+        setIsRoutePlanningMode(false);
+        setIsStartPointSelectionMode(false);
+        setPendingRouteRecommendDraft(null);
+        reopenRouteRecommendForm();
         openModal({
-          title: "내 위치를 확인 중이에요",
-          body: <p>현재 위치를 확인한 뒤 다시 시도해 주세요.</p>,
+          title: "추천 경로를 찾지 못했어요",
+          body: <p>{message}</p>,
         });
         return;
       }
 
-      setPreferRouteRecommendSheet(true);
-      setHomeTabMode("main");
-      setSheetViewMode("home");
-      startRouteRecommendLoading();
+      const firstRecommendation = response.recommendations[0];
+      selectRouteRecommendation(firstRecommendation.id);
+      applyRecommendationRoute(firstRecommendation);
 
-      try {
-        const response = await fetchRouteRecommendations({
-          start: myPos,
-          draft,
-        });
-        setRouteRecommendations(response.recommendations, response.meta);
+      setPreferRouteRecommendSheet(false);
+      setIsStartPointSelectionMode(false);
+      setPendingRouteRecommendDraft(null);
+      setIsRoutePlanningMode(true);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "추천 경로를 불러오지 못했어요.";
 
-        if (response.recommendations.length === 0) {
-          const message = "조건에 맞는 추천 경로를 찾지 못했어요.";
-          setRouteRecommendError(message);
-          setIsRoutePlanningMode(false);
-          openModal({
-            title: "추천 경로를 찾지 못했어요",
-            body: <p>{message}</p>,
-          });
-          return;
-        }
+      setRouteRecommendError(message);
+      setIsRoutePlanningMode(false);
+      setIsStartPointSelectionMode(false);
+      setPendingRouteRecommendDraft(null);
+      reopenRouteRecommendForm();
+      openModal({
+        title: "추천 경로를 불러오지 못했어요",
+        body: <p>{message}</p>,
+      });
+    }
+  }, [
+    applyRecommendationRoute,
+    mapRef,
+    openModal,
+    pendingRouteRecommendDraft,
+    reopenRouteRecommendForm,
+    routeRecommendLoading,
+    selectRouteRecommendation,
+    setRouteRecommendError,
+    setRouteRecommendations,
+    startRouteRecommendLoading,
+  ]);
 
-        const firstRecommendation = response.recommendations[0];
-        selectRouteRecommendation(firstRecommendation.id);
-        applyRecommendationRoute(firstRecommendation);
+  useEffect(() => {
+    if (!isStartPointSelectionMode) return;
 
-        setPreferRouteRecommendSheet(false);
-        setIsRoutePlanningMode(true);
-      } catch (error: unknown) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "추천 경로를 불러오지 못했어요.";
+    showStartPointCta({
+      backLabel: "이전",
+      confirmLabel: "경로 추천",
+      confirmDisabled: routeRecommendLoading || !pendingRouteRecommendDraft,
+      onBack: handleStartPointBack,
+      onConfirm: () => {
+        void handleStartPointConfirm();
+      },
+    });
 
-        setRouteRecommendError(message);
-        setIsRoutePlanningMode(false);
-        openModal({
-          title: "추천 경로를 불러오지 못했어요",
-          body: <p>{message}</p>,
-        });
-      }
-    },
-    [
-      applyRecommendationRoute,
-      myPos,
-      openModal,
-      selectRouteRecommendation,
-      setRouteRecommendError,
-      setRouteRecommendations,
-      startRouteRecommendLoading,
-    ],
-  );
+    return () => {
+      clearBottomNavOverride();
+    };
+  }, [
+    clearBottomNavOverride,
+    handleStartPointBack,
+    handleStartPointConfirm,
+    isStartPointSelectionMode,
+    pendingRouteRecommendDraft,
+    routeRecommendLoading,
+    showStartPointCta,
+  ]);
+
+  useEffect(() => {
+    if (!isStartPointSelectionMode) return;
+    setStartPointConfirmDisabled(routeRecommendLoading || !pendingRouteRecommendDraft);
+  }, [
+    isStartPointSelectionMode,
+    pendingRouteRecommendDraft,
+    routeRecommendLoading,
+    setStartPointConfirmDisabled,
+  ]);
 
   const handleRouteRecommendationSelect = useCallback(
     (routeId: string) => {
@@ -463,7 +559,10 @@ function MapPageContent() {
   }, [activeSheetViewMode]);
 
   const shouldShowSheetViewToggle =
-    hasSubmittedSearchResults && !focusedPoi && !isRoutePlanningMode;
+    hasSubmittedSearchResults &&
+    !focusedPoi &&
+    !isRoutePlanningMode &&
+    !isStartPointSelectionMode;
   const effectiveSearchResultSort =
     optimisticSearchSort ?? submittedSearchSort;
 
@@ -792,6 +891,7 @@ function MapPageContent() {
         routePlanningLoading={routeRecommendLoading}
         routePlanningError={routeRecommendError}
         onRoutePlanningSelect={handleRouteRecommendationSelect}
+        isStartPointSelectionMode={isStartPointSelectionMode}
       />
 
       {focusedPoi ? (
@@ -800,7 +900,7 @@ function MapPageContent() {
           onClose={handleFocusedPoiClose}
           onHeightChange={handleFocusedPoiHeightChange}
         />
-      ) : (
+      ) : isStartPointSelectionMode ? null : (
         <BottomSheet
           peekHeight={HOME_BOTTOM_SHEET_PEEK_HEIGHT}
           showBackdrop={

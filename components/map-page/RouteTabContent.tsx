@@ -27,7 +27,11 @@ export default function RouteTabContent({
 }: RouteTabContentProps) {
   if (!dog || preferRouteRecommendSheet) {
     return (
-      <DogInfoForm onRouteRecommendRequested={onRouteRecommendRequested} />
+      <DogInfoForm
+        useBottomNavCta
+        submitLabel="시작위치 설정"
+        onRouteRecommendRequested={onRouteRecommendRequested}
+      />
     );
   }
 
@@ -50,4 +54,3 @@ export default function RouteTabContent({
     </div>
   );
 }
-
