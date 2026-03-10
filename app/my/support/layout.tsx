@@ -30,10 +30,28 @@ export default function MySupportLayout({
 }) {
   const pathname = usePathname();
   const headerConfig = getSupportHeaderConfig(pathname);
+  const isFeedbackPage = pathname === "/my/support/feedback";
+  const sectionPaddingBottomClass =
+    isFeedbackPage
+      ? "pb-[calc(var(--safe-bottom)+16px)]"
+      : "pb-24";
+  const rootClassName = [
+    "bg-gray-50 pointer-events-auto",
+    isFeedbackPage ? "min-h-dvh" : "min-h-full",
+  ].join(" ");
+  const sectionClassName = [
+    "mx-auto max-w-[430px] px-4 pt-4",
+    sectionPaddingBottomClass,
+    isFeedbackPage ? "flex min-h-dvh flex-col" : "",
+  ].join(" ");
+  const contentClassName = [
+    "pt-3",
+    isFeedbackPage ? "flex flex-1 flex-col" : "",
+  ].join(" ");
 
   return (
-    <div className="min-h-full bg-gray-50 pointer-events-auto">
-      <section className="mx-auto max-w-[430px] px-4 pb-24 pt-4">
+    <div className={rootClassName}>
+      <section className={sectionClassName}>
         <header className="relative flex h-12 items-center">
           <Link
             href={headerConfig.backHref}
@@ -50,7 +68,7 @@ export default function MySupportLayout({
           </h1>
         </header>
 
-        <div className="pt-3">{children}</div>
+        <div className={contentClassName}>{children}</div>
       </section>
     </div>
   );
