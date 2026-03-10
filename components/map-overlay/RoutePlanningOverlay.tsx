@@ -84,6 +84,7 @@ export default function RoutePlanningOverlay({
                 const hours = Math.floor(minutes / 60);
                 const mins = minutes % 60;
                 const dist = formatRouteDistance(routeItem.route.summary?.distance);
+                const displayLabel = routeItem.displayLabel ?? `경로 ${index + 1}`;
 
                 return (
                   <button
@@ -104,7 +105,7 @@ export default function RoutePlanningOverlay({
                           isSelected ? "bg-dg-green-500" : "bg-dg-gray-500",
                         ].join(" ")}
                       >
-                        {`경로 ${index + 1}`}
+                        {displayLabel}
                       </div>
                       <div className="text-dg-gray-500 font-medium tracking-tighter">
                         {dist}
@@ -151,4 +152,3 @@ export default function RoutePlanningOverlay({
     </div>
   );
 }
-

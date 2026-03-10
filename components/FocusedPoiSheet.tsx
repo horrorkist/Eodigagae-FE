@@ -75,10 +75,12 @@ async function copyTextToClipboard(text: string) {
 export default function FocusedPoiSheet({
   poi,
   onClose,
+  onRouteClick,
   onHeightChange,
 }: {
   poi: FocusedPoi;
   onClose: () => void;
+  onRouteClick?: (poi: FocusedPoi) => void;
   onHeightChange?: (heightPx: number) => void;
 }) {
   const [showDetailAddress, setShowDetailAddress] = useState(false);
@@ -283,7 +285,11 @@ export default function FocusedPoiSheet({
             )}
           </div>
         )}
-        <button className="w-full py-2 rounded-xl bg-dg-green-500 text-white text-xl font-semibold">
+        <button
+          type="button"
+          onClick={() => onRouteClick?.(poi)}
+          className="w-full py-2 rounded-xl bg-dg-green-500 text-white text-xl font-semibold"
+        >
           길찾기
         </button>
       </section>

@@ -50,6 +50,8 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     ],
     description:
       "매번 같은 길이 아닌, 세 가지 경로를 새롭게\n추천해 더욱 즐거운 산책 경험을 만들어드려요.",
+    illustrationSrc: "/images/onboarding/step-3.svg",
+    illustrationAlt: "경로 추천 온보딩 일러스트",
   },
 ];
 

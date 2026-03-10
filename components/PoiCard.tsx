@@ -72,9 +72,11 @@ function estimateWalkMinutes(distanceM: number | null) {
 export default function PoiCard({
   item,
   onClick,
+  onRouteClick,
 }: {
   item: HomePoiCardItem;
   onClick: () => void;
+  onRouteClick?: () => void;
 }) {
   const [isThumbnailFailed, setIsThumbnailFailed] = useState(false);
   const thumbnailUrl = item.thumbnailUrl?.trim() ?? "";
@@ -86,8 +88,9 @@ export default function PoiCard({
   const estimatedWalkMinutes = estimateWalkMinutes(item.distanceM);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className="
         group flex w-full items-stretch justify-between gap-3 bg-white py-4 text-left
         transition-colors
@@ -95,6 +98,11 @@ export default function PoiCard({
         active:translate-y-0
       "
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onClick();
+      }}
     >
       <div className="min-w-0 flex-1 flex-col space-y-1">
         <div className="flex min-w-0 items-center gap-x-2">
@@ -131,10 +139,18 @@ export default function PoiCard({
             : "거리 정보 없음"}
         </div>
         <div className="flex">
-          <div className="rounded-full flex text-nowrap gap-x-1 items-center border border-dg-gray-500 bg-white px-2 py-1 text-xs">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRouteClick?.();
+            }}
+            className="rounded-full flex text-nowrap gap-x-1 items-center border border-dg-gray-500 bg-white px-2 py-1 text-xs disabled:cursor-default disabled:opacity-60"
+            disabled={!onRouteClick}
+          >
             <AppIcon icon={appIconPaw} className="w-3 h-3 text-dg-gray-600" />
             <span className="text-dg-gray-600">길찾기</span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -168,6 +184,6 @@ export default function PoiCard({
           </div>
         )}
       </div>
-    </button>
+    </div>
   );
 }

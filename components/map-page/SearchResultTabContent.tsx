@@ -5,12 +5,14 @@ import type { TmapPoi } from "@/types/tmapPoi";
 type SearchResultTabContentProps = {
   items: TmapPoi[];
   onFocusPoi: (poi: TmapPoi) => void;
+  onRouteClick: (poi: TmapPoi) => void;
   showSummary?: boolean;
 };
 
 export default function SearchResultTabContent({
   items,
   onFocusPoi,
+  onRouteClick,
   showSummary = true,
 }: SearchResultTabContentProps) {
   return (
@@ -35,6 +37,7 @@ export default function SearchResultTabContent({
                   thumbnailUrl: null,
                 }}
                 onClick={() => onFocusPoi(poi)}
+                onRouteClick={() => onRouteClick(poi)}
               />
               {i < items.length - 1 && <Divider />}
             </li>

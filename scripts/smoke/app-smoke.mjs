@@ -132,6 +132,29 @@ async function runSmokeChecks() {
     /must be numbers/i,
     "route validation error shape changed",
   );
+
+  const invalidSearchOptionRes = await fetch(`${BASE_URL}/api/tmap/pedestrian`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      startX: 127,
+      startY: 37.5,
+      endX: 127.1,
+      endY: 37.6,
+      searchOption: "bad",
+    }),
+  });
+  assert.equal(
+    invalidSearchOptionRes.status,
+    400,
+    "/api/tmap/pedestrian with invalid searchOption should return HTTP 400",
+  );
+  const invalidSearchOptionPayload = await invalidSearchOptionRes.json();
+  assert.match(
+    String(invalidSearchOptionPayload?.error ?? ""),
+    /searchoption must be a number/i,
+    "searchOption validation error shape changed",
+  );
 }
 
 const { child, getLogs } = startServer();

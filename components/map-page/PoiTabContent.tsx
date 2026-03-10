@@ -31,6 +31,7 @@ type PoiTabContentProps = {
   hasMorePois: boolean;
   loadMoreRef: RefObject<HTMLDivElement | null>;
   onFocusPoi: (poi: HomePoiListItem) => void;
+  onRouteClick: (poi: HomePoiListItem) => void;
 };
 
 export default function PoiTabContent({
@@ -40,6 +41,7 @@ export default function PoiTabContent({
   hasMorePois,
   loadMoreRef,
   onFocusPoi,
+  onRouteClick,
 }: PoiTabContentProps) {
   return (
     <>
@@ -61,6 +63,7 @@ export default function PoiTabContent({
                       poi.source === "fountain" || poi.source === "trash-bin",
                   }}
                   onClick={() => onFocusPoi(poi)}
+                  onRouteClick={() => onRouteClick(poi)}
                 />
                 {index < visiblePois.length - 1 && <Divider />}
               </li>

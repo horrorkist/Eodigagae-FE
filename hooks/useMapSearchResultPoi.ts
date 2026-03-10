@@ -81,6 +81,7 @@ function normalizePois(pois: TmapPoi[]): NormalizedPoi[] {
 export function useMapSearchResultPoi(
   mapRef: RefObject<naver.maps.Map | null>,
   sdkReady: boolean,
+  visible: boolean,
   submittedSearchPois: TmapPoi[],
   submittedSearchSeq: number,
 ) {
@@ -265,6 +266,10 @@ export function useMapSearchResultPoi(
 
   const syncMarkers = useCallback(() => {
     if (!sdkReady || !window.naver?.maps) return;
+    if (!visible) {
+      clearAllMarkers();
+      return;
+    }
 
     if (!mapRef.current) {
       pendingMarkerSyncRef.current = true;
@@ -315,9 +320,16 @@ export function useMapSearchResultPoi(
     submittedSearchPois,
     syncRenderLayout,
     updateExistingEntry,
+    visible,
+    clearAllMarkers,
   ]);
 
   const syncCamera = useCallback(() => {
+    if (!visible) {
+      lastCameraSeqRef.current = submittedSearchSeq;
+      pendingCameraSyncRef.current = false;
+      return;
+    }
     if (submittedSearchSeq === lastCameraSeqRef.current) return;
     if (!sdkReady || !window.naver?.maps) return;
 
@@ -348,7 +360,7 @@ export function useMapSearchResultPoi(
 
     lastCameraSeqRef.current = submittedSearchSeq;
     pendingCameraSyncRef.current = false;
-  }, [mapRef, sdkReady, submittedSearchPois, submittedSearchSeq]);
+  }, [mapRef, sdkReady, submittedSearchPois, submittedSearchSeq, visible]);
 
   useEffect(() => {
     syncMarkers();

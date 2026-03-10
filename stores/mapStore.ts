@@ -12,6 +12,8 @@ export type RouteStatePatch = Partial<
   >
 >;
 
+export type RouteSceneMode = "idle" | "start-point" | "planning" | "walking";
+
 // ================================
 // Store
 // ================================
@@ -28,6 +30,7 @@ type MapState = {
   walkingPausedTotalMs: number;
   walkedDistanceM: number;
   heading: number | null;
+  routeSceneMode: RouteSceneMode;
   submittedSearchPois: TmapPoi[];
   submittedSearchKeyword: string;
   submittedSearchSort: TmapPoiSearchSort;
@@ -56,6 +59,8 @@ type MapState = {
   setWalkedDistanceM: (m: number) => void;
   addWalkedDistanceM: (deltaM: number) => void;
   setHeading: (deg: number | null) => void;
+  setRouteSceneMode: (mode: RouteSceneMode) => void;
+  resetRouteSceneMode: () => void;
   commitSubmittedSearchPois: (
     pois: TmapPoi[],
     keyword: string,
@@ -90,6 +95,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   walkingPausedTotalMs: 0,
   walkedDistanceM: 0,
   heading: null,
+  routeSceneMode: "idle",
   submittedSearchPois: [],
   submittedSearchKeyword: "",
   submittedSearchSort: "R",
@@ -112,6 +118,8 @@ export const useMapStore = create<MapState>((set, get) => ({
       walkedDistanceM: clampNonNegative(state.walkedDistanceM + deltaM),
     })),
   setHeading: (deg) => set({ heading: deg }),
+  setRouteSceneMode: (mode) => set({ routeSceneMode: mode }),
+  resetRouteSceneMode: () => set({ routeSceneMode: "idle" }),
   commitSubmittedSearchPois: (pois, keyword, sort, center) =>
     set((state) => {
       const nextSeq = state.submittedSearchSeq + 1;

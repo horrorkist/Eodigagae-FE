@@ -50,8 +50,10 @@ import {
 } from "@/components/icons/definitions.generated";
 import { useRouteRecommendStore } from "@/stores/routeRecommendStore";
 import { fetchRouteRecommendations } from "@/services/routeRecommend";
+import { fetchPoiRouteRecommendations } from "@/services/routes";
 import { fetchTmapPois } from "@/services/tmapPois";
 import type { FacilityHomePoiListItem, HomePoiListItem } from "@/types/homePoi";
+import type { FocusedPoi } from "@/types/focusedPoi";
 import type { RouteRecommendation } from "@/types/routeRecommend";
 import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
 
@@ -63,6 +65,11 @@ type FocusedEntrySnapshot = {
   bottomSheetIsOpen: boolean;
   bottomSheetIndex: number;
 };
+type RoutePlanningSource = "dog-recommend" | "poi-route";
+type PoiRouteReturnTarget =
+  | { kind: "focused"; poi: FocusedPoi }
+  | { kind: "sheet"; snapshot: FocusedEntrySnapshot }
+  | null;
 
 const POI_INITIAL_RENDER_COUNT = 16;
 const POI_RENDER_BATCH_COUNT = 12;
@@ -116,6 +123,8 @@ function MapPageContent() {
   const setPickedPos = useMapStore((s) => s.setPickedPos);
   const setRouteState = useMapStore((s) => s.setRouteState);
   const walking = useMapStore((s) => s.walking);
+  const setRouteSceneMode = useMapStore((s) => s.setRouteSceneMode);
+  const resetRouteSceneMode = useMapStore((s) => s.resetRouteSceneMode);
   const bottomSheetOffsetPx = useMapViewportStore((s) => s.bottomSheetOffsetPx);
   const focusedSheetHeightPx = useMapViewportStore(
     (s) => s.focusedSheetHeightPx,
@@ -154,6 +163,7 @@ function MapPageContent() {
   const selectRouteRecommendation = useRouteRecommendStore(
     (s) => s.selectRoute,
   );
+  const clearRouteRecommendations = useRouteRecommendStore((s) => s.clear);
   const showStartPointCta = useBottomNavOverrideStore(
     (s) => s.showStartPointCta,
   );
@@ -205,6 +215,10 @@ function MapPageContent() {
     useState(false);
   const [pendingRouteRecommendDraft, setPendingRouteRecommendDraft] =
     useState<DogInfoFormDraft | null>(null);
+  const [routePlanningSource, setRoutePlanningSource] =
+    useState<RoutePlanningSource | null>(null);
+  const [poiRouteReturnTarget, setPoiRouteReturnTarget] =
+    useState<PoiRouteReturnTarget>(null);
   const isSearchOverlayOpen = searchParams.get(SEARCH_QUERY_KEY) === "1";
   const shouldFocusSearchInput = searchParams.get(FOCUS_QUERY_KEY) === "1";
   const [preferRouteRecommendSheet, setPreferRouteRecommendSheet] = useState(
@@ -278,22 +292,46 @@ function MapPageContent() {
     );
   }, [mergedPoiList.length]);
 
-  const captureFocusedEntrySnapshot = useCallback(
-    (capturedByLocalHandler: boolean) => {
-      focusedEntrySnapshotRef.current = {
-        sheetViewMode: activeSheetViewMode,
-        homeTabMode: activeHomeTabMode,
-        bottomSheetIsOpen,
-        bottomSheetIndex,
-      };
-      focusedCapturedByLocalHandlerRef.current = capturedByLocalHandler;
-    },
+  const buildFocusedEntrySnapshot = useCallback(
+    (): FocusedEntrySnapshot => ({
+      sheetViewMode: activeSheetViewMode,
+      homeTabMode: activeHomeTabMode,
+      bottomSheetIsOpen,
+      bottomSheetIndex,
+    }),
     [
       activeHomeTabMode,
       activeSheetViewMode,
       bottomSheetIndex,
       bottomSheetIsOpen,
     ],
+  );
+
+  const captureFocusedEntrySnapshot = useCallback(
+    (capturedByLocalHandler: boolean) => {
+      focusedEntrySnapshotRef.current = buildFocusedEntrySnapshot();
+      focusedCapturedByLocalHandlerRef.current = capturedByLocalHandler;
+    },
+    [buildFocusedEntrySnapshot],
+  );
+
+  const restoreFocusedEntrySnapshot = useCallback(
+    (snapshot: FocusedEntrySnapshot | null) => {
+      if (!snapshot) return;
+
+      setSheetViewMode(snapshot.sheetViewMode);
+      setHomeTabMode(snapshot.homeTabMode);
+
+      if (snapshot.bottomSheetIsOpen) {
+        requestAnimationFrame(() => {
+          openBottomSheet(snapshot.bottomSheetIndex);
+        });
+        return;
+      }
+
+      closeBottomSheet();
+    },
+    [closeBottomSheet, openBottomSheet],
   );
 
   const handleFocusHomePoi = useCallback(
@@ -317,20 +355,8 @@ function MapPageContent() {
   const handleFocusedPoiClose = useCallback(() => {
     const snapshot = focusedEntrySnapshotRef.current;
     clearFocusedPoi();
-    if (!snapshot) return;
-
-    setSheetViewMode(snapshot.sheetViewMode);
-    setHomeTabMode(snapshot.homeTabMode);
-
-    if (snapshot.bottomSheetIsOpen) {
-      requestAnimationFrame(() => {
-        openBottomSheet(snapshot.bottomSheetIndex);
-      });
-      return;
-    }
-
-    closeBottomSheet();
-  }, [clearFocusedPoi, closeBottomSheet, openBottomSheet]);
+    restoreFocusedEntrySnapshot(snapshot);
+  }, [clearFocusedPoi, restoreFocusedEntrySnapshot]);
 
   const handleFocusedPoiHeightChange = useCallback(
     (heightPx: number) => {
@@ -365,6 +391,8 @@ function MapPageContent() {
   );
 
   const reopenRouteRecommendForm = useCallback(() => {
+    setRoutePlanningSource(null);
+    setPoiRouteReturnTarget(null);
     setPreferRouteRecommendSheet(true);
     setHomeTabMode("main");
     setSheetViewMode("home");
@@ -374,6 +402,8 @@ function MapPageContent() {
   }, [openBottomSheet]);
 
   const handleRequestDogEdit = useCallback(() => {
+    setRoutePlanningSource(null);
+    setPoiRouteReturnTarget(null);
     setPreferRouteRecommendSheet(true);
     setHomeTabMode("main");
     setSheetViewMode("home");
@@ -384,6 +414,8 @@ function MapPageContent() {
 
   const handleRouteRecommendRequested = useCallback(
     (draft: DogInfoFormDraft) => {
+      setRoutePlanningSource(null);
+      setPoiRouteReturnTarget(null);
       setPendingRouteRecommendDraft(draft);
       setPreferRouteRecommendSheet(true);
       setHomeTabMode("main");
@@ -396,6 +428,8 @@ function MapPageContent() {
   );
 
   const handleStartPointBack = useCallback(() => {
+    setRoutePlanningSource(null);
+    setPoiRouteReturnTarget(null);
     setIsStartPointSelectionMode(false);
     setPendingRouteRecommendDraft(null);
     reopenRouteRecommendForm();
@@ -435,6 +469,8 @@ function MapPageContent() {
       if (response.recommendations.length === 0) {
         const message = "조건에 맞는 추천 경로를 찾지 못했어요.";
         setRouteRecommendError(message);
+        setRoutePlanningSource(null);
+        setPoiRouteReturnTarget(null);
         setIsRoutePlanningMode(false);
         setIsStartPointSelectionMode(false);
         setPendingRouteRecommendDraft(null);
@@ -450,6 +486,8 @@ function MapPageContent() {
       selectRouteRecommendation(firstRecommendation.id);
       applyRecommendationRoute(firstRecommendation);
 
+      setRoutePlanningSource("dog-recommend");
+      setPoiRouteReturnTarget(null);
       setPreferRouteRecommendSheet(false);
       setIsStartPointSelectionMode(false);
       setPendingRouteRecommendDraft(null);
@@ -459,6 +497,8 @@ function MapPageContent() {
         error instanceof Error ? error.message : "추천 경로를 불러오지 못했어요.";
 
       setRouteRecommendError(message);
+      setRoutePlanningSource(null);
+      setPoiRouteReturnTarget(null);
       setIsRoutePlanningMode(false);
       setIsStartPointSelectionMode(false);
       setPendingRouteRecommendDraft(null);
@@ -480,6 +520,118 @@ function MapPageContent() {
     setRouteRecommendations,
     startRouteRecommendLoading,
   ]);
+
+  const restorePoiRouteOrigin = useCallback(
+    (target: PoiRouteReturnTarget) => {
+      if (!target) return;
+
+      if (target.kind === "focused") {
+        setFocusedPoi(target.poi);
+        return;
+      }
+
+      restoreFocusedEntrySnapshot(target.snapshot);
+    },
+    [restoreFocusedEntrySnapshot, setFocusedPoi],
+  );
+
+  const startPoiRoutePlanning = useCallback(
+    async (poi: FocusedPoi, returnTarget: Exclude<PoiRouteReturnTarget, null>) => {
+      if (!myPos) {
+        openModal({
+          title: "현재 위치가 필요해요",
+          body: <p>위치 권한을 허용하거나 현재 위치를 먼저 확인한 뒤 다시 시도해 주세요.</p>,
+        });
+        return;
+      }
+
+      setRoutePlanningSource("poi-route");
+      setPoiRouteReturnTarget(returnTarget);
+      setIsStartPointSelectionMode(false);
+      setIsRoutePlanningMode(true);
+      startRouteRecommendLoading();
+      clearFocusedPoi();
+      closeBottomSheet();
+      setRouteState({
+        route: null,
+        routeRawResponse: null,
+        routeLoading: false,
+        routeError: null,
+        drawRoute: false,
+      });
+
+      try {
+        const response = await fetchPoiRouteRecommendations({
+          start: myPos,
+          poi,
+        });
+
+        if (response.recommendations.length === 0) {
+          throw new Error(
+            response.errors[0] ?? "길찾기 경로를 불러오지 못했어요.",
+          );
+        }
+
+        setRouteRecommendations(response.recommendations, null);
+        const firstRecommendation = response.recommendations[0];
+        selectRouteRecommendation(firstRecommendation.id);
+        applyRecommendationRoute(firstRecommendation);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "길찾기 경로를 불러오지 못했어요.";
+
+        setRouteRecommendError(message);
+        setIsRoutePlanningMode(false);
+        setRoutePlanningSource(null);
+        setPoiRouteReturnTarget(null);
+        restorePoiRouteOrigin(returnTarget);
+        openModal({
+          title: "길찾기 경로를 불러오지 못했어요",
+          body: <p>{message}</p>,
+        });
+      }
+    },
+    [
+      applyRecommendationRoute,
+      clearFocusedPoi,
+      closeBottomSheet,
+      myPos,
+      openModal,
+      restorePoiRouteOrigin,
+      selectRouteRecommendation,
+      setRouteRecommendations,
+      setRouteRecommendError,
+      setRouteState,
+      startRouteRecommendLoading,
+    ],
+  );
+
+  const handleFocusedPoiRouteClick = useCallback(
+    (poi: FocusedPoi) => {
+      void startPoiRoutePlanning(poi, { kind: "focused", poi });
+    },
+    [startPoiRoutePlanning],
+  );
+
+  const handleHomePoiRouteClick = useCallback(
+    (poi: HomePoiListItem) => {
+      void startPoiRoutePlanning(fromHomePoiListItem(poi), {
+        kind: "sheet",
+        snapshot: buildFocusedEntrySnapshot(),
+      });
+    },
+    [buildFocusedEntrySnapshot, startPoiRoutePlanning],
+  );
+
+  const handleSearchResultRouteClick = useCallback(
+    (poi: TmapPoi) => {
+      void startPoiRoutePlanning(fromTmapPoi(poi), {
+        kind: "sheet",
+        snapshot: buildFocusedEntrySnapshot(),
+      });
+    },
+    [buildFocusedEntrySnapshot, startPoiRoutePlanning],
+  );
 
   useEffect(() => {
     if (!isStartPointSelectionMode) return;
@@ -533,11 +685,26 @@ function MapPageContent() {
   const handleRouteEdit = useCallback(() => {
     setPickedPos(null);
     setRouteState({
+      route: null,
+      routeRawResponse: null,
       drawRoute: false,
       routeLoading: false,
       routeError: null,
     });
+    clearRouteRecommendations();
     setIsRoutePlanningMode(false);
+
+    if (routePlanningSource === "poi-route") {
+      const target = poiRouteReturnTarget;
+      setRoutePlanningSource(null);
+      setPoiRouteReturnTarget(null);
+      emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
+      restorePoiRouteOrigin(target);
+      return;
+    }
+
+    setRoutePlanningSource(null);
+    setPoiRouteReturnTarget(null);
     setPreferRouteRecommendSheet(true);
     setHomeTabMode("main");
     setSheetViewMode("home");
@@ -545,7 +712,16 @@ function MapPageContent() {
     requestAnimationFrame(() => {
       openBottomSheet(0);
     });
-  }, [emit, openBottomSheet, setPickedPos, setRouteState]);
+  }, [
+    clearRouteRecommendations,
+    emit,
+    openBottomSheet,
+    poiRouteReturnTarget,
+    restorePoiRouteOrigin,
+    routePlanningSource,
+    setPickedPos,
+    setRouteState,
+  ]);
 
   const handleMainTabClick = useCallback(() => {
     setHomeTabMode("main");
@@ -718,6 +894,36 @@ function MapPageContent() {
       resetFocusedSheetHeight();
     };
   }, [resetBottomSheetOffset, resetFocusedSheetHeight]);
+
+  useEffect(() => {
+    if (walking) {
+      setRouteSceneMode("walking");
+      return;
+    }
+
+    if (isStartPointSelectionMode) {
+      setRouteSceneMode("start-point");
+      return;
+    }
+
+    if (isRoutePlanningMode) {
+      setRouteSceneMode("planning");
+      return;
+    }
+
+    setRouteSceneMode("idle");
+  }, [
+    isRoutePlanningMode,
+    isStartPointSelectionMode,
+    setRouteSceneMode,
+    walking,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      resetRouteSceneMode();
+    };
+  }, [resetRouteSceneMode]);
 
   useEffect(() => {
     const shouldHideBottomChrome = isRoutePlanningMode || walking;
@@ -916,6 +1122,7 @@ function MapPageContent() {
         <FocusedPoiSheet
           poi={focusedPoi}
           onClose={handleFocusedPoiClose}
+          onRouteClick={handleFocusedPoiRouteClick}
           onHeightChange={handleFocusedPoiHeightChange}
         />
       ) : isStartPointSelectionMode ? null : (
@@ -936,6 +1143,7 @@ function MapPageContent() {
                 void handleSearchResultSortChange(nextSort);
               }}
               onFocusPoi={handleFocusSearchResultPoi}
+              onRouteClick={handleSearchResultRouteClick}
             />
           ) : (
             <div className="space-y-4">
@@ -953,6 +1161,7 @@ function MapPageContent() {
                   hasMorePois={hasMorePois}
                   loadMoreRef={poiLoadMoreRef}
                   onFocusPoi={handleFocusHomePoi}
+                  onRouteClick={handleHomePoiRouteClick}
                 />
               ) : (
                 <RouteTabContent

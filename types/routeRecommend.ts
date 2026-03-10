@@ -13,6 +13,7 @@ export type RouteWaypoint = {
 export type RouteRecommendation = {
   id: string;
   title: string;
+  displayLabel?: string;
   source: RouteRecommendationSource;
   route: RouteResult;
   waypoint: RouteWaypoint;

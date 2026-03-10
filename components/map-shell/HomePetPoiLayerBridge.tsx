@@ -2,6 +2,7 @@
 
 import { useMapPetPoi } from "@/hooks/useMapPetPoi";
 import { useMapRuntime } from "@/hooks/useMapRuntime";
+import { useMapStore } from "@/stores/mapStore";
 import type { PetPoiItem } from "@/types/mapEvents";
 
 export default function HomePetPoiLayerBridge({
@@ -12,6 +13,7 @@ export default function HomePetPoiLayerBridge({
   petPois: PetPoiItem[];
 }) {
   const { mapRef, sdkReady } = useMapRuntime();
-  useMapPetPoi(mapRef, sdkReady, showPetPoi, petPois);
+  const routeSceneMode = useMapStore((s) => s.routeSceneMode);
+  useMapPetPoi(mapRef, sdkReady, showPetPoi && routeSceneMode === "idle", petPois);
   return null;
 }

@@ -10,6 +10,7 @@ type SearchResultsBottomSheetContentProps = {
   sortError?: string | null;
   onSortChange: (next: TmapPoiSearchSort) => void;
   onFocusPoi: (poi: TmapPoi) => void;
+  onRouteClick: (poi: TmapPoi) => void;
 };
 
 export default function SearchResultsBottomSheetContent({
@@ -19,6 +20,7 @@ export default function SearchResultsBottomSheetContent({
   sortError = null,
   onSortChange,
   onFocusPoi,
+  onRouteClick,
 }: SearchResultsBottomSheetContentProps) {
   return (
     <div
@@ -96,6 +98,7 @@ export default function SearchResultsBottomSheetContent({
         <SearchResultTabContent
           items={items}
           onFocusPoi={onFocusPoi}
+          onRouteClick={onRouteClick}
           showSummary={false}
         />
       )}

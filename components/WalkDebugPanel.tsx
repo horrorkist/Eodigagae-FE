@@ -242,7 +242,9 @@ export default function WalkDebugPanel() {
           <button
             type="button"
             className={ACTION_BUTTON_CLASS}
-            onClick={requestTmapWalkRoute}
+            onClick={() => {
+              void requestTmapWalkRoute();
+            }}
             disabled={!canRequest}
           >
             <FontAwesomeIcon
