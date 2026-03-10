@@ -41,7 +41,7 @@ function getSourceIcon(source: FocusedPoi["source"]): AppIconDefinition {
 
 function getSourceBadgeClass(source: FocusedPoi["source"]) {
   if (source === "fountain") return "bg-dg-blue-500";
-  if (source === "trash-bin") return "bg-green-sub";
+  if (source === "trash-bin") return "bg-dg-green-sub";
   if (source === "tmap") return "bg-dg-gray-600";
   return "bg-dg-orange-500";
 }
@@ -173,12 +173,7 @@ export default function FocusedPoiSheet({
         <div className="flex flex-col">
           <div className="flex justify-between">
             <div className="min-w-0 flex items-center gap-x-2">
-              <div
-                className={[
-                  "p-1 rounded-full",
-                  sourceBadgeClass,
-                ].join(" ")}
-              >
+              <div className={["p-1 rounded-full", sourceBadgeClass].join(" ")}>
                 <AppIcon icon={sourceIcon} className="w-5 h-5 text-white" />
               </div>
               <div className="truncate text-xl font-semibold text-dg-black text-ellipsis">
