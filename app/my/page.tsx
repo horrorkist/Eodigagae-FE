@@ -9,6 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import type { Area } from "react-easy-crop";
 import AppIcon from "@/components/icons/AppIcon";
 import {
   appIconBell,
@@ -24,6 +25,7 @@ import {
 } from "@/components/icons/definitions.generated";
 import PetProfileModal from "@/components/my-page/PetProfileModal";
 import PetPhotoPreviewOverlay from "@/components/my-page/PetPhotoPreviewOverlay";
+import { createCroppedImageFile } from "@/lib/images/cropImageClient";
 import {
   COACHMARK_COOKIE_NAME,
   ONBOARDING_COOKIE_NAME,
@@ -176,7 +178,7 @@ export default function MyPage() {
     setPendingPetPhotoFile(file);
   };
 
-  const handleConfirmPetPhoto = async () => {
+  const handleConfirmPetPhoto = async (croppedAreaPixels: Area) => {
     if (isPhotoUploading) return;
     if (!dog) {
       setPetPhotoError("반려동물 정보를 먼저 등록해 주세요.");
@@ -193,8 +195,13 @@ export default function MyPage() {
     const previousImageId = dog.photo?.imageId ?? null;
 
     try {
+      const croppedFile = await createCroppedImageFile({
+        imageUrl: pendingPetPhotoUrl,
+        cropAreaPixels: croppedAreaPixels,
+        file: pendingPetPhotoFile,
+      });
       const { imageId, uploadURL, variantUrl } = await requestDirectUpload();
-      await uploadFileToDirectUrl(uploadURL, pendingPetPhotoFile);
+      await uploadFileToDirectUrl(uploadURL, croppedFile);
 
       setDog({
         ...dog,
@@ -585,13 +592,14 @@ export default function MyPage() {
 
       {isPetPhotoOverlayOpen ? (
         <PetPhotoPreviewOverlay
-          previewUrl={pendingPetPhotoUrl ?? petPhotoUrl}
+          key={pendingPetPhotoUrl ?? "empty"}
+          imageUrl={pendingPetPhotoUrl}
           error={petPhotoError}
           canConfirm={Boolean(pendingPetPhotoUrl && pendingPetPhotoFile)}
           isUploading={isPhotoUploading}
           onClose={closePetPhotoOverlay}
           onReselect={handleReselectPetPhoto}
-          onConfirm={handleConfirmPetPhoto}
+          onConfirmCrop={handleConfirmPetPhoto}
         />
       ) : null}
     </div>

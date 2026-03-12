@@ -1,35 +1,43 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Image from "next/image";
+import Cropper, { type Area } from "react-easy-crop";
 import AppIcon from "@/components/icons/AppIcon";
 import {
   appIconPuppy,
   appIconXMark,
 } from "@/components/icons/definitions.generated";
 
+const PET_PHOTO_CROP_ASPECT = 300 / 340;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.05;
+
 type PetPhotoPreviewOverlayProps = {
-  previewUrl: string | null;
+  imageUrl: string | null;
   error: string | null;
   canConfirm: boolean;
   isUploading: boolean;
   onClose: () => void;
   onReselect: () => void;
-  onConfirm: () => void;
+  onConfirmCrop: (croppedAreaPixels: Area) => void;
 };
 
 export default function PetPhotoPreviewOverlay({
-  previewUrl,
+  imageUrl,
   error,
   canConfirm,
   isUploading,
   onClose,
   onReselect,
-  onConfirm,
+  onConfirmCrop,
 }: PetPhotoPreviewOverlayProps) {
   const firstButtonRef = useRef<HTMLButtonElement | null>(null);
   const lastActiveElementRef = useRef<HTMLElement | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
 
   useEffect(() => {
     lastActiveElementRef.current =
@@ -56,6 +64,9 @@ export default function PetPhotoPreviewOverlay({
       lastActiveElementRef.current?.focus();
     };
   }, [isUploading, onClose]);
+
+  const isConfirmDisabled =
+    !canConfirm || isUploading || !imageUrl || croppedAreaPixels === null;
 
   const overlayContent = (
     <div
@@ -94,17 +105,29 @@ export default function PetPhotoPreviewOverlay({
             </button>
           </div>
 
-          <div className="relative mb-3 h-[320px] overflow-hidden rounded-2xl bg-dg-gray-400">
-            {previewUrl ? (
-              <Image
-                src={previewUrl}
-                alt="반려동물 사진 미리보기"
-                fill
-                sizes="380px"
-                className="object-cover"
-              />
+          <div className="relative mb-3 overflow-hidden rounded-2xl bg-dg-gray-400">
+            {imageUrl ? (
+              <div className="relative h-[320px] w-full touch-none bg-dg-black">
+                <Cropper
+                  image={imageUrl}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={PET_PHOTO_CROP_ASPECT}
+                  minZoom={MIN_ZOOM}
+                  maxZoom={MAX_ZOOM}
+                  zoomSpeed={ZOOM_STEP}
+                  restrictPosition
+                  objectFit="cover"
+                  showGrid={false}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={(_, nextCroppedAreaPixels) =>
+                    setCroppedAreaPixels(nextCroppedAreaPixels)
+                  }
+                />
+              </div>
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-dg-gray-500">
+              <div className="flex h-[320px] w-full flex-col items-center justify-center gap-2 text-dg-gray-500">
                 <AppIcon icon={appIconPuppy} className="h-8 w-8" />
                 <span className="text-sm font-medium">
                   선택한 사진이 없어요
@@ -112,6 +135,26 @@ export default function PetPhotoPreviewOverlay({
               </div>
             )}
           </div>
+
+          {imageUrl ? (
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center justify-between text-xs font-medium text-dg-gray-700">
+                <span>확대/축소</span>
+                <span>{Math.round(zoom * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={MIN_ZOOM}
+                max={MAX_ZOOM}
+                step={ZOOM_STEP}
+                value={zoom}
+                onChange={(event) => setZoom(Number(event.target.value))}
+                disabled={isUploading}
+                aria-label="사진 확대/축소"
+                className="h-2 w-full cursor-pointer accent-dg-green-500"
+              />
+            </div>
+          ) : null}
 
           {error ? <p className="mb-3 text-xs text-red-600">{error}</p> : null}
 
@@ -132,11 +175,14 @@ export default function PetPhotoPreviewOverlay({
             </button>
             <button
               type="button"
-              onClick={onConfirm}
-              disabled={!canConfirm || isUploading}
+              onClick={() => {
+                if (!croppedAreaPixels) return;
+                onConfirmCrop(croppedAreaPixels);
+              }}
+              disabled={isConfirmDisabled}
               className={[
                 "h-11 rounded-xl text-sm font-semibold text-white",
-                canConfirm && !isUploading
+                !isConfirmDisabled
                   ? "bg-dg-green-500 active:bg-dg-green-600"
                   : "cursor-not-allowed bg-gray-300",
               ].join(" ")}
