@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type { LatLng } from "@/types/mapEvents";
 import type { FocusedPoi } from "@/types/focusedPoi";
 import type { RouteResult } from "@/domain/route/types";
+import type { RoutePlanningSource } from "@/types/routePlanning";
 import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
 
 export type RouteStatePatch = Partial<
@@ -31,6 +32,7 @@ type MapState = {
   walkedDistanceM: number;
   heading: number | null;
   routeSceneMode: RouteSceneMode;
+  routeExperienceSource: RoutePlanningSource | null;
   submittedSearchPois: TmapPoi[];
   submittedSearchKeyword: string;
   submittedSearchSort: TmapPoiSearchSort;
@@ -60,6 +62,7 @@ type MapState = {
   addWalkedDistanceM: (deltaM: number) => void;
   setHeading: (deg: number | null) => void;
   setRouteSceneMode: (mode: RouteSceneMode) => void;
+  setRouteExperienceSource: (source: RoutePlanningSource | null) => void;
   resetRouteSceneMode: () => void;
   commitSubmittedSearchPois: (
     pois: TmapPoi[],
@@ -96,6 +99,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   walkedDistanceM: 0,
   heading: null,
   routeSceneMode: "idle",
+  routeExperienceSource: null,
   submittedSearchPois: [],
   submittedSearchKeyword: "",
   submittedSearchSort: "R",
@@ -119,6 +123,7 @@ export const useMapStore = create<MapState>((set, get) => ({
     })),
   setHeading: (deg) => set({ heading: deg }),
   setRouteSceneMode: (mode) => set({ routeSceneMode: mode }),
+  setRouteExperienceSource: (source) => set({ routeExperienceSource: source }),
   resetRouteSceneMode: () => set({ routeSceneMode: "idle" }),
   commitSubmittedSearchPois: (pois, keyword, sort, center) =>
     set((state) => {

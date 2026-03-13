@@ -1,9 +1,9 @@
 "use client";
 
 import { RefObject, useCallback, useEffect, useMemo, useRef } from "react";
+import { useEmit } from "@/hooks/useEventBus";
 import { useMapStore } from "@/stores/mapStore";
 import { useModalStore } from "@/stores/modal";
-import { useRouteActions } from "@/hooks/useRouteActions";
 import type { LatLng } from "@/types/mapEvents";
 import { projectPointToSegmentMeters } from "@/lib/geo";
 import { ROUTE_OFF_ROUTE_DISTANCE_M } from "@/features/route/tracking/constants";
@@ -35,16 +35,17 @@ export function useMapRoute(
   const lastProgressSegIdxRef = useRef<number | null>(null);
   const lastProjectedHeadRef = useRef<LatLng | null>(null);
   const wasOffRouteRef = useRef(false);
-  const reroutePromptShownRef = useRef(false);
-  const lastReroutePromptAtRef = useRef(0);
+  const offRoutePromptShownRef = useRef(false);
+  const lastOffRoutePromptAtRef = useRef(0);
+  const emit = useEmit();
   const route = useMapStore((s) => s.route);
   const drawRoute = useMapStore((s) => s.drawRoute);
   const myPos = useMapStore((s) => s.myPos);
   const walking = useMapStore((s) => s.walking);
+  const routeExperienceSource = useMapStore((s) => s.routeExperienceSource);
   const routeLoading = useMapStore((s) => s.routeLoading);
   const isModalOpen = useModalStore((s) => s.isOpen);
   const openModal = useModalStore((s) => s.open);
-  const { requestTmapWalkRoute } = useRouteActions();
   const {
     fullRouteStyle,
     activeRouteStyle,
@@ -84,19 +85,19 @@ export function useMapRoute(
     lastProgressSegIdxRef.current = null;
     lastProjectedHeadRef.current = null;
     wasOffRouteRef.current = false;
-    reroutePromptShownRef.current = false;
-    lastReroutePromptAtRef.current = 0;
+    offRoutePromptShownRef.current = false;
+    lastOffRoutePromptAtRef.current = 0;
   }, []);
 
   const resetOffRoutePromptState = useCallback(() => {
     wasOffRouteRef.current = false;
-    reroutePromptShownRef.current = false;
+    offRoutePromptShownRef.current = false;
   }, []);
 
-  const maybePromptReroute = useCallback(
+  const maybePromptOffRoute = useCallback(
     (snapDistM: number, isOffRoute: boolean) => {
       if (!isOffRoute) {
-        reroutePromptShownRef.current = false;
+        offRoutePromptShownRef.current = false;
         return;
       }
 
@@ -105,29 +106,32 @@ export function useMapRoute(
         !shouldPromptReroute({
           isOffRoute,
           snapDistM,
-          promptShown: reroutePromptShownRef.current,
+          promptShown: offRoutePromptShownRef.current,
           routeLoading,
           isModalOpen,
-          lastPromptAt: lastReroutePromptAtRef.current,
+          lastPromptAt: lastOffRoutePromptAtRef.current,
           now,
         })
       ) {
         return;
       }
 
-      reroutePromptShownRef.current = true;
-      lastReroutePromptAtRef.current = now;
+      const stopLabel =
+        routeExperienceSource === "poi-route" ? "길안내 종료" : "산책 종료";
+
+      offRoutePromptShownRef.current = true;
+      lastOffRoutePromptAtRef.current = now;
       openModal({
-        title: "경로를 많이 이탈했어요",
-        body: `현재 경로에서 약 ${Math.round(snapDistM)}m 벗어났습니다. 새 경로를 받을까요?`,
-        confirmLabel: "재탐색",
-        cancelLabel: "유지",
-        onConfirm: () => {
-          requestTmapWalkRoute();
+        title: "경로를 벗어났어요",
+        body: `현재 경로에서 약 ${Math.round(snapDistM)}m 벗어났어요. 지금 상태를 유지할까요, 아니면 ${stopLabel}할까요?`,
+        confirmLabel: "유지",
+        cancelLabel: stopLabel,
+        onCancel: () => {
+          emit({ type: "STOP_WALKING", channel: "map" });
         },
       });
     },
-    [routeLoading, isModalOpen, openModal, requestTmapWalkRoute],
+    [emit, isModalOpen, openModal, routeExperienceSource, routeLoading],
   );
 
   const clearRouteVisuals = useCallback(() => {
@@ -250,7 +254,7 @@ export function useMapRoute(
     }
 
     const isOffRoute = snap.distM > ROUTE_OFF_ROUTE_DISTANCE_M;
-    maybePromptReroute(snap.distM, isOffRoute);
+    maybePromptOffRoute(snap.distM, isOffRoute);
     const wasOffRoute = wasOffRouteRef.current;
     const progressedSegIdx = Math.max(
       snap.segIdx,
@@ -309,7 +313,7 @@ export function useMapRoute(
     fullRouteStyle,
     myPos,
     walking,
-    maybePromptReroute,
+    maybePromptOffRoute,
     resetOffRoutePromptState,
     drawRouteLine,
     clearRouteVisuals,

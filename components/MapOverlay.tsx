@@ -73,6 +73,7 @@ type MapOverlayProps = {
   onRoutePlanningSelect?: (routeId: string) => void;
   routePlanningSource?: RoutePlanningSource | null;
   isStartPointSelectionMode?: boolean;
+  startPointAddressText?: string;
 };
 
 function getRouteExperienceCopy(
@@ -127,6 +128,7 @@ export default function MapOverlay({
   onRoutePlanningSelect,
   routePlanningSource = null,
   isStartPointSelectionMode = false,
+  startPointAddressText = "주소를 확인하는 중...",
 }: MapOverlayProps) {
   const emit = useEmit();
   const isBottomChromeVisible = useUiChromeStore(
@@ -369,7 +371,7 @@ export default function MapOverlay({
           />
           <StartPointCenterMarker />
           <StartPointPromptSheet
-            addressText="서울특별시 중구 세종대로 110"
+            addressText={startPointAddressText}
             onHeightChange={setStartPointPromptSheetHeightPx}
           />
         </>

@@ -2,14 +2,12 @@ import { useEffect, useRef } from "react";
 import { BOTTOM_CHROME_HEIGHT_PX } from "@/lib/bottomChromeMetrics";
 
 type StartPointPromptSheetProps = {
-  addressText?: string;
+  addressText: string;
   onHeightChange?: (heightPx: number) => void;
 };
 
-const DEFAULT_PLACEHOLDER_ADDRESS = "서울특별시 중구 세종대로 110";
-
 export default function StartPointPromptSheet({
-  addressText = DEFAULT_PLACEHOLDER_ADDRESS,
+  addressText,
   onHeightChange,
 }: StartPointPromptSheetProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -46,7 +44,9 @@ export default function StartPointPromptSheet({
     >
       <div className="rounded-t-2xl rounded-b-none bg-white px-4 py-8 text-dg-black shadow-lg shadow-black/15 backdrop-blur space-y-2 flex flex-col justify-center">
         <p className="text-base font-medium">여기서부터 산책을 시작할까요?</p>
-        <p className="text-base font-medium text-dg-gray-600">{addressText}</p>
+        <p className="text-base font-medium text-dg-gray-600 text-ellipsis">
+          {addressText.split(",").at(-1)}
+        </p>
       </div>
     </div>
   );

@@ -27,6 +27,7 @@ import { useMapViewportStore } from "@/stores/mapViewport";
 import { useBottomNavOverrideStore } from "@/stores/bottomNavOverride";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
 import { useMapRuntime } from "@/hooks/useMapRuntime";
+import { useStartPointAddress } from "@/hooks/useStartPointAddress";
 import { useMapFacilitiesProbe } from "@/hooks/useMapFacilitiesProbe";
 import type { DogInfoFormDraft } from "@/stores/dogStore";
 import { useModalStore } from "@/stores/modal";
@@ -125,6 +126,9 @@ function MapPageContent() {
   const setRouteState = useMapStore((s) => s.setRouteState);
   const walking = useMapStore((s) => s.walking);
   const setRouteSceneMode = useMapStore((s) => s.setRouteSceneMode);
+  const setRouteExperienceSource = useMapStore(
+    (s) => s.setRouteExperienceSource,
+  );
   const resetRouteSceneMode = useMapStore((s) => s.resetRouteSceneMode);
   const bottomSheetOffsetPx = useMapViewportStore((s) => s.bottomSheetOffsetPx);
   const focusedSheetHeightPx = useMapViewportStore(
@@ -217,6 +221,11 @@ function MapPageContent() {
     useState<DogInfoFormDraft | null>(null);
   const [routePlanningSource, setRoutePlanningSource] =
     useState<RoutePlanningSource | null>(null);
+  const { addressText: startPointAddressText } = useStartPointAddress({
+    mapRef,
+    sdkReady,
+    enabled: isStartPointSelectionMode,
+  });
   const [poiRouteReturnTarget, setPoiRouteReturnTarget] =
     useState<PoiRouteReturnTarget>(null);
   const isSearchOverlayOpen = searchParams.get(SEARCH_QUERY_KEY) === "1";
@@ -236,6 +245,7 @@ function MapPageContent() {
   const focusedEntrySnapshotRef = useRef<FocusedEntrySnapshot | null>(null);
   const focusedCapturedByLocalHandlerRef = useRef(false);
   const prevFocusedPoiIdRef = useRef<string | null>(focusedPoi?.id ?? null);
+  const prevWalkingRef = useRef(walking);
   const hasAnyPoiSourceOn = petPoiOn || showWater || showBin;
   const referencePos = myPos ?? facilitiesProbe.referenceCenter;
   const mergedPoiList = useMemo(
@@ -667,6 +677,29 @@ function MapPageContent() {
     [applyRecommendationRoute, routeRecommendations, selectRouteRecommendation],
   );
 
+  const returnToHomeAfterWalkingStop = useCallback(() => {
+    setPickedPos(null);
+    setRouteState({
+      route: null,
+      routeRawResponse: null,
+      drawRoute: false,
+      routeLoading: false,
+      routeError: null,
+    });
+    clearRouteRecommendations();
+    setIsRoutePlanningMode(false);
+    setIsStartPointSelectionMode(false);
+    setPendingRouteRecommendDraft(null);
+    setRoutePlanningSource(null);
+    setPoiRouteReturnTarget(null);
+    setHomeTabMode("main");
+    setSheetViewMode("home");
+    emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
+    requestAnimationFrame(() => {
+      openBottomSheet(0);
+    });
+  }, [clearRouteRecommendations, emit, openBottomSheet, setPickedPos, setRouteState]);
+
   const handleRouteEdit = useCallback(() => {
     setPickedPos(null);
     setRouteState({
@@ -927,10 +960,22 @@ function MapPageContent() {
   ]);
 
   useEffect(() => {
+    if (prevWalkingRef.current && !walking) {
+      returnToHomeAfterWalkingStop();
+    }
+    prevWalkingRef.current = walking;
+  }, [returnToHomeAfterWalkingStop, walking]);
+
+  useEffect(() => {
+    setRouteExperienceSource(routePlanningSource);
+  }, [routePlanningSource, setRouteExperienceSource]);
+
+  useEffect(() => {
     return () => {
       resetRouteSceneMode();
+      setRouteExperienceSource(null);
     };
-  }, [resetRouteSceneMode]);
+  }, [resetRouteSceneMode, setRouteExperienceSource]);
 
   useEffect(() => {
     const shouldHideBottomChrome = isRoutePlanningMode || walking;
@@ -1124,6 +1169,7 @@ function MapPageContent() {
         onRoutePlanningSelect={handleRouteRecommendationSelect}
         routePlanningSource={routePlanningSource}
         isStartPointSelectionMode={isStartPointSelectionMode}
+        startPointAddressText={startPointAddressText}
       />
 
       {focusedPoi ? (
