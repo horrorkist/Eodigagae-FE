@@ -28,7 +28,7 @@ import { useBottomNavOverrideStore } from "@/stores/bottomNavOverride";
 import { usePetPoiController } from "@/hooks/usePetPoiController";
 import { useMapRuntime } from "@/hooks/useMapRuntime";
 import { useMapFacilitiesProbe } from "@/hooks/useMapFacilitiesProbe";
-import { useDogStore, type DogInfoFormDraft } from "@/stores/dogStore";
+import type { DogInfoFormDraft } from "@/stores/dogStore";
 import { useModalStore } from "@/stores/modal";
 import { useEmit } from "@/hooks/useEventBus";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -142,7 +142,6 @@ function MapPageContent() {
     (s) => s.resetFocusedSheetHeight,
   );
 
-  const dog = useDogStore((s) => s.dog);
   const clearSubmittedSearchPois = useMapStore((s) => s.clearSubmittedSearchPois);
   const openBottomSheet = useBottomSheetStore((s) => s.open);
   const closeBottomSheet = useBottomSheetStore((s) => s.close);
@@ -221,9 +220,6 @@ function MapPageContent() {
     useState<PoiRouteReturnTarget>(null);
   const isSearchOverlayOpen = searchParams.get(SEARCH_QUERY_KEY) === "1";
   const shouldFocusSearchInput = searchParams.get(FOCUS_QUERY_KEY) === "1";
-  const [preferRouteRecommendSheet, setPreferRouteRecommendSheet] = useState(
-    () => !dog,
-  );
   const activeHomeTabMode: HomeTabMode = homeTabMode;
   const activeSheetViewMode: SheetViewMode =
     !hasSubmittedSearchResults && sheetViewMode === "searchResults"
@@ -393,7 +389,6 @@ function MapPageContent() {
   const reopenRouteRecommendForm = useCallback(() => {
     setRoutePlanningSource(null);
     setPoiRouteReturnTarget(null);
-    setPreferRouteRecommendSheet(true);
     setHomeTabMode("main");
     setSheetViewMode("home");
     requestAnimationFrame(() => {
@@ -401,23 +396,11 @@ function MapPageContent() {
     });
   }, [openBottomSheet]);
 
-  const handleRequestDogEdit = useCallback(() => {
-    setRoutePlanningSource(null);
-    setPoiRouteReturnTarget(null);
-    setPreferRouteRecommendSheet(true);
-    setHomeTabMode("main");
-    setSheetViewMode("home");
-    setIsRoutePlanningMode(false);
-    setIsStartPointSelectionMode(false);
-    setPendingRouteRecommendDraft(null);
-  }, []);
-
   const handleRouteRecommendRequested = useCallback(
     (draft: DogInfoFormDraft) => {
       setRoutePlanningSource(null);
       setPoiRouteReturnTarget(null);
       setPendingRouteRecommendDraft(draft);
-      setPreferRouteRecommendSheet(true);
       setHomeTabMode("main");
       setSheetViewMode("home");
       setIsRoutePlanningMode(false);
@@ -488,7 +471,6 @@ function MapPageContent() {
 
       setRoutePlanningSource("dog-recommend");
       setPoiRouteReturnTarget(null);
-      setPreferRouteRecommendSheet(false);
       setIsStartPointSelectionMode(false);
       setPendingRouteRecommendDraft(null);
       setIsRoutePlanningMode(true);
@@ -705,7 +687,6 @@ function MapPageContent() {
 
     setRoutePlanningSource(null);
     setPoiRouteReturnTarget(null);
-    setPreferRouteRecommendSheet(true);
     setHomeTabMode("main");
     setSheetViewMode("home");
     emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
@@ -1165,10 +1146,7 @@ function MapPageContent() {
                 />
               ) : (
                 <RouteTabContent
-                  dog={dog}
-                  preferRouteRecommendSheet={preferRouteRecommendSheet}
                   onRouteRecommendRequested={handleRouteRecommendRequested}
-                  onRequestDogEdit={handleRequestDogEdit}
                 />
               )}
 
