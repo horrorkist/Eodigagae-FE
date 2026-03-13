@@ -21,6 +21,10 @@ type RoutePlanningOverlayProps = {
   selectedRouteId: string | null;
   loading: boolean;
   error: string | null;
+  routeEditLabel: string;
+  loadingLabel: string;
+  emptyLabel: string;
+  startLabel: string;
   onRouteSelect?: (routeId: string) => void;
   onRouteEdit?: () => void;
   onGuideStart?: () => void;
@@ -31,6 +35,10 @@ export default function RoutePlanningOverlay({
   selectedRouteId,
   loading,
   error,
+  routeEditLabel,
+  loadingLabel,
+  emptyLabel,
+  startLabel,
   onRouteSelect,
   onRouteEdit,
   onGuideStart,
@@ -53,7 +61,7 @@ export default function RoutePlanningOverlay({
             className="pointer-events-auto flex items-center gap-x-1 rounded-full bg-white px-3 py-4 text-dg-black shadow-md backdrop-blur transition-colors active:bg-dg-green-50"
           >
             <AppIcon icon={appIconOption} className="w-5 h-5" />
-            경로 수정
+            {routeEditLabel}
           </button>
         </div>
 
@@ -61,7 +69,7 @@ export default function RoutePlanningOverlay({
           {loading ? (
             <div className="px-3">
               <div className="rounded-xl bg-white px-3 py-5 text-sm font-medium text-gray-500 shadow-md">
-                추천 경로를 불러오는 중...
+                {loadingLabel}
               </div>
             </div>
           ) : error ? (
@@ -73,7 +81,7 @@ export default function RoutePlanningOverlay({
           ) : recommendations.length === 0 ? (
             <div className="px-3">
               <div className="rounded-xl bg-white px-3 py-5 text-sm font-medium text-gray-500 shadow-md">
-                추천 경로가 없어요.
+                {emptyLabel}
               </div>
             </div>
           ) : (
@@ -145,7 +153,7 @@ export default function RoutePlanningOverlay({
             disabled={!canStartGuide}
             className="pointer-events-auto w-full text-lg rounded-xl bg-dg-green-500/95 px-3 py-5 font-semibold text-white shadow-md backdrop-blur transition-colors active:bg-dg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            산책 시작
+            {startLabel}
           </button>
         </div>
       </div>

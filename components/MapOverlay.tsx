@@ -7,6 +7,7 @@ import { useMapStore } from "@/stores/mapStore";
 import { useUiChromeStore } from "@/stores/uiChrome";
 import { useMapControlStore } from "@/stores/mapControlStore";
 import type { FABMenuItem } from "@/components/FloatingFABMenu";
+import type { RoutePlanningSource } from "@/types/routePlanning";
 import type { RouteRecommendation } from "@/types/routeRecommend";
 import {
   faFlagCheckered,
@@ -16,6 +17,7 @@ import {
 import type { ToggleItem } from "@/components/map-overlay/types";
 import TopOverlay from "@/components/map-overlay/TopOverlay";
 import RoutePlanningOverlay from "@/components/map-overlay/RoutePlanningOverlay";
+import RouteLoadingSplash from "@/components/map-overlay/RouteLoadingSplash";
 import FloatingControlsOverlay from "@/components/map-overlay/FloatingControlsOverlay";
 import WalkingOverlay from "@/components/map-overlay/WalkingOverlay";
 import StartPointCenterMarker from "@/components/map-overlay/StartPointCenterMarker";
@@ -68,8 +70,39 @@ type MapOverlayProps = {
   routePlanningLoading?: boolean;
   routePlanningError?: string | null;
   onRoutePlanningSelect?: (routeId: string) => void;
+  routePlanningSource?: RoutePlanningSource | null;
   isStartPointSelectionMode?: boolean;
 };
+
+function getRouteExperienceCopy(
+  source: RoutePlanningSource | null | undefined,
+) {
+  if (source === "poi-route") {
+    return {
+      routeEditLabel: "돌아가기",
+      routeLoadingLabel: "길찾기 경로를 불러오는 중...",
+      routeEmptyLabel: "길찾기 경로가 없어요.",
+      routeStartLabel: "길안내 시작",
+      walkingElapsedLabel: "이동 시간",
+      walkingStopLabel: "길안내 종료",
+      loadingSplashTitle: "길찾기 경로를 찾고 있어요",
+      loadingSplashDescription:
+        "목적지까지 갈 수 있는 도보 경로를 정리하고 있어요.",
+    };
+  }
+
+  return {
+    routeEditLabel: "돌아가기",
+    routeLoadingLabel: "추천 경로를 불러오는 중...",
+    routeEmptyLabel: "추천 경로가 없어요.",
+    routeStartLabel: "산책 시작",
+    walkingElapsedLabel: "산책 시간",
+    walkingStopLabel: "산책 종료",
+    loadingSplashTitle: "추천 경로를 찾고 있어요",
+    loadingSplashDescription:
+      "반려견에게 맞는 산책 코스를 준비하고 있어요. 잠시만 기다려 주세요.",
+  };
+}
 
 export default function MapOverlay({
   topOffsetPx = 12,
@@ -91,6 +124,7 @@ export default function MapOverlay({
   routePlanningLoading = false,
   routePlanningError = null,
   onRoutePlanningSelect,
+  routePlanningSource = null,
   isStartPointSelectionMode = false,
 }: MapOverlayProps) {
   const emit = useEmit();
@@ -121,6 +155,16 @@ export default function MapOverlay({
       startPointPromptSheetHeightPx - floatingBaseGapPx + 12;
     return Math.max(0, requiredExtraPx);
   }, [startPointPromptSheetHeightPx]);
+  const routeExperienceCopy = useMemo(
+    () => getRouteExperienceCopy(routePlanningSource),
+    [routePlanningSource],
+  );
+  const shouldShowRouteLoadingSplash =
+    routePlanningLoading &&
+    routePlanningRecommendations.length === 0 &&
+    ((routePlanningSource === "poi-route" && isRoutePlanningMode) ||
+      (routePlanningSource === "dog-recommend" && isStartPointSelectionMode)) &&
+    !walking;
 
   const canStartWalking = useMemo(
     () => !!route?.path && route.path.length > 1,
@@ -249,7 +293,9 @@ export default function MapOverlay({
           leftSlot={
             <div className="rounded-xl bg-white px-3 py-4 flex flex-col text-dg-black space-y-4 shadow-lg shadow-black/20 backdrop-blur">
               <div className="flex space-x-2 items-center">
-                <div className="leading-none">산책 시간</div>
+                <div className="leading-none">
+                  {routeExperienceCopy.walkingElapsedLabel}
+                </div>
                 <div className="border-l border-dg-gray-400 h-3.5"></div>
                 <div className="tabular-nums">{formatElapsed(elapsedSec)}</div>
               </div>
@@ -266,13 +312,23 @@ export default function MapOverlay({
           fabItems={[]}
           onRequestMyLocation={onRequestMyLocation}
         />
-        <WalkingOverlay onStop={onStopWalking} />
+        <WalkingOverlay
+          stopLabel={routeExperienceCopy.walkingStopLabel}
+          onStop={onStopWalking}
+        />
       </div>
     );
   }
 
   return (
     <div className="pointer-events-none absolute inset-0 z-50">
+      {shouldShowRouteLoadingSplash ? (
+        <RouteLoadingSplash
+          title={routeExperienceCopy.loadingSplashTitle}
+          description={routeExperienceCopy.loadingSplashDescription}
+        />
+      ) : null}
+
       {!isRoutePlanningMode && !isStartPointSelectionMode && (
         <TopOverlay
           topOffsetPx={topOffsetPx}
@@ -285,7 +341,7 @@ export default function MapOverlay({
         />
       )}
 
-      {isStartPointSelectionMode ? (
+      {isStartPointSelectionMode && !shouldShowRouteLoadingSplash ? (
         <>
           <FloatingControlsOverlay
             isBottomChromeVisible={isBottomChromeVisible}
@@ -305,7 +361,7 @@ export default function MapOverlay({
             onHeightChange={setStartPointPromptSheetHeightPx}
           />
         </>
-      ) : isRoutePlanningMode ? (
+      ) : shouldShowRouteLoadingSplash ? null : isRoutePlanningMode ? (
         <RoutePlanningOverlay
           recommendations={routePlanningRecommendations}
           selectedRouteId={routePlanningSelectedRouteId}
@@ -314,6 +370,10 @@ export default function MapOverlay({
           onRouteSelect={onRoutePlanningSelect}
           onRouteEdit={onRouteEdit}
           onGuideStart={onGuideStart}
+          routeEditLabel={routeExperienceCopy.routeEditLabel}
+          loadingLabel={routeExperienceCopy.routeLoadingLabel}
+          emptyLabel={routeExperienceCopy.routeEmptyLabel}
+          startLabel={routeExperienceCopy.routeStartLabel}
         />
       ) : (
         <FloatingControlsOverlay

@@ -627,8 +627,8 @@ export default function SearchOverlayPanel({
           ))}
 
         {!!trimmedKeyword && trimmedKeyword.length < 2 && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            검색어를 2글자 이상 입력해 주세요.
+          <div className="flex flex-1 items-center justify-center px-5 text-center text-sm text-dg-gray-600">
+            두 글자 이상 입력해 주세요
           </div>
         )}
 

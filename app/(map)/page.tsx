@@ -54,6 +54,7 @@ import { fetchPoiRouteRecommendations } from "@/services/routes";
 import { fetchTmapPois } from "@/services/tmapPois";
 import type { FacilityHomePoiListItem, HomePoiListItem } from "@/types/homePoi";
 import type { FocusedPoi } from "@/types/focusedPoi";
+import type { RoutePlanningSource } from "@/types/routePlanning";
 import type { RouteRecommendation } from "@/types/routeRecommend";
 import type { TmapPoi, TmapPoiSearchSort } from "@/types/tmapPoi";
 
@@ -65,7 +66,6 @@ type FocusedEntrySnapshot = {
   bottomSheetIsOpen: boolean;
   bottomSheetIndex: number;
 };
-type RoutePlanningSource = "dog-recommend" | "poi-route";
 type PoiRouteReturnTarget =
   | { kind: "focused"; poi: FocusedPoi }
   | { kind: "sheet"; snapshot: FocusedEntrySnapshot }
@@ -441,6 +441,7 @@ function MapPageContent() {
       return;
     }
 
+    setRoutePlanningSource("dog-recommend");
     startRouteRecommendLoading();
 
     try {
@@ -498,6 +499,7 @@ function MapPageContent() {
     pendingRouteRecommendDraft,
     reopenRouteRecommendForm,
     routeRecommendLoading,
+    setRoutePlanningSource,
     selectRouteRecommendation,
     setRouteRecommendError,
     setRouteRecommendations,
@@ -1120,6 +1122,7 @@ function MapPageContent() {
         routePlanningLoading={routeRecommendLoading}
         routePlanningError={routeRecommendError}
         onRoutePlanningSelect={handleRouteRecommendationSelect}
+        routePlanningSource={routePlanningSource}
         isStartPointSelectionMode={isStartPointSelectionMode}
       />
 
