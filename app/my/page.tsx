@@ -15,7 +15,6 @@ import {
   appIconBell,
   appIconCamera,
   appIconChevronRight,
-  appIconMarkerCrossed,
   appIconMessage,
   appIconNotice,
   appIconPenToSquare,
@@ -488,23 +487,6 @@ export default function MyPage() {
                     iconClassName="text-dg-blue-500"
                   />
                   <span>공지사항</span>
-                </div>
-                <AppIcon
-                  icon={appIconChevronRight}
-                  className="h-3.5 w-3.5 text-dg-gray-500"
-                />
-              </Link>
-
-              <Link
-                href="/my/support/report"
-                className="flex items-center justify-between py-3"
-              >
-                <div className="flex items-center gap-2 font-medium text-dg-black">
-                  <RowIcon
-                    icon={appIconMarkerCrossed}
-                    iconClassName="text-dg-red-sub"
-                  />
-                  <span>잘못된 정보 신고</span>
                 </div>
                 <AppIcon
                   icon={appIconChevronRight}
