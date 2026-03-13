@@ -10,9 +10,11 @@ function formatRouteDistance(distanceM: number | undefined) {
 }
 
 function durationToMinutes(durationRaw: number | undefined) {
-  if (typeof durationRaw !== "number" || !Number.isFinite(durationRaw)) return 0;
+  if (typeof durationRaw !== "number" || !Number.isFinite(durationRaw))
+    return 0;
   if (durationRaw <= 0) return 0;
-  const minutes = durationRaw > 100_000 ? durationRaw / 60_000 : durationRaw / 60;
+  const minutes =
+    durationRaw > 100_000 ? durationRaw / 60_000 : durationRaw / 60;
   return Math.max(1, Math.round(minutes));
 }
 
@@ -88,11 +90,16 @@ export default function RoutePlanningOverlay({
             <div className="flex w-max min-w-full items-center gap-2 px-3">
               {recommendations.map((routeItem, index) => {
                 const isSelected = selectedRouteId === routeItem.id;
-                const minutes = durationToMinutes(routeItem.route.summary?.duration);
+                const minutes = durationToMinutes(
+                  routeItem.route.summary?.duration,
+                );
                 const hours = Math.floor(minutes / 60);
                 const mins = minutes % 60;
-                const dist = formatRouteDistance(routeItem.route.summary?.distance);
-                const displayLabel = routeItem.displayLabel ?? `경로 ${index + 1}`;
+                const dist = formatRouteDistance(
+                  routeItem.route.summary?.distance,
+                );
+                const displayLabel =
+                  routeItem.displayLabel ?? `경로 ${index + 1}`;
 
                 return (
                   <button
@@ -109,7 +116,7 @@ export default function RoutePlanningOverlay({
                     <div className="flex justify-between w-full items-end">
                       <div
                         className={[
-                          "px-2 py-0.5 rounded-full text-white text-base",
+                          "px-2 py-0.5 rounded-full text-white text-sm",
                           isSelected ? "bg-dg-green-500" : "bg-dg-gray-500",
                         ].join(" ")}
                       >

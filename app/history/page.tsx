@@ -268,11 +268,14 @@ export default function HistoryPage() {
                     prev === "latest" ? "oldest" : "latest",
                   )
                 }
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-dg-gray-700"
+                className="inline-flex items-center gap-1.5 text-base font-medium text-dg-gray-600"
                 aria-label={`산책 기록 정렬 변경, 현재 ${walkSortLabel}`}
               >
                 <span>{walkSortLabel}</span>
-                <span className="inline-flex w-4 justify-center" aria-hidden="true">
+                <span
+                  className="inline-flex w-4 justify-center"
+                  aria-hidden="true"
+                >
                   <FontAwesomeIcon
                     icon={faArrowDownWideShort}
                     className={[
@@ -292,18 +295,22 @@ export default function HistoryPage() {
                       key={walk.id}
                       className="rounded-2xl bg-white px-4 py-4 text-dg-black"
                     >
-                      <p className="text-sm font-semibold tabular-nums text-dg-black">
+                      <p className="text-base font-medium tabular-nums text-dg-gray-600">
                         {walk.dateLabel}
                       </p>
                       <div className="mt-4 space-y-2">
-                        <div className="flex items-center justify-between gap-3 text-sm">
-                          <span className="text-dg-gray-700">거리</span>
+                        <div className="flex items-center justify-between gap-3 text-base">
+                          <span className="text-dg-gray-600 font-medium">
+                            거리
+                          </span>
                           <span className="font-semibold tabular-nums">
                             {walk.distanceLabel}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between gap-3 text-sm">
-                          <span className="text-dg-gray-700">시간</span>
+                        <div className="flex items-center justify-between gap-3 text-base">
+                          <span className="text-dg-gray-600 font-medium">
+                            시간
+                          </span>
                           <span className="font-semibold tabular-nums">
                             {walk.durationLabel}
                           </span>
