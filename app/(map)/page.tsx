@@ -77,6 +77,7 @@ const SEARCH_RESULTS_ENTRY_SNAP_INDEX = 1;
 const HOME_BOTTOM_SHEET_PEEK_HEIGHT = 30;
 const SEARCH_QUERY_KEY = "search";
 const FOCUS_QUERY_KEY = "focus";
+const OPEN_ROUTE_RECOMMEND_QUERY_KEY = "openRouteRecommend";
 const DEFAULT_BOTTOM_SHEET_MOTION: BottomSheetHeightMotion = {
   durationMs: 0,
   easing: "linear",
@@ -841,6 +842,29 @@ function MapPageContent() {
     openBottomSheet,
     submittedSearchSeq,
   ]);
+
+  useEffect(() => {
+    if (searchParams.get(OPEN_ROUTE_RECOMMEND_QUERY_KEY) !== "1") return;
+
+    setHomeTabMode("main");
+    setSheetViewMode("home");
+    setIsRoutePlanningMode(false);
+    setIsStartPointSelectionMode(false);
+    setPendingRouteRecommendDraft(null);
+    setRoutePlanningSource(null);
+    setPoiRouteReturnTarget(null);
+    clearFocusedPoi();
+    emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
+
+    requestAnimationFrame(() => {
+      openBottomSheet(0);
+    });
+
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete(OPEN_ROUTE_RECOMMEND_QUERY_KEY);
+    const qs = next.toString();
+    router.replace(qs ? `/?${qs}` : "/");
+  }, [clearFocusedPoi, emit, openBottomSheet, router, searchParams]);
 
   useEffect(() => {
     const prevFocusedPoiId = prevFocusedPoiIdRef.current;
