@@ -35,6 +35,7 @@ const CENTER_CACHE_TTL_MS = 60 * 1000;
 const RECENT_SEARCHES_STORAGE_KEY = "search:recent-keywords";
 const SEARCH_PAGE_STATE_STORAGE_KEY = "search:page-state";
 const MAX_RECENT_SEARCHES = 10;
+const SEARCH_SKELETON_ROW_COUNT = 5;
 
 type SearchSWRKey = readonly [string, TmapPoiSearchSort];
 type SearchPagePersistedState = {
@@ -236,6 +237,33 @@ function writeSearchPageState(keyword: string, sort: TmapPoiSearchSort) {
       JSON.stringify({ keyword, sort }),
     );
   } catch {}
+}
+
+function SearchResultSkeleton() {
+  return (
+    <div className="bg-white">
+      <ul className="px-5" aria-hidden="true">
+        {Array.from({ length: SEARCH_SKELETON_ROW_COUNT }, (_, index) => (
+          <li key={`search-skeleton-${index}`}>
+            <div className="flex items-start justify-between gap-3 py-4">
+              <div className="flex min-w-0 flex-1 items-center gap-x-4">
+                <div className="h-6 w-6 shrink-0 rounded-full bg-dg-gray-400 animate-pulse" />
+                <div className="min-w-0 flex-1">
+                  <div className="h-5 w-32 max-w-[70%] rounded-full bg-dg-gray-400 animate-pulse" />
+                  <div className="mt-2 h-4 w-full rounded-full bg-dg-gray-400 animate-pulse" />
+                </div>
+              </div>
+              <div className="w-20 shrink-0 text-right">
+                <div className="ml-auto h-4 w-16 rounded-full bg-dg-gray-400 animate-pulse" />
+                <div className="mt-2 ml-auto h-4 w-12 rounded-full bg-dg-gray-400 animate-pulse" />
+              </div>
+            </div>
+            {index < SEARCH_SKELETON_ROW_COUNT - 1 && <Divider />}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export default function SearchOverlayPanel({
@@ -611,9 +639,7 @@ export default function SearchOverlayPanel({
         )}
 
         {showLoading && (
-          <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
-            검색 중...
-          </div>
+          <SearchResultSkeleton />
         )}
 
         {isSearchMode && submittingMarkers && (

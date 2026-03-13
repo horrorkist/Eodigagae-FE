@@ -3,6 +3,8 @@ import PoiCard from "@/components/PoiCard";
 import Divider from "@/components/Divider";
 import type { HomePoiListItem } from "@/types/homePoi";
 
+const POI_TAB_SKELETON_COUNT = 4;
+
 // function PetPoiSummary({
 //   loading,
 //   totalCount,
@@ -33,6 +35,33 @@ type PoiTabContentProps = {
   onFocusPoi: (poi: HomePoiListItem) => void;
   onRouteClick: (poi: HomePoiListItem) => void;
 };
+
+function PoiTabSkeletonList() {
+  return (
+    <ul aria-hidden="true">
+      {Array.from({ length: POI_TAB_SKELETON_COUNT }, (_, index) => (
+        <li key={`poi-tab-skeleton-${index}`}>
+          <div className="flex w-full items-stretch justify-between gap-3 bg-white py-4">
+            <div className="min-w-0 flex-1 space-y-3">
+              <div className="flex min-w-0 items-center gap-x-2">
+                <div className="h-6 w-6 shrink-0 rounded-full bg-dg-gray-400 animate-pulse" />
+                <div className="flex min-w-0 flex-1 items-center gap-x-2">
+                  <div className="h-5 w-28 rounded-full bg-dg-gray-400 animate-pulse" />
+                  <div className="h-4 w-16 rounded-full bg-dg-gray-400 animate-pulse" />
+                </div>
+              </div>
+              <div className="h-4 w-full rounded-full bg-dg-gray-400 animate-pulse" />
+              <div className="h-4 w-40 rounded-full bg-dg-gray-400 animate-pulse" />
+              <div className="h-7 w-20 rounded-full border border-dg-gray-500 bg-white animate-pulse" />
+            </div>
+            <div className="h-20 w-20 shrink-0 rounded-xl bg-dg-gray-400 animate-pulse" />
+          </div>
+          {index < POI_TAB_SKELETON_COUNT - 1 && <Divider />}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function PoiTabContent({
   hasAnySourceOn,
@@ -73,13 +102,17 @@ export default function PoiTabContent({
       )}
 
       {!hasAnySourceOn && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <div className="flex min-h-32 items-center justify-center px-4 py-8 text-center text-sm text-dg-gray-600">
           상단 토글 칩을 켜면 장소 목록을 불러올 수 있어요.
         </div>
       )}
 
+      {hasAnySourceOn && loading && visiblePois.length === 0 && (
+        <PoiTabSkeletonList />
+      )}
+
       {hasAnySourceOn && !loading && visiblePois.length === 0 && (
-        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
+        <div className="flex min-h-32 items-center justify-center px-4 py-8 text-center text-sm text-dg-gray-600">
           표시할 장소가 없어요.
         </div>
       )}
