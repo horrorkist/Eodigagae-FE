@@ -20,6 +20,7 @@ import RoutePlanningOverlay from "@/components/map-overlay/RoutePlanningOverlay"
 import RouteLoadingSplash from "@/components/map-overlay/RouteLoadingSplash";
 import FloatingControlsOverlay from "@/components/map-overlay/FloatingControlsOverlay";
 import WalkingOverlay from "@/components/map-overlay/WalkingOverlay";
+import WalkingGuidanceOverlay from "@/components/map-overlay/WalkingGuidanceOverlay";
 import StartPointCenterMarker from "@/components/map-overlay/StartPointCenterMarker";
 import StartPointPromptSheet from "@/components/map-overlay/StartPointPromptSheet";
 import {
@@ -140,6 +141,7 @@ export default function MapOverlay({
   const requestMyLocation = useMapControlStore((s) => s.requestMyLocation);
   const walking = useMapStore((s) => s.walking);
   const route = useMapStore((s) => s.route);
+  const myPos = useMapStore((s) => s.myPos);
   const walkingPaused = useMapStore((s) => s.walkingPaused);
   const walkingStartedAt = useMapStore((s) => s.walkingStartedAt);
   const walkingPausedAt = useMapStore((s) => s.walkingPausedAt);
@@ -165,6 +167,7 @@ export default function MapOverlay({
     ((routePlanningSource === "poi-route" && isRoutePlanningMode) ||
       (routePlanningSource === "dog-recommend" && isStartPointSelectionMode)) &&
     !walking;
+  const isPoiRouteWalking = walking && routePlanningSource === "poi-route";
 
   const canStartWalking = useMemo(
     () => !!route?.path && route.path.length > 1,
@@ -285,12 +288,20 @@ export default function MapOverlay({
   if (walking) {
     return (
       <div className="pointer-events-none absolute inset-0 z-50">
+        {isPoiRouteWalking ? (
+          <WalkingGuidanceOverlay
+            topOffsetPx={topOffsetPx}
+            myPos={myPos}
+            guidance={route?.guidance}
+          />
+        ) : null}
         <FloatingControlsOverlay
           isBottomChromeVisible={false}
           bottomOffsetPx={floatingControlsBottomOffsetPx + 72}
           bottomTransitionMs={floatingControlsBottomTransitionMs}
           bottomTransitionEasing={floatingControlsBottomTransitionEasing}
           leftSlot={
+            isPoiRouteWalking ? null : (
             <div className="rounded-xl bg-white px-3 py-4 flex flex-col text-dg-black space-y-4 shadow-lg shadow-black/20 backdrop-blur">
               <div className="flex space-x-2 items-center">
                 <div className="leading-none">
@@ -307,6 +318,7 @@ export default function MapOverlay({
                 </div>
               </div>
             </div>
+            )
           }
           showFabMenu={false}
           fabItems={[]}
