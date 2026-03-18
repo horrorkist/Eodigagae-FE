@@ -1,11 +1,11 @@
 "use client";
 
 import { RefObject, useCallback, useEffect, useMemo, useRef } from "react";
-import { useEmit } from "@/hooks/useEventBus";
 import { useMapStore } from "@/stores/mapStore";
 import { useModalStore } from "@/stores/modal";
 import type { LatLng } from "@/types/mapEvents";
 import { projectPointToSegmentMeters } from "@/lib/geo";
+import { requestWalkStop } from "@/lib/walkSession";
 import { ROUTE_OFF_ROUTE_DISTANCE_M } from "@/features/route/tracking/constants";
 import { buildRemainingPath, hasRenderablePolyline } from "@/features/route/tracking/path";
 import { shouldPromptReroute, shouldSkipRouteRedraw } from "@/features/route/tracking/policy";
@@ -37,7 +37,6 @@ export function useMapRoute(
   const wasOffRouteRef = useRef(false);
   const offRoutePromptShownRef = useRef(false);
   const lastOffRoutePromptAtRef = useRef(0);
-  const emit = useEmit();
   const route = useMapStore((s) => s.route);
   const drawRoute = useMapStore((s) => s.drawRoute);
   const myPos = useMapStore((s) => s.myPos);
@@ -127,11 +126,11 @@ export function useMapRoute(
         confirmLabel: "유지",
         cancelLabel: stopLabel,
         onCancel: () => {
-          emit({ type: "STOP_WALKING", channel: "map" });
+          requestWalkStop();
         },
       });
     },
-    [emit, isModalOpen, openModal, routeExperienceSource, routeLoading],
+    [isModalOpen, openModal, routeExperienceSource, routeLoading],
   );
 
   const clearRouteVisuals = useCallback(() => {

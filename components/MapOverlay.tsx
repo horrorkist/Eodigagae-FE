@@ -27,6 +27,7 @@ import {
   BOTTOM_CHROME_HEIGHT_PX,
   FLOATING_CONTROLS_BASE_BOTTOM_WITH_CHROME_PX,
 } from "@/lib/bottomChromeMetrics";
+import { requestWalkStop } from "@/lib/walkSession";
 
 function formatElapsed(totalSec: number) {
   if (!Number.isFinite(totalSec) || totalSec < 0) return "00:00";
@@ -225,15 +226,20 @@ export default function MapOverlay({
     if (!canStartWalking) return;
     if (!walking) requestOrientationPermissionIfNeeded();
 
+    if (walking) {
+      requestWalkStop();
+      return;
+    }
+
     emit({
-      type: walking ? "STOP_WALKING" : "START_WALKING",
+      type: "START_WALKING",
       channel: "map",
     });
   }, [canStartWalking, emit, walking]);
 
   const onStopWalking = useCallback(() => {
-    emit({ type: "STOP_WALKING", channel: "map" });
-  }, [emit]);
+    requestWalkStop();
+  }, []);
 
   const onRequestMyLocation = useCallback(() => {
     requestMyLocation();

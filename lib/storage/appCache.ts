@@ -1,7 +1,12 @@
+import { MY_SETTINGS_STORAGE_KEY } from "@/stores/mySettingsStore";
+import { WALK_HISTORY_STORAGE_KEY } from "@/stores/walkHistoryStore";
+
 const LOCAL_STORAGE_KEYS = [
   "search:recent-keywords",
   "walkDebug",
   "walkDebugPanelVisible",
+  MY_SETTINGS_STORAGE_KEY,
+  WALK_HISTORY_STORAGE_KEY,
 ] as const;
 
 const SESSION_STORAGE_KEYS = ["search:page-state"] as const;

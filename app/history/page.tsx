@@ -9,133 +9,28 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import AppIcon from "@/components/icons/AppIcon";
-import { appIconPuppy } from "@/components/icons/definitions.generated";
+import {
+  buildActualHistoryView,
+  type HistoryViewRecord,
+} from "@/lib/walkHistory";
+import {
+  appIconPaw,
+  appIconPuppy,
+} from "@/components/icons/definitions.generated";
 import { useDogStore } from "@/stores/dogStore";
+import { useMySettingsStore } from "@/stores/mySettingsStore";
+import { useWalkHistoryStore } from "@/stores/walkHistoryStore";
 
 type WalkSummaryMetric = {
   label: string;
   value: string;
 };
 
-type PreviousWalk = {
-  id: string;
-  walkedAt: string;
-  dateLabel: string;
-  distanceLabel: string;
+type TodayWalkSummary = {
+  walkedAt: string | null;
   durationLabel: string;
+  distanceLabel: string;
 };
-
-const todaySummary = {
-  durationLabel: "42분",
-  distanceLabel: "2.8km",
-};
-
-const totals: WalkSummaryMetric[] = [
-  { label: "총 산책일", value: "128일" },
-  { label: "총 시간", value: "93시간 20분" },
-  { label: "총 거리", value: "214.6km" },
-];
-
-const previousWalks: PreviousWalk[] = [
-  {
-    id: "2026-03-12-evening",
-    walkedAt: "2026-03-12T19:10:00+09:00",
-    dateLabel: "03.12",
-    distanceLabel: "3.1km",
-    durationLabel: "48분",
-  },
-  {
-    id: "2026-03-11-morning",
-    walkedAt: "2026-03-11T08:15:00+09:00",
-    dateLabel: "03.11",
-    distanceLabel: "2.4km",
-    durationLabel: "37분",
-  },
-  {
-    id: "2026-03-10-evening",
-    walkedAt: "2026-03-10T18:40:00+09:00",
-    dateLabel: "03.10",
-    distanceLabel: "3.7km",
-    durationLabel: "55분",
-  },
-  {
-    id: "2026-03-09-morning",
-    walkedAt: "2026-03-09T07:50:00+09:00",
-    dateLabel: "03.09",
-    distanceLabel: "1.9km",
-    durationLabel: "29분",
-  },
-  {
-    id: "2026-03-08-evening",
-    walkedAt: "2026-03-08T18:05:00+09:00",
-    dateLabel: "03.08",
-    distanceLabel: "2.6km",
-    durationLabel: "41분",
-  },
-  {
-    id: "2026-03-07-morning",
-    walkedAt: "2026-03-07T08:30:00+09:00",
-    dateLabel: "03.07",
-    distanceLabel: "3.0km",
-    durationLabel: "46분",
-  },
-  {
-    id: "2026-03-06-evening",
-    walkedAt: "2026-03-06T18:25:00+09:00",
-    dateLabel: "03.06",
-    distanceLabel: "2.2km",
-    durationLabel: "34분",
-  },
-  {
-    id: "2026-03-05-morning",
-    walkedAt: "2026-03-05T07:40:00+09:00",
-    dateLabel: "03.05",
-    distanceLabel: "3.4km",
-    durationLabel: "52분",
-  },
-  {
-    id: "2026-03-04-evening",
-    walkedAt: "2026-03-04T19:00:00+09:00",
-    dateLabel: "03.04",
-    distanceLabel: "2.8km",
-    durationLabel: "43분",
-  },
-  {
-    id: "2026-03-03-morning",
-    walkedAt: "2026-03-03T08:05:00+09:00",
-    dateLabel: "03.03",
-    distanceLabel: "1.7km",
-    durationLabel: "26분",
-  },
-  {
-    id: "2026-03-02-evening",
-    walkedAt: "2026-03-02T18:50:00+09:00",
-    dateLabel: "03.02",
-    distanceLabel: "3.6km",
-    durationLabel: "58분",
-  },
-  {
-    id: "2026-03-01-morning",
-    walkedAt: "2026-03-01T09:10:00+09:00",
-    dateLabel: "03.01",
-    distanceLabel: "2.5km",
-    durationLabel: "39분",
-  },
-  {
-    id: "2026-02-28-evening",
-    walkedAt: "2026-02-28T18:15:00+09:00",
-    dateLabel: "02.28",
-    distanceLabel: "3.3km",
-    durationLabel: "50분",
-  },
-  {
-    id: "2026-02-27-morning",
-    walkedAt: "2026-02-27T07:55:00+09:00",
-    dateLabel: "02.27",
-    distanceLabel: "2.1km",
-    durationLabel: "32분",
-  },
-];
 
 type WalkSortOrder = "latest" | "oldest";
 const INITIAL_VISIBLE_WALKS = 4;
@@ -173,18 +68,35 @@ function PetAvatar({
 
 export default function HistoryPage() {
   const dog = useDogStore((s) => s.dog);
+  const historyDataSource = useMySettingsStore((s) => s.historyDataSource);
+  const mockHistoryEntries = useMySettingsStore((s) => s.mockHistoryEntries);
+  const historyEntries = useWalkHistoryStore((s) => s.entries);
   const dogName = dog?.name?.trim() ? dog.name.trim() : null;
   const dogPhotoUrl = dog?.photo?.variantUrl ?? null;
   const highlightedName = dogName ?? "내 반려동물";
   const [walkSortOrder, setWalkSortOrder] = useState<WalkSortOrder>("latest");
   const [isShowingAllWalks, setIsShowingAllWalks] = useState(false);
+  const selectedEntries =
+    historyDataSource === "mock" ? mockHistoryEntries : historyEntries;
+  const actualHistoryView = useMemo(
+    () => buildActualHistoryView(selectedEntries),
+    [selectedEntries],
+  );
+  const todaySummary: TodayWalkSummary = actualHistoryView.todaySummary;
+  const totals: WalkSummaryMetric[] = [
+    { label: "총 산책일", value: actualHistoryView.totalDays },
+    { label: "총 시간", value: actualHistoryView.totalDuration },
+    { label: "총 거리", value: actualHistoryView.totalDistance },
+  ];
+  const previousWalks: HistoryViewRecord[] = actualHistoryView.previousWalks;
+  const streakDays = actualHistoryView.streakDays;
   const sortedPreviousWalks = useMemo(() => {
     return [...previousWalks].sort((a, b) => {
       const timeA = new Date(a.walkedAt).getTime();
       const timeB = new Date(b.walkedAt).getTime();
       return walkSortOrder === "latest" ? timeB - timeA : timeA - timeB;
     });
-  }, [walkSortOrder]);
+  }, [previousWalks, walkSortOrder]);
   const visiblePreviousWalks = useMemo(() => {
     if (isShowingAllWalks) return sortedPreviousWalks;
     return sortedPreviousWalks.slice(0, INITIAL_VISIBLE_WALKS);
@@ -192,6 +104,7 @@ export default function HistoryPage() {
   const hasPreviousWalks = sortedPreviousWalks.length > 0;
   const canToggleWalkList = sortedPreviousWalks.length > INITIAL_VISIBLE_WALKS;
   const walkSortLabel = walkSortOrder === "latest" ? "최신순" : "날짜순";
+  const streakLabel = streakDays > 0 ? `${streakDays}일 연속` : null;
 
   return (
     <div className="min-h-full bg-dg-gray-400 pointer-events-auto">
@@ -257,10 +170,21 @@ export default function HistoryPage() {
           </section>
 
           <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-dg-black">
-                이전 산책 기록
-              </h2>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="text-lg font-semibold text-dg-black">
+                  산책 기록
+                </h2>
+                {streakLabel ? (
+                  <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-dg-green-500">
+                    <AppIcon
+                      icon={appIconPaw}
+                      className="h-3.5 w-3.5 text-dg-green-500"
+                    />
+                    <p>{streakLabel}</p>
+                  </div>
+                ) : null}
+              </div>
               <button
                 type="button"
                 onClick={() =>
@@ -268,7 +192,7 @@ export default function HistoryPage() {
                     prev === "latest" ? "oldest" : "latest",
                   )
                 }
-                className="inline-flex items-center gap-1.5 text-base font-medium text-dg-gray-600"
+                className="inline-flex shrink-0 items-center gap-1.5 text-base font-medium text-dg-gray-600"
                 aria-label={`산책 기록 정렬 변경, 현재 ${walkSortLabel}`}
               >
                 <span>{walkSortLabel}</span>

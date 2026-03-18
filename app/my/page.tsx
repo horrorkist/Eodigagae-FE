@@ -44,6 +44,7 @@ import {
 import { useDogStore } from "@/stores/dogStore";
 import { useModalStore } from "@/stores/modal";
 import { useMySettingsStore } from "@/stores/mySettingsStore";
+import { useWalkHistoryStore } from "@/stores/walkHistoryStore";
 import type { DogInfo } from "@/types/dog";
 
 function RowIcon({
@@ -101,6 +102,15 @@ export default function MyPage() {
   const setNotificationsEnabled = useMySettingsStore(
     (s) => s.setNotificationsEnabled,
   );
+  const historyDataSource = useMySettingsStore((s) => s.historyDataSource);
+  const setHistoryDataSource = useMySettingsStore(
+    (s) => s.setHistoryDataSource,
+  );
+  const regenerateMockHistory = useMySettingsStore(
+    (s) => s.regenerateMockHistory,
+  );
+  const resetSettings = useMySettingsStore((s) => s.resetSettings);
+  const clearWalkHistory = useWalkHistoryStore((s) => s.clearEntries);
 
   const openModal = useModalStore((s) => s.open);
   const showWalkDebugPanel = useSyncExternalStore(
@@ -260,6 +270,8 @@ export default function MyPage() {
   };
 
   const handleConfirmCacheClear = () => {
+    resetSettings();
+    clearWalkHistory();
     clearAppCache();
   };
 
@@ -534,6 +546,46 @@ export default function MyPage() {
                     className={[
                       "absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform",
                       showWalkDebugPanel
+                        ? "translate-x-[20px]"
+                        : "translate-x-0",
+                    ].join(" ")}
+                  />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between py-1">
+                <div>
+                  <div className="font-medium text-dg-black">
+                    산책일지 실제 데이터 사용
+                  </div>
+                  <p className="mt-1 text-xs text-dg-gray-600">
+                    꺼두면 최신 날짜 기준 목업 기록을 표시합니다.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={historyDataSource === "actual"}
+                  onClick={() => {
+                    if (historyDataSource === "actual") {
+                      regenerateMockHistory();
+                      setHistoryDataSource("mock");
+                      return;
+                    }
+
+                    setHistoryDataSource("actual");
+                  }}
+                  className={[
+                    "relative h-7 w-12 rounded-full transition-colors",
+                    historyDataSource === "actual"
+                      ? "bg-dg-green-500"
+                      : "bg-gray-300",
+                  ].join(" ")}
+                >
+                  <span
+                    className={[
+                      "absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform",
+                      historyDataSource === "actual"
                         ? "translate-x-[20px]"
                         : "translate-x-0",
                     ].join(" ")}
