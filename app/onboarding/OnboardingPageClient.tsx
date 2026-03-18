@@ -16,10 +16,13 @@ type TitleSegment = {
   highlight?: boolean;
 };
 
+type OnboardingIllustrationSrc =
+  (typeof ONBOARDING_ILLUSTRATION_SRCS)[number];
+
 type OnboardingStep = {
   titleSegments: TitleSegment[];
   description: string;
-  illustrationSrc?: string;
+  illustrationSrc?: OnboardingIllustrationSrc;
   illustrationAlt?: string;
 };
 
@@ -71,10 +74,10 @@ export default function OnboardingPageClient({
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [loadedIllustrations, setLoadedIllustrations] = useState<
-    Partial<Record<(typeof ONBOARDING_ILLUSTRATION_SRCS)[number], boolean>>
+    Partial<Record<OnboardingIllustrationSrc, boolean>>
   >(() =>
     ONBOARDING_ILLUSTRATION_SRCS.reduce<
-      Partial<Record<(typeof ONBOARDING_ILLUSTRATION_SRCS)[number], boolean>>
+      Partial<Record<OnboardingIllustrationSrc, boolean>>
     >((acc, src, index) => {
       acc[src] = index === 0;
       return acc;
