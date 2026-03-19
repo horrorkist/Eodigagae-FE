@@ -139,10 +139,7 @@ export default function PetProfileModal({
   };
 
   const modalContent = (
-    <div
-      className="fixed inset-0 z-[210] bg-black/45 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[210] bg-black/45 p-4" onClick={onClose}>
       <div className="flex h-full items-center justify-center">
         <div
           ref={dialogRef}
@@ -212,7 +209,7 @@ export default function PetProfileModal({
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, age: event.target.value }))
                   }
-                  placeholder="나이를 입력해 주세요"
+                  placeholder="나이"
                   className="h-16 min-w-0 flex-1 rounded-2xl border border-gray-300 px-5  text-dg-black outline-none placeholder:text-gray-300 focus:border-dg-green-500"
                 />
                 <div className="grid h-16 w-[136px] grid-cols-2 overflow-hidden rounded-2xl border border-gray-300  font-semibold leading-none">
@@ -258,7 +255,7 @@ export default function PetProfileModal({
                   className="h-2 w-2 text-dg-green-500"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 {BREED_OPTIONS.map((option) => (
                   <button
                     key={option.value}
@@ -270,7 +267,7 @@ export default function PetProfileModal({
                       }))
                     }
                     className={[
-                      "h-14 rounded-full border px-7  font-semibold leading-none",
+                      "h-14 min-w-0 rounded-full border px-4 text-nowrap font-semibold leading-none",
                       form.breed === option.value
                         ? "border-dg-green-500 bg-dg-green-50 text-dg-green-700"
                         : "border-gray-300 text-dg-black",
