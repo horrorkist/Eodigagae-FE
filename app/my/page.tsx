@@ -419,35 +419,6 @@ export default function MyPage() {
           <section>
             <h3 className="mb-1 font-semibold text-dg-black">설정</h3>
             <div>
-              <div className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-2 font-medium text-dg-black">
-                  <RowIcon
-                    icon={appIconBell}
-                    iconClassName="text-dg-yellow-sub"
-                  />
-                  <span>알림 설정</span>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={notificationsEnabled}
-                  onClick={() => setNotificationsEnabled(!notificationsEnabled)}
-                  className={[
-                    "relative h-7 w-12 rounded-full transition-colors",
-                    notificationsEnabled ? "bg-dg-green-500" : "bg-gray-300",
-                  ].join(" ")}
-                >
-                  <span
-                    className={[
-                      "absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform",
-                      notificationsEnabled
-                        ? "translate-x-[20px]"
-                        : "translate-x-0",
-                    ].join(" ")}
-                  />
-                </button>
-              </div>
-
               <button
                 type="button"
                 onClick={handleOpenCacheClearModal}
