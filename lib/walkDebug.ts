@@ -54,15 +54,15 @@ export function isWalkDebugEnabled() {
 }
 
 export function isWalkDebugPanelVisible() {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return false;
   try {
     const fromStorage = window.localStorage.getItem(
       WALK_DEBUG_PANEL_VISIBLE_STORAGE_KEY,
     );
-    if (fromStorage == null) return true;
+    if (fromStorage == null) return false;
     return isDebugTruthy(fromStorage);
   } catch {
-    return true;
+    return false;
   }
 }
 

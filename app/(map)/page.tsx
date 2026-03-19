@@ -103,7 +103,7 @@ function MapPageContent() {
   const showWalkDebugPanel = useSyncExternalStore(
     subscribeWalkDebugUpdates,
     isWalkDebugPanelVisible,
-    () => true,
+    () => false,
   );
   const { mapRef, sdkReady } = useMapRuntime();
 

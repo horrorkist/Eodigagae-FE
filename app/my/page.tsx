@@ -4,7 +4,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type ChangeEvent,
 } from "react";
 import Link from "next/link";
@@ -30,11 +29,6 @@ import {
   ONBOARDING_COOKIE_NAME,
 } from "@/lib/onboarding";
 import { clearAppCache } from "@/lib/storage/appCache";
-import {
-  isWalkDebugPanelVisible,
-  setWalkDebugPanelVisible,
-  subscribeWalkDebugUpdates,
-} from "@/lib/walkDebug";
 import {
   deleteDogPhotoWithFallbackQueue,
   drainPendingDogPhotoDeletes,
@@ -96,12 +90,6 @@ export default function MyPage() {
   const setFormDraft = useDogStore((s) => s.setFormDraft);
   const clearDog = useDogStore((s) => s.clearDog);
 
-  const notificationsEnabled = useMySettingsStore(
-    (s) => s.notificationsEnabled,
-  );
-  const setNotificationsEnabled = useMySettingsStore(
-    (s) => s.setNotificationsEnabled,
-  );
   const historyDataSource = useMySettingsStore((s) => s.historyDataSource);
   const setHistoryDataSource = useMySettingsStore(
     (s) => s.setHistoryDataSource,
@@ -113,12 +101,6 @@ export default function MyPage() {
   const clearWalkHistory = useWalkHistoryStore((s) => s.clearEntries);
 
   const openModal = useModalStore((s) => s.open);
-  const showWalkDebugPanel = useSyncExternalStore(
-    subscribeWalkDebugUpdates,
-    isWalkDebugPanelVisible,
-    () => true,
-  );
-
   const dogDisplayName = dog?.name?.trim() ? dog.name.trim() : "이름";
   const petPhotoUrl = dog?.photo?.variantUrl ?? null;
 
@@ -499,7 +481,7 @@ export default function MyPage() {
           <section>
             <h3 className="mb-1 font-semibold text-dg-black">개발자 옵션</h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between py-1">
+              {/* <div className="flex items-center justify-between py-1">
                 <div className="font-medium text-dg-black">
                   산책 디버그 패널 표시
                 </div>
@@ -522,7 +504,7 @@ export default function MyPage() {
                     ].join(" ")}
                   />
                 </button>
-              </div>
+              </div> */}
 
               <div className="flex items-center justify-between py-1">
                 <div>
