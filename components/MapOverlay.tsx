@@ -1,19 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useEmit } from "@/hooks/useEventBus";
-import { requestOrientationPermissionIfNeeded } from "@/hooks/useWalkHeading";
 import { useMapStore } from "@/stores/mapStore";
 import { useUiChromeStore } from "@/stores/uiChrome";
 import { useMapControlStore } from "@/stores/mapControlStore";
-import type { FABMenuItem } from "@/components/FloatingFABMenu";
 import type { RoutePlanningSource } from "@/types/routePlanning";
 import type { RouteRecommendation } from "@/types/routeRecommend";
-import {
-  faFlagCheckered,
-  faMapLocationDot,
-  faPersonWalking,
-} from "@fortawesome/free-solid-svg-icons";
 import type { ToggleItem } from "@/components/map-overlay/types";
 import TopOverlay from "@/components/map-overlay/TopOverlay";
 import RoutePlanningOverlay from "@/components/map-overlay/RoutePlanningOverlay";
@@ -131,15 +123,8 @@ export default function MapOverlay({
   isStartPointSelectionMode = false,
   startPointAddressText = "주소를 확인하는 중...",
 }: MapOverlayProps) {
-  const emit = useEmit();
   const isBottomChromeVisible = useUiChromeStore(
     (s) => s.isBottomChromeVisible,
-  );
-  const markerPlacementMode = useMapControlStore((s) => s.markerPlacementMode);
-  const startMoveMyMarker = useMapControlStore((s) => s.startMoveMyMarker);
-  const startMoveDest = useMapControlStore((s) => s.startMoveDest);
-  const cancelMarkerPlacement = useMapControlStore(
-    (s) => s.cancelMarkerPlacement,
   );
   const requestMyLocation = useMapControlStore((s) => s.requestMyLocation);
   const walking = useMapStore((s) => s.walking);
@@ -172,10 +157,6 @@ export default function MapOverlay({
     !walking;
   const isPoiRouteWalking = walking && routePlanningSource === "poi-route";
 
-  const canStartWalking = useMemo(
-    () => !!route?.path && route.path.length > 1,
-    [route],
-  );
   const elapsedSec = useMemo(() => {
     if (!walkingStartedAt) return 0;
     const effectiveNow =
@@ -193,50 +174,6 @@ export default function MapOverlay({
     nowMs,
   ]);
 
-  const isMovingMyMarker = markerPlacementMode === "my";
-  const isSettingDest = markerPlacementMode === "dest";
-
-  const cancelMoveMyMarker = useCallback(() => {
-    cancelMarkerPlacement();
-  }, [cancelMarkerPlacement]);
-
-  const cancelMoveDest = useCallback(() => {
-    cancelMarkerPlacement();
-  }, [cancelMarkerPlacement]);
-
-  const onToggleMoveMyMarker = useCallback(() => {
-    if (isMovingMyMarker) {
-      cancelMoveMyMarker();
-      return;
-    }
-
-    startMoveMyMarker();
-  }, [cancelMoveMyMarker, isMovingMyMarker, startMoveMyMarker]);
-
-  const onToggleMoveDest = useCallback(() => {
-    if (isSettingDest) {
-      cancelMoveDest();
-      return;
-    }
-
-    startMoveDest();
-  }, [cancelMoveDest, isSettingDest, startMoveDest]);
-
-  const onToggleWalking = useCallback(() => {
-    if (!canStartWalking) return;
-    if (!walking) requestOrientationPermissionIfNeeded();
-
-    if (walking) {
-      requestWalkStop();
-      return;
-    }
-
-    emit({
-      type: "START_WALKING",
-      channel: "map",
-    });
-  }, [canStartWalking, emit, walking]);
-
   const onStopWalking = useCallback(() => {
     requestWalkStop();
   }, []);
@@ -244,42 +181,6 @@ export default function MapOverlay({
   const onRequestMyLocation = useCallback(() => {
     requestMyLocation();
   }, [requestMyLocation]);
-
-  const fabItems = useMemo<FABMenuItem[]>(
-    () => [
-      {
-        key: "move-marker",
-        icon: faMapLocationDot,
-        label: "내 위치 변경",
-        active: isMovingMyMarker,
-        onClick: onToggleMoveMyMarker,
-      },
-      {
-        key: "set-dest",
-        icon: faFlagCheckered,
-        label: "도착지 설정",
-        active: isSettingDest,
-        onClick: onToggleMoveDest,
-      },
-      {
-        key: "start-walking",
-        icon: faPersonWalking,
-        label: walking ? "산책 종료" : "산책 시작",
-        active: walking,
-        disabled: !canStartWalking,
-        onClick: onToggleWalking,
-      },
-    ],
-    [
-      isMovingMyMarker,
-      isSettingDest,
-      onToggleMoveMyMarker,
-      onToggleMoveDest,
-      onToggleWalking,
-      walking,
-      canStartWalking,
-    ],
-  );
 
   useEffect(() => {
     if (!walking || walkingPaused || !walkingStartedAt) return;
@@ -328,8 +229,6 @@ export default function MapOverlay({
             </div>
             )
           }
-          showFabMenu={false}
-          fabItems={[]}
           onRequestMyLocation={onRequestMyLocation}
         />
         <WalkingOverlay
@@ -371,8 +270,6 @@ export default function MapOverlay({
             }
             bottomTransitionMs={floatingControlsBottomTransitionMs}
             bottomTransitionEasing={floatingControlsBottomTransitionEasing}
-            showFabMenu={false}
-            fabItems={[]}
             onRequestMyLocation={onRequestMyLocation}
           />
           <StartPointCenterMarker />
@@ -402,7 +299,6 @@ export default function MapOverlay({
           bottomTransitionMs={floatingControlsBottomTransitionMs}
           bottomTransitionEasing={floatingControlsBottomTransitionEasing}
           leftSlot={bottomLeftSlot}
-          fabItems={fabItems}
           onRequestMyLocation={onRequestMyLocation}
         />
       )}

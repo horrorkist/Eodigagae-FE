@@ -1,5 +1,3 @@
-import FloatingFABMenu from "@/components/FloatingFABMenu";
-import type { FABMenuItem } from "@/components/FloatingFABMenu";
 import AppIcon from "@/components/icons/AppIcon";
 import { appIconLocation } from "@/components/icons/definitions.generated";
 import { FLOATING_CONTROLS_BASE_BOTTOM_WITH_CHROME_PX } from "@/lib/bottomChromeMetrics";
@@ -10,8 +8,6 @@ type FloatingControlsOverlayProps = {
   bottomTransitionMs?: number;
   bottomTransitionEasing?: "linear" | "ease-in-out" | "ease-out";
   leftSlot?: React.ReactNode;
-  showFabMenu?: boolean;
-  fabItems: FABMenuItem[];
   onRequestMyLocation: () => void;
 };
 
@@ -21,8 +17,6 @@ export default function FloatingControlsOverlay({
   bottomTransitionMs = 0,
   bottomTransitionEasing = "linear",
   leftSlot,
-  showFabMenu = true,
-  fabItems,
   onRequestMyLocation,
 }: FloatingControlsOverlayProps) {
   const baseBottomPx = isBottomChromeVisible
@@ -42,7 +36,6 @@ export default function FloatingControlsOverlay({
       <div className="pointer-events-auto">{leftSlot}</div>
 
       <div className="flex flex-col items-end space-y-4">
-        {showFabMenu ? <FloatingFABMenu items={fabItems} /> : null}
         <button
           onClick={onRequestMyLocation}
           className="pointer-events-auto rounded-full w-10 h-10 bg-white p-2 flex items-center justify-center shadow-lg shadow-black/15 overflow-hidden text-dg-black active:bg-dg-green-500 active:text-white"
