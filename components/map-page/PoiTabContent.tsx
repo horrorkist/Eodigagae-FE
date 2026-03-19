@@ -77,13 +77,18 @@ export default function PoiTabContent({
       {visiblePois.length > 0 && (
         <ul>
           {visiblePois.map((poi, index) => {
+            const cardTitle =
+              poi.source === "trash-bin"
+                ? poi.meta.item.locationDesc.trim() || poi.title
+                : poi.title;
+
             return (
               <li key={poi.id}>
                 <PoiCard
                   item={{
                     id: poi.id,
                     source: poi.source,
-                    title: poi.title,
+                    title: cardTitle,
                     category: poi.category,
                     address: poi.address,
                     distanceM: poi.distanceM,
