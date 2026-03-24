@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import AppIcon from "@/components/icons/AppIcon";
 import { appIconAsterisk } from "@/components/icons/definitions.generated";
+import { submitFeedback } from "@/services/feedback";
 
 const SATISFACTION_OPTIONS = [
   { value: 1, label: "1" },
@@ -38,15 +39,43 @@ export default function SupportFeedbackPage() {
   >(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [message, setMessage] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const isSubmitDisabled =
-    satisfaction === null || hasExperiencedError === null;
+    satisfaction === null || hasExperiencedError === null || isSubmitting;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (isSubmitDisabled) return;
-    setIsSubmitted(true);
+    if (
+      isSubmitDisabled ||
+      satisfaction === null ||
+      hasExperiencedError === null
+    ) {
+      return;
+    }
+
+    setSubmitError(null);
+    setIsSubmitting(true);
+
+    try {
+      await submitFeedback({
+        satisfactionScore: satisfaction,
+        hasError: hasExperiencedError,
+        errorDetail: hasExperiencedError ? errorMessage.trim() : "",
+        content: message.trim(),
+      });
+      setIsSubmitted(true);
+    } catch (error: unknown) {
+      setSubmitError(
+        error instanceof Error
+          ? error.message
+          : "의견 제출에 실패했어요. 잠시 후 다시 시도해 주세요.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSubmitted) {
@@ -199,6 +228,11 @@ export default function SupportFeedbackPage() {
         </div>
 
         <div className="mt-auto pt-8">
+          {submitError ? (
+            <p className="mb-3 text-sm font-medium text-red-600">
+              {submitError}
+            </p>
+          ) : null}
           <button
             type="submit"
             disabled={isSubmitDisabled}
@@ -209,7 +243,7 @@ export default function SupportFeedbackPage() {
                 : "bg-dg-green-500 active:bg-dg-green-600",
             ].join(" ")}
           >
-            제출하기
+            {isSubmitting ? "제출 중..." : "제출하기"}
           </button>
         </div>
       </form>

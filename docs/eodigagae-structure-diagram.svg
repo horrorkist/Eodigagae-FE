@@ -1,0 +1,173 @@
+<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Eodigagae structure diagram</title>
+  <desc id="desc">Compact structure diagram for Eodigagae showing UI, client architecture, API layer, and external services.</desc>
+
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#0D1B14" flood-opacity="0.08"/>
+    </filter>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto">
+      <path d="M0 0L14 7L0 14V0Z" fill="#2B5F49"/>
+    </marker>
+    <style>
+      .h1 { font: 700 34px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #172A21; }
+      .h2 { font: 700 22px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #173126; }
+      .h3 { font: 700 18px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #173126; }
+      .body { font: 500 15px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #446355; }
+      .small { font: 600 13px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #5C7A6D; letter-spacing: 0.05em; text-transform: uppercase; }
+      .box { fill: #FFFFFF; stroke: #D7E3DC; stroke-width: 1.5; }
+      .accent { fill: #EEF6F2; stroke: #CFE0D7; stroke-width: 1.5; }
+      .warm { fill: #FAF7F0; stroke: #E6DAC0; stroke-width: 1.5; }
+      .blue { fill: #F4F8FC; stroke: #D7E4F2; stroke-width: 1.5; }
+      .red { fill: #FCF6F6; stroke: #ECD6D6; stroke-width: 1.5; }
+      .tag { font: 600 12px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #2D624B; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="#F6F8F7"/>
+
+  <text x="90" y="92" class="small">Architecture at a glance</text>
+  <text x="90" y="138" class="h1">Eodigagae Frontend Structure</text>
+  <text x="90" y="168" class="body">Mobile web architecture focused on map UX, route recommendation, live walking flow, and stable API integration.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="80" y="210" width="1440" height="690" rx="28" class="box"/>
+  </g>
+
+  <text x="122" y="258" class="small">User-facing layer</text>
+  <text x="466" y="258" class="small">Client architecture</text>
+  <text x="1058" y="258" class="small">Server boundary</text>
+  <text x="1318" y="258" class="small">External systems</text>
+
+  <g filter="url(#shadow)">
+    <rect x="112" y="286" width="280" height="566" rx="24" class="accent"/>
+    <rect x="430" y="286" width="588" height="566" rx="24" class="blue"/>
+    <rect x="1056" y="286" width="220" height="566" rx="24" class="warm"/>
+    <rect x="1314" y="286" width="174" height="566" rx="24" class="red"/>
+  </g>
+
+  <g>
+    <text x="136" y="328" class="h2">Screens</text>
+
+    <rect x="136" y="356" width="232" height="92" rx="18" class="box"/>
+    <text x="156" y="388" class="h3">Map Page</text>
+    <text x="156" y="414" class="body">Search overlay</text>
+    <text x="156" y="436" class="body">POI list / focused sheet</text>
+
+    <rect x="136" y="468" width="232" height="92" rx="18" class="box"/>
+    <text x="156" y="500" class="h3">Walk Flow</text>
+    <text x="156" y="526" class="body">Start point selection</text>
+    <text x="156" y="548" class="body">Route planning / guidance</text>
+
+    <rect x="136" y="580" width="232" height="92" rx="18" class="box"/>
+    <text x="156" y="612" class="h3">History / My Page</text>
+    <text x="156" y="638" class="body">Walk history / streak</text>
+    <text x="156" y="660" class="body">Pet profile / photo upload</text>
+
+    <rect x="136" y="692" width="232" height="92" rx="18" class="box"/>
+    <text x="156" y="724" class="h3">Support</text>
+    <text x="156" y="750" class="body">Feedback / notices</text>
+
+    <rect x="136" y="804" width="232" height="28" rx="14" fill="#DFF0E8"/>
+    <text x="156" y="823" class="tag">Next.js App Router UI</text>
+  </g>
+
+  <g>
+    <text x="454" y="328" class="h2">Frontend Core</text>
+
+    <rect x="454" y="356" width="540" height="92" rx="18" class="box"/>
+    <text x="478" y="388" class="h3">Presentation + Orchestration</text>
+    <text x="478" y="414" class="body">components/*, map overlays, bottom sheet, page containers</text>
+    <text x="478" y="436" class="body">Complex screen transitions handled at the page + overlay level</text>
+
+    <rect x="454" y="470" width="258" height="116" rx="18" class="box"/>
+    <text x="478" y="502" class="h3">State Layer</text>
+    <text x="478" y="528" class="body">Zustand stores</text>
+    <text x="478" y="550" class="body">map / route / history / UI chrome</text>
+    <text x="478" y="572" class="body">Focused on persistent client state</text>
+
+    <rect x="736" y="470" width="258" height="116" rx="18" class="box"/>
+    <text x="760" y="502" class="h3">Hooks + Controllers</text>
+    <text x="760" y="528" class="body">Map runtime, my location, POI control</text>
+    <text x="760" y="550" class="body">Walk session, route actions, search state</text>
+    <text x="760" y="572" class="body">SWR-backed fetch coordination</text>
+
+    <rect x="454" y="608" width="258" height="136" rx="18" class="box"/>
+    <text x="478" y="640" class="h3">Domain Logic</text>
+    <text x="478" y="666" class="body">Route tracking policy</text>
+    <text x="478" y="688" class="body">Walk history calculation</text>
+    <text x="478" y="710" class="body">POI normalization / parsing</text>
+    <text x="478" y="732" class="body">Pure logic extracted for testability</text>
+
+    <rect x="736" y="608" width="258" height="136" rx="18" class="box"/>
+    <text x="760" y="640" class="h3">Client Services</text>
+    <text x="760" y="666" class="body">services/routes.ts</text>
+    <text x="760" y="688" class="body">services/routeRecommend.ts</text>
+    <text x="760" y="710" class="body">services/feedback.ts / dogPhoto.ts</text>
+    <text x="760" y="732" class="body">Typed fetch wrappers + response guards</text>
+
+    <rect x="454" y="768" width="540" height="64" rx="18" fill="#DAEBE3"/>
+    <text x="478" y="806" class="tag">SWRConfig + EventBus + modular hooks support cross-screen map behavior</text>
+  </g>
+
+  <g>
+    <text x="1080" y="328" class="h2">Route Handlers</text>
+
+    <rect x="1080" y="356" width="172" height="64" rx="16" class="box"/>
+    <text x="1100" y="394" class="body">/api/routes/recommend</text>
+
+    <rect x="1080" y="438" width="172" height="82" rx="16" class="box"/>
+    <text x="1100" y="470" class="body">/api/tmap/pois</text>
+    <text x="1100" y="492" class="body">/api/tmap/pedestrian</text>
+
+    <rect x="1080" y="538" width="172" height="82" rx="16" class="box"/>
+    <text x="1100" y="570" class="body">/api/tmap/reverse-geocode</text>
+    <text x="1100" y="592" class="body">/api/fountains / trash-bins</text>
+
+    <rect x="1080" y="638" width="172" height="82" rx="16" class="box"/>
+    <text x="1100" y="670" class="body">/api/images/*</text>
+    <text x="1100" y="692" class="body">/api/feedback</text>
+
+    <rect x="1080" y="752" width="172" height="80" rx="16" fill="#EEDFC4"/>
+    <text x="1100" y="784" class="h3">Role</text>
+    <text x="1100" y="808" class="body">Validation</text>
+    <text x="1100" y="828" class="body">Normalization</text>
+  </g>
+
+  <g>
+    <text x="1338" y="328" class="h2">Upstream</text>
+
+    <rect x="1338" y="356" width="126" height="72" rx="16" class="box"/>
+    <text x="1360" y="392" class="body">Naver Maps</text>
+    <text x="1360" y="414" class="body">SDK</text>
+
+    <rect x="1338" y="446" width="126" height="96" rx="16" class="box"/>
+    <text x="1360" y="478" class="body">TMAP</text>
+    <text x="1360" y="500" class="body">POI / Route</text>
+    <text x="1360" y="522" class="body">Reverse geocode</text>
+
+    <rect x="1338" y="560" width="126" height="120" rx="16" class="box"/>
+    <text x="1360" y="592" class="body">Route API</text>
+    <text x="1360" y="614" class="body">Pet POI API</text>
+    <text x="1360" y="636" class="body">Facilities API</text>
+    <text x="1360" y="658" class="body">Feedback API</text>
+
+    <rect x="1338" y="698" width="126" height="72" rx="16" class="box"/>
+    <text x="1360" y="734" class="body">Cloudflare</text>
+    <text x="1360" y="756" class="body">Images</text>
+
+    <rect x="1338" y="790" width="126" height="42" rx="14" fill="#F1DDDD"/>
+    <text x="1359" y="816" class="tag">3rd-party APIs</text>
+  </g>
+
+  <path d="M392 540H438" stroke="#2B5F49" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M1018 540H1048" stroke="#2B5F49" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M1276 540H1306" stroke="#2B5F49" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <path d="M584 586V608" stroke="#7A9A8B" stroke-width="3" stroke-linecap="round"/>
+  <path d="M866 586V608" stroke="#7A9A8B" stroke-width="3" stroke-linecap="round"/>
+  <path d="M712 676H736" stroke="#7A9A8B" stroke-width="3" stroke-linecap="round"/>
+
+  <rect x="80" y="920" width="1440" height="2" fill="#D8E1DC"/>
+  <text x="90" y="950" class="body">Strong resume message: UI complexity is controlled on the client, unstable upstreams are absorbed at the API boundary, and route logic is isolated into testable modules.</text>
+</svg>

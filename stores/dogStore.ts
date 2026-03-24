@@ -14,6 +14,8 @@ export type DogInfoFormDraft = {
 type DogState = {
   dog: DogInfo | null;
   formDraft: DogInfoFormDraft | null;
+  hasHydrated: boolean;
+  setHasHydrated: (value: boolean) => void;
   setDog: (dog: DogInfo) => void;
   setFormDraft: (draft: DogInfoFormDraft | null) => void;
   clearDog: () => void;
@@ -32,6 +34,8 @@ export const useDogStore = create<DogState>()(
     (set) => ({
       dog: null,
       formDraft: null,
+      hasHydrated: false,
+      setHasHydrated: (value) => set({ hasHydrated: value }),
       setDog: (dog) => set({ dog }),
       setFormDraft: (draft) => set({ formDraft: draft }),
       clearDog: () => set({ dog: null, formDraft: null }),
@@ -45,6 +49,9 @@ export const useDogStore = create<DogState>()(
         dog: state.dog,
         formDraft: state.formDraft,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

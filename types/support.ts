@@ -18,3 +18,16 @@ export type SupportFeedbackDraft = {
   message: string;
   contact: string;
 };
+
+export type FeedbackSubmitRequest = {
+  satisfactionScore: number;
+  hasError: boolean;
+  errorDetail: string;
+  content: string;
+};
+
+export type FeedbackSubmitResponse = {
+  resultCode: string;
+  feebackId?: number;
+  feedbackId?: number;
+};

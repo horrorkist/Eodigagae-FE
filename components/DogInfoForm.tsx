@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { DogBreed, DogInfo } from "@/types/dog";
 import { useDogStore } from "@/stores/dogStore";
@@ -65,6 +65,7 @@ export default function DogInfoForm({
   const setDog = useDogStore((s) => s.setDog);
   const currentDog = useDogStore((s) => s.dog);
   const currentFormDraft = useDogStore((s) => s.formDraft);
+  const dogStoreHydrated = useDogStore((s) => s.hasHydrated);
   const setFormDraft = useDogStore((s) => s.setFormDraft);
   const isBottomSheetOpen = useBottomSheetStore((s) => s.isOpen);
   const showRouteFormCta = useBottomNavOverrideStore((s) => s.showRouteFormCta);
@@ -77,6 +78,9 @@ export default function DogInfoForm({
   const formRootRef = useRef<HTMLDivElement | null>(null);
   const wasWalkRecVisibleRef = useRef(false);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const initialRecommendationKeyRef = useRef<string | null>(null);
+  const hydratedFormSnapshotRef = useRef<string | null>(null);
+  const preserveRestoredDistanceOnceRef = useRef(false);
 
   const dogDefaultUnit = getDefaultAgeUnit(currentDog);
   const restoreUnit = currentFormDraft?.ageUnit ?? dogDefaultUnit;
@@ -103,7 +107,7 @@ export default function DogInfoForm({
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid },
+    formState: { errors, isValid, isDirty },
     control,
     setValue,
     reset,
@@ -141,20 +145,79 @@ export default function DogInfoForm({
   const recommendedWalkDistanceKm = walkRec
     ? clampWalkDistanceKm(walkRec.minKm)
     : null;
+  const recommendationKey =
+    selectedBreed && ageInMonthsForRecommendation !== null && walkRec
+      ? `${selectedBreed}:${ageInMonthsForRecommendation}:${walkRec.minKm}:${walkRec.maxKm}`
+      : null;
+  const hydrationSnapshotKey = [
+    restoreUnit,
+    currentDog?.name ?? "",
+    currentDog?.ageInMonths ?? "",
+    currentDog?.breed ?? "",
+    currentFormDraft?.name ?? "",
+    currentFormDraft?.age ?? "",
+    currentFormDraft?.ageUnit ?? "",
+    currentFormDraft?.breed ?? "",
+    currentFormDraft?.walkDistanceKm ?? "",
+    currentFormDraft?.walkDurationMinutes ?? "",
+  ].join("|");
   const isDurationPriority =
     Number(watchedWalkDurationMinutes ?? WALK_DURATION_MIN_MINUTES) >
     WALK_DURATION_MIN_MINUTES;
-  const hasSavedDraft = currentFormDraft != null;
 
   useEffect(() => {
-    if (hasSavedDraft) return;
+    if (!dogStoreHydrated || isDirty) return;
+    if (hydratedFormSnapshotRef.current === hydrationSnapshotKey) return;
+
+    hydratedFormSnapshotRef.current = hydrationSnapshotKey;
+    initialRecommendationKeyRef.current = null;
+    preserveRestoredDistanceOnceRef.current = currentFormDraft != null;
+    startTransition(() => {
+      setAgeUnit(restoreUnit);
+    });
+    reset({
+      name: currentFormDraft?.name ?? currentDog?.name ?? "",
+      age: defaultAge,
+      breed: currentFormDraft?.breed ?? currentDog?.breed ?? "",
+      walkDistanceKm:
+        currentFormDraft?.walkDistanceKm ?? WALK_DISTANCE_MIN_KM,
+      walkDurationHours:
+        currentFormDraft?.walkDurationMinutes ?? WALK_DURATION_MIN_MINUTES,
+    });
+  }, [
+    currentFormDraft,
+    currentDog,
+    defaultAge,
+    dogStoreHydrated,
+    hydrationSnapshotKey,
+    isDirty,
+    reset,
+    restoreUnit,
+  ]);
+
+  useEffect(() => {
     if (recommendedWalkDistanceKm == null || isDurationPriority) return;
+
+    if (recommendationKey && initialRecommendationKeyRef.current == null) {
+      initialRecommendationKeyRef.current = recommendationKey;
+
+      if (preserveRestoredDistanceOnceRef.current) {
+        preserveRestoredDistanceOnceRef.current = false;
+        return;
+      }
+    }
+
     setValue("walkDistanceKm", recommendedWalkDistanceKm, {
       shouldDirty: false,
       shouldTouch: false,
       shouldValidate: true,
     });
-  }, [recommendedWalkDistanceKm, setValue, isDurationPriority, hasSavedDraft]);
+  }, [
+    isDurationPriority,
+    recommendationKey,
+    recommendedWalkDistanceKm,
+    setValue,
+  ]);
 
   useEffect(() => {
     if (!shouldActivateBottomNavCta) return;
@@ -259,6 +322,9 @@ export default function DogInfoForm({
   const handleReset = () => {
     reset(resetFormValues);
     setAgeUnit("years");
+    initialRecommendationKeyRef.current = null;
+    preserveRestoredDistanceOnceRef.current = false;
+    hydratedFormSnapshotRef.current = null;
     setFormDraft(null);
   };
 
@@ -485,7 +551,6 @@ export default function DogInfoForm({
                   />
                   {/* 거리 */}
                   <Controller
-                    key={`${walkRec.minKm}-${walkRec.maxKm}`}
                     control={control}
                     name="walkDistanceKm"
                     rules={{

@@ -1,0 +1,151 @@
+<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Eodigagae architecture overview</title>
+  <desc id="desc">Resume-friendly architecture diagram for the Eodigagae project showing client UI, frontend orchestration, API boundary, and external services.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="120" y1="80" x2="1480" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F6FAF8"/>
+      <stop offset="1" stop-color="#EEF4F1"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="120" y1="80" x2="1480" y2="260" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1F7A53"/>
+      <stop offset="1" stop-color="#145C3D"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#103727" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto">
+      <path d="M0 0L14 7L0 14V0Z" fill="#1F7A53"/>
+    </marker>
+    <style>
+      .title { font: 700 40px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #FFFFFF; }
+      .subtitle { font: 500 18px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: rgba(255,255,255,0.82); }
+      .section-title { font: 700 24px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #123525; }
+      .card-title { font: 700 20px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #143C2A; }
+      .label { font: 600 15px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #1F513B; }
+      .body { font: 500 15px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #355946; }
+      .small { font: 600 13px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #537463; letter-spacing: 0.04em; text-transform: uppercase; }
+      .pill { font: 600 13px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #1C6A48; }
+      .strength { font: 600 16px 'Pretendard', 'Segoe UI', Arial, sans-serif; fill: #123525; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="980" fill="url(#bg)"/>
+
+  <rect x="80" y="60" width="1440" height="180" rx="32" fill="url(#hero)" filter="url(#shadow)"/>
+  <text x="128" y="130" class="small" fill="#D7F0E4">Resume Snapshot</text>
+  <text x="128" y="186" class="title">Eodigagae Frontend Architecture</text>
+  <text x="128" y="226" class="subtitle">Mobile map experience for dog walking: search, route recommendation, live walk flow, history, profile, and support.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="80" y="280" width="300" height="470" rx="28" fill="#FFFFFF"/>
+    <rect x="400" y="280" width="360" height="470" rx="28" fill="#FFFFFF"/>
+    <rect x="780" y="280" width="360" height="470" rx="28" fill="#FFFFFF"/>
+    <rect x="1160" y="280" width="360" height="470" rx="28" fill="#FFFFFF"/>
+  </g>
+
+  <text x="108" y="332" class="section-title">1. Client Experience</text>
+  <text x="428" y="332" class="section-title">2. Frontend Core</text>
+  <text x="808" y="332" class="section-title">3. API Boundary</text>
+  <text x="1188" y="332" class="section-title">4. External Services</text>
+
+  <g>
+    <rect x="108" y="366" width="244" height="80" rx="20" fill="#F4FBF7" stroke="#D8EDE2"/>
+    <text x="130" y="396" class="card-title">Map / Search</text>
+    <text x="130" y="422" class="body">Map page, search overlay, POI focus, bottom sheet, route planning UI</text>
+
+    <rect x="108" y="466" width="244" height="80" rx="20" fill="#F4FBF7" stroke="#D8EDE2"/>
+    <text x="130" y="496" class="card-title">Walk Experience</text>
+    <text x="130" y="522" class="body">Start point selection, route loading, live guidance, walking mode</text>
+
+    <rect x="108" y="566" width="244" height="80" rx="20" fill="#F4FBF7" stroke="#D8EDE2"/>
+    <text x="130" y="596" class="card-title">History / My Page</text>
+    <text x="130" y="622" class="body">Walk history, streaks, pet profile, photo upload, settings</text>
+
+    <rect x="108" y="666" width="244" height="56" rx="18" fill="#F4FBF7" stroke="#D8EDE2"/>
+    <text x="130" y="700" class="card-title">Support</text>
+    <text x="235" y="700" class="body">Feedback, notices</text>
+  </g>
+
+  <g>
+    <rect x="428" y="366" width="304" height="104" rx="20" fill="#F7FBFF" stroke="#D8E8F7"/>
+    <text x="450" y="396" class="card-title">State + Flow Control</text>
+    <text x="450" y="422" class="body">Zustand stores for map, route, history, UI chrome</text>
+    <text x="450" y="446" class="body">Event bus for cross-cutting map events</text>
+
+    <rect x="428" y="490" width="304" height="104" rx="20" fill="#F7FBFF" stroke="#D8E8F7"/>
+    <text x="450" y="520" class="card-title">Hooks + Orchestration</text>
+    <text x="450" y="546" class="body">Map runtime, my location, POI controllers, route actions</text>
+    <text x="450" y="570" class="body">Search persistence, walk session, overlay coordination</text>
+
+    <rect x="428" y="614" width="304" height="108" rx="20" fill="#F7FBFF" stroke="#D8E8F7"/>
+    <text x="450" y="644" class="card-title">Pure Logic + Testable Modules</text>
+    <text x="450" y="670" class="body">Route tracking policy, TMAP parsing, home POI normalization, walk history</text>
+    <text x="450" y="694" class="body">Node unit tests and smoke checks for regression safety</text>
+  </g>
+
+  <g>
+    <rect x="808" y="366" width="304" height="104" rx="20" fill="#FFFBF4" stroke="#F3E3C5"/>
+    <text x="830" y="396" class="card-title">Service Layer</text>
+    <text x="830" y="422" class="body">Client fetch modules for route, POI, reverse geocode, feedback, dog photo</text>
+    <text x="830" y="446" class="body">Response guards and user-facing error normalization</text>
+
+    <rect x="808" y="490" width="304" height="150" rx="20" fill="#FFFBF4" stroke="#F3E3C5"/>
+    <text x="830" y="520" class="card-title">Next.js Route Handlers</text>
+    <text x="830" y="548" class="label">/api/routes/recommend</text>
+    <text x="830" y="572" class="label">/api/tmap/pois  /api/tmap/pedestrian</text>
+    <text x="830" y="596" class="label">/api/tmap/reverse-geocode</text>
+    <text x="830" y="620" class="label">/api/fountains  /api/trash-bins</text>
+    <text x="830" y="644" class="label">/api/images/*  /api/feedback</text>
+
+    <rect x="808" y="660" width="304" height="62" rx="18" fill="#FFFBF4" stroke="#F3E3C5"/>
+    <text x="830" y="696" class="body">Request validation, upstream isolation, response reshaping</text>
+  </g>
+
+  <g>
+    <rect x="1188" y="366" width="304" height="76" rx="20" fill="#FFF7F7" stroke="#F2D6D6"/>
+    <text x="1210" y="396" class="card-title">Naver Maps SDK</text>
+    <text x="1210" y="422" class="body">Map canvas, markers, overlays, viewport control</text>
+
+    <rect x="1188" y="458" width="304" height="96" rx="20" fill="#FFF7F7" stroke="#F2D6D6"/>
+    <text x="1210" y="488" class="card-title">TMAP APIs</text>
+    <text x="1210" y="514" class="body">POI search, pedestrian route, reverse geocoding</text>
+    <text x="1210" y="538" class="body">Parsed into stable frontend route models</text>
+
+    <rect x="1188" y="570" width="304" height="96" rx="20" fill="#FFF7F7" stroke="#F2D6D6"/>
+    <text x="1210" y="600" class="card-title">Recommendation + Facility APIs</text>
+    <text x="1210" y="626" class="body">Dog-walk route recommend, pet POIs, fountains, trash bins, feedback</text>
+    <text x="1210" y="650" class="body">Consumed only through route handlers</text>
+
+    <rect x="1188" y="682" width="304" height="56" rx="18" fill="#FFF7F7" stroke="#F2D6D6"/>
+    <text x="1210" y="716" class="card-title">Cloudflare Images</text>
+    <text x="1374" y="716" class="body">Direct upload + delete</text>
+  </g>
+
+  <path d="M366 512H412" stroke="#1F7A53" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M746 512H792" stroke="#1F7A53" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M1126 512H1172" stroke="#1F7A53" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="80" y="790" width="1440" height="130" rx="28" fill="#FFFFFF"/>
+  </g>
+  <text x="108" y="834" class="section-title">Resume Talking Points</text>
+
+  <g>
+    <rect x="108" y="856" width="420" height="40" rx="20" fill="#EAF6F0"/>
+    <text x="132" y="881" class="strength">Complex map state was split into stores, hooks, and event channels.</text>
+
+    <rect x="552" y="856" width="432" height="40" rx="20" fill="#EDF4FB"/>
+    <text x="576" y="881" class="strength">Unstable upstream APIs were normalized behind Next.js route handlers.</text>
+
+    <rect x="1008" y="856" width="484" height="40" rx="20" fill="#FDF3E6"/>
+    <text x="1032" y="881" class="strength">Route tracking and POI normalization were isolated into testable logic.</text>
+  </g>
+
+  <g>
+    <rect x="1180" y="104" width="274" height="82" rx="22" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.24)"/>
+    <text x="1204" y="134" class="pill" fill="#E8FFF2">Key stack</text>
+    <text x="1204" y="160" class="subtitle">Next.js 16  •  React 19  •  TypeScript</text>
+    <text x="1204" y="182" class="subtitle">Zustand  •  SWR  •  Naver Maps  •  TMAP</text>
+  </g>
+</svg>

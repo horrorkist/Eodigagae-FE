@@ -1,6 +1,6 @@
 import type { RouteResult } from "@/domain/route/types";
 
-export type RouteRecommendationSource = "petpoi" | "synthetic";
+export type RouteRecommendationSource = "petpoi" | "synthetic" | "stroll-api";
 
 export type RouteWaypoint = {
   lat: number;

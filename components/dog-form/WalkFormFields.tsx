@@ -51,6 +51,7 @@ export function WalkDistanceSelector({
   const walkDistanceKm = disabledByDuration ? 0 : clampWalkDistanceKm(value);
   const isSelectedInRecommendedRange =
     !disabledByDuration && walkDistanceKm >= minKm && walkDistanceKm <= maxKm;
+  const recommendationBadgeKey = `walk-distance-tooltip-${minKm}-${maxKm}`;
 
   return (
     <div className="space-y-1.5">
@@ -77,7 +78,7 @@ export function WalkDistanceSelector({
           {isSelectedInRecommendedRange && (
             <div className="pointer-events-none absolute left-1/2 -top-8 z-10 -translate-x-1/2">
               <motion.div
-                key="walk-distance-tooltip"
+                key={recommendationBadgeKey}
                 initial={{ opacity: 0, y: 2 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 2 }}
@@ -187,4 +188,3 @@ export function WalkDurationSelector({
     </div>
   );
 }
-
