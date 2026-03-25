@@ -118,6 +118,12 @@ export default function PetPhotoPreviewOverlay({
                   zoomSpeed={ZOOM_STEP}
                   restrictPosition
                   objectFit="cover"
+                  style={{
+                    mediaStyle: {
+                      maxWidth: "none",
+                      maxHeight: "none",
+                    },
+                  }}
                   showGrid={false}
                   onCropChange={setCrop}
                   onZoomChange={setZoom}
