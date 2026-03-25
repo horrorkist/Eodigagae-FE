@@ -80,9 +80,7 @@ function getRouteExperienceCopy(
       routeStartLabel: "길안내 시작",
       walkingElapsedLabel: "이동 시간",
       walkingStopLabel: "길안내 종료",
-      loadingSplashTitle: "길찾기 경로를 찾고 있어요",
-      loadingSplashDescription:
-        "목적지까지 갈 수 있는 도보 경로를 정리하고 있어요.",
+      loadingSplashMessage: "길찾기 경로를 찾고 있어요.\n조금만 기다려주세요!",
     };
   }
 
@@ -93,9 +91,7 @@ function getRouteExperienceCopy(
     routeStartLabel: "산책 시작",
     walkingElapsedLabel: "산책 시간",
     walkingStopLabel: "산책 종료",
-    loadingSplashTitle: "추천 경로를 찾고 있어요",
-    loadingSplashDescription:
-      "반려견에게 맞는 산책 코스를 준비하고 있어요. 잠시만 기다려 주세요.",
+    loadingSplashMessage: "경로를 찾고 있어요.\n조금만 기다려주세요!",
   };
 }
 
@@ -243,8 +239,7 @@ export default function MapOverlay({
     <div className="pointer-events-none absolute inset-0 z-50">
       {shouldShowRouteLoadingSplash ? (
         <RouteLoadingSplash
-          title={routeExperienceCopy.loadingSplashTitle}
-          description={routeExperienceCopy.loadingSplashDescription}
+          message={routeExperienceCopy.loadingSplashMessage}
         />
       ) : null}
 

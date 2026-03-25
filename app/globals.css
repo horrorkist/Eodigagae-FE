@@ -25,6 +25,18 @@ body {
     sans-serif;
 }
 
+@keyframes route-loading-bounce {
+  0%,
+  40%,
+  100% {
+    transform: translateY(0);
+  }
+
+  20% {
+    transform: translateY(-10px);
+  }
+}
+
 input.search-input-no-native-clear::-webkit-search-decoration,
 input.search-input-no-native-clear::-webkit-search-cancel-button,
 input.search-input-no-native-clear::-webkit-search-results-button,

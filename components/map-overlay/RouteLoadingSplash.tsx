@@ -1,25 +1,40 @@
+import Image from "next/image";
+
 type RouteLoadingSplashProps = {
-  title: string;
-  description: string;
+  message: string;
 };
 
 export default function RouteLoadingSplash({
-  title,
-  description,
+  message,
 }: RouteLoadingSplashProps) {
   return (
-    <div className="absolute inset-0 z-[60] flex items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(11,220,0,0.18),_transparent_42%),linear-gradient(180deg,_rgba(255,255,255,0.9),_rgba(255,255,255,0.98))] px-6 backdrop-blur-md">
-      <div className="flex w-full max-w-xs flex-col items-center rounded-[28px] border border-white/80 bg-white/92 px-6 py-8 text-center shadow-[0_20px_80px_rgba(0,0,0,0.14)]">
-        <div className="relative mb-6 flex h-18 w-18 items-center justify-center rounded-full bg-dg-green-50">
-          <div className="h-11 w-11 animate-spin rounded-full border-[3px] border-dg-green-200 border-t-dg-green-600" />
-          <div className="absolute h-3 w-3 rounded-full bg-dg-green-500 shadow-[0_0_18px_rgba(11,220,0,0.45)]" />
+    <div className="absolute inset-0 z-[60] flex items-center justify-center bg-white/88 px-6 backdrop-blur-sm">
+      <div className="flex w-full max-w-xs flex-col items-center text-center">
+        <div className="relative mb-6 h-40 w-40">
+          <div className="absolute inset-0 animate-spin rounded-full bg-[conic-gradient(from_90deg,_rgba(206,206,206,0.14)_0deg,_rgba(206,206,206,0.14)_220deg,_rgba(237,237,237,0.96)_300deg,_rgba(151,151,151,0.88)_360deg)] [mask:radial-gradient(farthest-side,transparent_calc(100%-6px),#000_calc(100%-6px))] [-webkit-mask:radial-gradient(farthest-side,transparent_calc(100%-6px),#000_calc(100%-6px))]" />
+          <div className="absolute inset-[6px] overflow-hidden rounded-full bg-white shadow-[0_14px_34px_rgba(44,44,44,0.08)]">
+            <Image
+              src="/images/route/route-loading.svg"
+              alt="경로 추천 로딩 일러스트"
+              fill
+              sizes="160px"
+              priority
+              className="object-cover"
+            />
+          </div>
         </div>
-        <p className="text-xl font-semibold tracking-[-0.03em] text-dg-black">
-          {title}
+        <p className="whitespace-pre-line text-xl font-semibold leading-8 tracking-[-0.03em] text-dg-black">
+          {message}
         </p>
-        <p className="mt-2 text-sm leading-6 text-dg-gray-600">
-          {description}
-        </p>
+        <div className="mt-7 flex items-center justify-center gap-2" aria-hidden="true">
+          {[0, 1, 2].map((index) => (
+            <span
+              key={index}
+              className="h-2 w-2 rounded-full bg-dg-gray-500 [animation:route-loading-bounce_1.2s_ease-in-out_infinite]"
+              style={{ animationDelay: `${index * 160}ms` }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
