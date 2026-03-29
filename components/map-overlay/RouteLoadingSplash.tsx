@@ -54,7 +54,7 @@ export default function RouteLoadingSplash({
   useEffect(() => {
     const controls = [dog1Controls, dog2Controls, dog3Controls];
     let active = true;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let timeoutId: number | null = null;
 
     const wait = (ms: number) =>
       new Promise<void>((resolve) => {
