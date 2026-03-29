@@ -18,6 +18,11 @@ config.autoAddCss = false;
 export const metadata: Metadata = {
   title: "어디가개",
   description: "모바일 중심 Next.js UI 스캐폴딩",
+  icons: {
+    icon: "/images/favicon.png",
+    shortcut: "/images/favicon.png",
+    apple: "/images/favicon.png",
+  },
 };
 
 export const viewport = {
