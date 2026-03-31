@@ -5,11 +5,26 @@ import { useMapStore } from "@/stores/mapStore";
 import { useModalStore } from "@/stores/modal";
 import type { LatLng } from "@/types/mapEvents";
 import { projectPointToSegmentMeters } from "@/lib/geo";
+import { walkDebug } from "@/lib/walkDebug";
 import { requestWalkStop } from "@/lib/walkSession";
 import { ROUTE_OFF_ROUTE_DISTANCE_M } from "@/features/route/tracking/constants";
-import { buildRemainingPath, hasRenderablePolyline } from "@/features/route/tracking/path";
+import {
+  buildRemainingPath,
+  hasRenderablePolyline,
+  haversineMeters,
+} from "@/features/route/tracking/path";
 import { shouldPromptReroute, shouldSkipRouteRedraw } from "@/features/route/tracking/policy";
 import { findNearestSnap } from "@/features/route/tracking/snap";
+import {
+  findMatchCandidates,
+  resolveBestCursor,
+  type TrackingCursor,
+  type TrackingPendingCandidate,
+} from "@/features/route/tracking/matcher";
+import {
+  buildTrackingRouteModel,
+  type TrackingRouteModel,
+} from "@/features/route/tracking/model";
 import {
   clearGuidanceMarkers as clearGuidanceMarkersNaver,
   clearRouteVisuals as clearRouteVisualsNaver,
@@ -32,8 +47,11 @@ export function useMapRoute(
   const guidanceMarkersRef = useRef<naver.maps.Marker[]>([]);
   const lastDrawnPathRef = useRef<[number, number][] | null>(null);
   const lastMarkerVisibleRef = useRef(false);
-  const lastProgressSegIdxRef = useRef<number | null>(null);
-  const lastProjectedHeadRef = useRef<LatLng | null>(null);
+  const trackingModelRef = useRef<TrackingRouteModel | null>(null);
+  const lastConfirmedCursorRef = useRef<TrackingCursor | null>(null);
+  const lastRenderedCursorRef = useRef<TrackingCursor | null>(null);
+  const pendingCandidateRef = useRef<TrackingPendingCandidate | null>(null);
+  const legacyProgressSegIdxRef = useRef<number | null>(null);
   const wasOffRouteRef = useRef(false);
   const offRoutePromptShownRef = useRef(false);
   const lastOffRoutePromptAtRef = useRef(0);
@@ -41,6 +59,7 @@ export function useMapRoute(
   const drawRoute = useMapStore((s) => s.drawRoute);
   const myPos = useMapStore((s) => s.myPos);
   const walking = useMapStore((s) => s.walking);
+  const heading = useMapStore((s) => s.heading);
   const routeExperienceSource = useMapStore((s) => s.routeExperienceSource);
   const routeLoading = useMapStore((s) => s.routeLoading);
   const isModalOpen = useModalStore((s) => s.isOpen);
@@ -81,8 +100,10 @@ export function useMapRoute(
   );
 
   const resetRouteTracking = useCallback(() => {
-    lastProgressSegIdxRef.current = null;
-    lastProjectedHeadRef.current = null;
+    lastConfirmedCursorRef.current = null;
+    lastRenderedCursorRef.current = null;
+    pendingCandidateRef.current = null;
+    legacyProgressSegIdxRef.current = null;
     wasOffRouteRef.current = false;
     offRoutePromptShownRef.current = false;
     lastOffRoutePromptAtRef.current = 0;
@@ -220,6 +241,13 @@ export function useMapRoute(
   ]);
 
   useEffect(() => {
+    trackingModelRef.current =
+      route?.path?.length && route.path.length >= 2
+        ? buildTrackingRouteModel(route)
+        : null;
+  }, [route]);
+
+  useEffect(() => {
     resetRouteTracking();
   }, [route?.path, resetRouteTracking]);
 
@@ -232,7 +260,7 @@ export function useMapRoute(
     }
 
     const drawFullRoute = () => {
-      lastProjectedHeadRef.current = null;
+      lastRenderedCursorRef.current = null;
       resetOffRoutePromptState();
       drawRouteLine(route.path, fullRouteStyle);
     };
@@ -242,61 +270,112 @@ export function useMapRoute(
       return;
     }
 
-    const snap = findNearestSnap(
-      route.path,
-      myPos,
-      lastProgressSegIdxRef.current,
-    );
-    if (!snap) {
+    const trackingModel = trackingModelRef.current;
+    if (!trackingModel || trackingModel.segments.length === 0) {
       drawFullRoute();
       return;
     }
 
-    const isOffRoute = snap.distM > ROUTE_OFF_ROUTE_DISTANCE_M;
-    maybePromptOffRoute(snap.distM, isOffRoute);
-    const wasOffRoute = wasOffRouteRef.current;
-    const progressedSegIdx = Math.max(
-      snap.segIdx,
-      lastProgressSegIdxRef.current ?? 0,
+    const candidates = findMatchCandidates(
+      trackingModel,
+      myPos,
+      lastConfirmedCursorRef.current,
+      heading,
     );
-    const prevProgressSegIdx = lastProgressSegIdxRef.current;
-    lastProgressSegIdxRef.current = progressedSegIdx;
+    const resolution = resolveBestCursor(
+      trackingModel,
+      candidates,
+      lastConfirmedCursorRef.current,
+      pendingCandidateRef.current,
+    );
+    pendingCandidateRef.current = resolution.pendingCandidate;
+    if (!resolution.confirmedCursor) {
+      drawFullRoute();
+      return;
+    }
 
-    const segA: LatLng = {
-      lat: route.path[progressedSegIdx][1],
-      lng: route.path[progressedSegIdx][0],
-    };
-    const segB: LatLng = {
-      lat: route.path[progressedSegIdx + 1][1],
-      lng: route.path[progressedSegIdx + 1][0],
-    };
+    lastConfirmedCursorRef.current = resolution.confirmedCursor;
+    const activeCursor = resolution.confirmedCursor;
 
-    const projected = projectPointToSegmentMeters(myPos, segA, segB).point;
-    const prevProjected = lastProjectedHeadRef.current;
+    const legacySnap = findNearestSnap(
+      route.path,
+      myPos,
+      legacyProgressSegIdxRef.current,
+    );
+    if (legacySnap) {
+      const legacyProgressSegIdx = Math.max(
+        legacySnap.segIdx,
+        legacyProgressSegIdxRef.current ?? 0,
+      );
+      legacyProgressSegIdxRef.current = legacyProgressSegIdx;
+
+      const legacySegA: LatLng = {
+        lat: route.path[legacyProgressSegIdx][1],
+        lng: route.path[legacyProgressSegIdx][0],
+      };
+      const legacySegB: LatLng = {
+        lat: route.path[legacyProgressSegIdx + 1][1],
+        lng: route.path[legacyProgressSegIdx + 1][0],
+      };
+      const legacyProjected = projectPointToSegmentMeters(
+        myPos,
+        legacySegA,
+        legacySegB,
+      ).point;
+      const divergenceM = haversineMeters(
+        legacyProjected,
+        activeCursor.projected,
+      );
+
+      if (
+        legacyProgressSegIdx !== activeCursor.segmentIndex ||
+        divergenceM > 3 ||
+        resolution.ambiguous
+      ) {
+        walkDebug("route-tracker:compare", {
+          legacySegmentIndex: legacyProgressSegIdx,
+          legacyProjected,
+          legacySnapDistM: legacySnap.distM,
+          sequenceSegmentIndex: activeCursor.segmentIndex,
+          sequenceProjected: activeCursor.projected,
+          sequenceDistanceAlongRouteM: activeCursor.distanceAlongRouteM,
+          sequenceSnapDistM: activeCursor.snapDistM,
+          confidence: activeCursor.confidence,
+          overlapOccurrenceIndex: activeCursor.overlapOccurrenceIndex,
+          ambiguous: resolution.ambiguous,
+          leadingCandidateSegmentIndex:
+            resolution.leadingCandidate?.segment.index ?? null,
+        });
+      }
+    }
+
+    const isOffRoute =
+      !resolution.ambiguous &&
+      activeCursor.snapDistM > ROUTE_OFF_ROUTE_DISTANCE_M;
+    maybePromptOffRoute(activeCursor.snapDistM, isOffRoute);
+    const wasOffRoute = wasOffRouteRef.current;
+    const prevRenderedCursor = lastRenderedCursorRef.current;
 
     if (
       shouldSkipRouteRedraw({
         isOffRoute,
         wasOffRoute,
-        prevProjected,
-        prevProgressSegIdx,
-        progressedSegIdx,
-        projected,
+        prevCursor: prevRenderedCursor,
+        cursor: activeCursor,
       })
     ) {
       return;
     }
 
-    lastProjectedHeadRef.current = projected;
+    lastRenderedCursorRef.current = activeCursor;
     wasOffRouteRef.current = isOffRoute;
 
     const remainingPath = buildRemainingPath({
       isOffRoute,
-      snapDistM: snap.distM,
+      snapDistM: activeCursor.snapDistM,
       myPos,
-      projected,
       path: route.path,
-      progressedSegIdx,
+      cursor: activeCursor,
     });
 
     if (!hasRenderablePolyline(remainingPath)) {
@@ -312,6 +391,7 @@ export function useMapRoute(
     fullRouteStyle,
     myPos,
     walking,
+    heading,
     maybePromptOffRoute,
     resetOffRoutePromptState,
     drawRouteLine,

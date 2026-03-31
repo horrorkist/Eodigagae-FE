@@ -1,4 +1,4 @@
-import { projectPointToSegmentMeters } from "../../../lib/geo";
+import { projectPointToSegmentMeters } from "../../../lib/geo.ts";
 import type { LatLng } from "@/types/mapEvents";
 import {
   SNAP_FALLBACK_DISTANCE_M,

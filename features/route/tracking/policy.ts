@@ -1,10 +1,10 @@
-import type { LatLng } from "@/types/mapEvents";
 import {
   ROUTE_REDRAW_MIN_MOVE_M,
   ROUTE_REROUTE_PROMPT_COOLDOWN_MS,
   ROUTE_REROUTE_PROMPT_DISTANCE_M,
 } from "./constants.ts";
 import { haversineMeters } from "./path.ts";
+import type { TrackingCursor } from "./matcher.ts";
 
 export type ReroutePromptConditionInput = {
   isOffRoute: boolean;
@@ -21,10 +21,8 @@ export type ReroutePromptConditionInput = {
 export type RouteRedrawSkipConditionInput = {
   isOffRoute: boolean;
   wasOffRoute: boolean;
-  prevProjected: LatLng | null;
-  prevProgressSegIdx: number | null;
-  progressedSegIdx: number;
-  projected: LatLng;
+  prevCursor: TrackingCursor | null;
+  cursor: TrackingCursor;
   redrawMinMoveM?: number;
 };
 
@@ -52,15 +50,18 @@ export function shouldPromptReroute({
 export function shouldSkipRouteRedraw({
   isOffRoute,
   wasOffRoute,
-  prevProjected,
-  prevProgressSegIdx,
-  progressedSegIdx,
-  projected,
+  prevCursor,
+  cursor,
   redrawMinMoveM = ROUTE_REDRAW_MIN_MOVE_M,
 }: RouteRedrawSkipConditionInput) {
   if (isOffRoute || wasOffRoute) return false;
-  if (!prevProjected || prevProgressSegIdx == null) return false;
-  if (progressedSegIdx !== prevProgressSegIdx) return false;
+  if (!prevCursor) return false;
 
-  return haversineMeters(prevProjected, projected) < redrawMinMoveM;
+  const progressDeltaM = Math.max(
+    0,
+    cursor.distanceAlongRouteM - prevCursor.distanceAlongRouteM,
+  );
+  if (progressDeltaM >= redrawMinMoveM) return false;
+
+  return haversineMeters(prevCursor.projected, cursor.projected) < redrawMinMoveM;
 }

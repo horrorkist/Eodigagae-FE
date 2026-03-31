@@ -1,4 +1,5 @@
 import type { LatLng } from "@/types/mapEvents";
+import type { TrackingCursor } from "./matcher.ts";
 import {
   ROUTE_MIN_RENDERABLE_LENGTH_M,
   ROUTE_OFF_ROUTE_CONNECTOR_MAX_M,
@@ -8,9 +9,8 @@ export type BuildRemainingPathInput = {
   isOffRoute: boolean;
   snapDistM: number;
   myPos: LatLng;
-  projected: LatLng;
   path: [number, number][];
-  progressedSegIdx: number;
+  cursor: TrackingCursor;
   offRouteConnectorMaxM?: number;
 };
 
@@ -33,24 +33,22 @@ export function buildRemainingPath({
   isOffRoute,
   snapDistM,
   myPos,
-  projected,
   path,
-  progressedSegIdx,
+  cursor,
   offRouteConnectorMaxM = ROUTE_OFF_ROUTE_CONNECTOR_MAX_M,
 }: BuildRemainingPathInput): [number, number][] {
+  const projected = cursor.projected;
+  const remainingTail = path.slice(cursor.segmentIndex + 1);
   const shouldDrawOffRouteConnector =
     isOffRoute && snapDistM <= offRouteConnectorMaxM;
   if (!shouldDrawOffRouteConnector) {
-    return [
-      [projected.lng, projected.lat],
-      ...path.slice(progressedSegIdx + 1),
-    ];
+    return [[projected.lng, projected.lat], ...remainingTail];
   }
 
   return [
     [myPos.lng, myPos.lat],
     [projected.lng, projected.lat],
-    ...path.slice(progressedSegIdx + 1),
+    ...remainingTail,
   ];
 }
 
