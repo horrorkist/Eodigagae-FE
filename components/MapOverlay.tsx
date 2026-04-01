@@ -67,6 +67,7 @@ type MapOverlayProps = {
   routePlanningSource?: RoutePlanningSource | null;
   isStartPointSelectionMode?: boolean;
   startPointAddressText?: string;
+  onRouteLoadingCancel?: () => void;
 };
 
 function getRouteExperienceCopy(
@@ -80,7 +81,7 @@ function getRouteExperienceCopy(
       routeStartLabel: "길안내 시작",
       walkingElapsedLabel: "이동 시간",
       walkingStopLabel: "길안내 종료",
-      loadingSplashMessage: "길찾기 경로를 찾고 있어요.\n조금만 기다려주세요!",
+      loadingSplashMessage: "경로를 찾고 있어요.\n조금만 기다려주세요!",
     };
   }
 
@@ -118,6 +119,7 @@ export default function MapOverlay({
   routePlanningSource = null,
   isStartPointSelectionMode = false,
   startPointAddressText = "주소를 확인하는 중...",
+  onRouteLoadingCancel,
 }: MapOverlayProps) {
   const isBottomChromeVisible = useUiChromeStore(
     (s) => s.isBottomChromeVisible,
@@ -230,22 +232,24 @@ export default function MapOverlay({
           bottomTransitionEasing={floatingControlsBottomTransitionEasing}
           leftSlot={
             isPoiRouteWalking ? null : (
-            <div className="rounded-xl bg-white px-3 py-4 flex flex-col text-dg-black space-y-4 shadow-lg shadow-black/20 backdrop-blur">
-              <div className="flex space-x-2 items-center">
-                <div className="leading-none">
-                  {routeExperienceCopy.walkingElapsedLabel}
+              <div className="rounded-xl bg-white px-3 py-4 flex flex-col text-dg-black space-y-4 shadow-lg shadow-black/20 backdrop-blur">
+                <div className="flex space-x-2 items-center">
+                  <div className="leading-none">
+                    {routeExperienceCopy.walkingElapsedLabel}
+                  </div>
+                  <div className="border-l border-dg-gray-400 h-3.5"></div>
+                  <div className="tabular-nums">
+                    {formatElapsed(elapsedSec)}
+                  </div>
                 </div>
-                <div className="border-l border-dg-gray-400 h-3.5"></div>
-                <div className="tabular-nums">{formatElapsed(elapsedSec)}</div>
-              </div>
-              <div className="flex space-x-2 items-center">
-                <div className="leading-none">이동 거리</div>
-                <div className="border-l border-dg-gray-400 h-3.5"></div>
-                <div className="tabular-nums">
-                  {formatDistance(walkedDistanceM)}
+                <div className="flex space-x-2 items-center">
+                  <div className="leading-none">이동 거리</div>
+                  <div className="border-l border-dg-gray-400 h-3.5"></div>
+                  <div className="tabular-nums">
+                    {formatDistance(walkedDistanceM)}
+                  </div>
                 </div>
               </div>
-            </div>
             )
           }
           onRequestMyLocation={onRequestMyLocation}
@@ -263,6 +267,7 @@ export default function MapOverlay({
       {shouldShowRouteLoadingSplash ? (
         <RouteLoadingSplash
           message={routeExperienceCopy.loadingSplashMessage}
+          onCancel={onRouteLoadingCancel}
         />
       ) : null}
 

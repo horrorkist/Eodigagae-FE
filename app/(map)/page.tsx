@@ -246,6 +246,7 @@ function MapPageContent() {
   const focusedCapturedByLocalHandlerRef = useRef(false);
   const prevFocusedPoiIdRef = useRef<string | null>(focusedPoi?.id ?? null);
   const prevWalkingRef = useRef(walking);
+  const routePlanningRequestSeqRef = useRef(0);
   const hasAnyPoiSourceOn = petPoiOn || showWater || showBin;
   const referencePos = myPos ?? facilitiesProbe.referenceCenter;
   const mergedPoiList = useMemo(
@@ -411,6 +412,10 @@ function MapPageContent() {
     [setPickedPos, setRouteState],
   );
 
+  const invalidateRoutePlanningRequests = useCallback(() => {
+    routePlanningRequestSeqRef.current += 1;
+  }, []);
+
   const reopenRouteRecommendForm = useCallback(() => {
     setRoutePlanningSource(null);
     setPoiRouteReturnTarget(null);
@@ -423,6 +428,7 @@ function MapPageContent() {
 
   const handleRouteRecommendRequested = useCallback(
     (draft: DogInfoFormDraft) => {
+      invalidateRoutePlanningRequests();
       setRoutePlanningSource(null);
       setPoiRouteReturnTarget(null);
       setPendingRouteRecommendDraft(draft);
@@ -432,16 +438,17 @@ function MapPageContent() {
       setIsStartPointSelectionMode(true);
       closeBottomSheet();
     },
-    [closeBottomSheet],
+    [closeBottomSheet, invalidateRoutePlanningRequests],
   );
 
   const handleStartPointBack = useCallback(() => {
+    invalidateRoutePlanningRequests();
     setRoutePlanningSource(null);
     setPoiRouteReturnTarget(null);
     setIsStartPointSelectionMode(false);
     setPendingRouteRecommendDraft(null);
     reopenRouteRecommendForm();
-  }, [reopenRouteRecommendForm]);
+  }, [invalidateRoutePlanningRequests, reopenRouteRecommendForm]);
 
   const handleStartPointConfirm = useCallback(async () => {
     if (routeRecommendLoading) return;
@@ -465,6 +472,8 @@ function MapPageContent() {
       return;
     }
 
+    const requestSeq = routePlanningRequestSeqRef.current + 1;
+    routePlanningRequestSeqRef.current = requestSeq;
     setRoutePlanningSource("dog-recommend");
     startRouteRecommendLoading();
 
@@ -473,6 +482,7 @@ function MapPageContent() {
         start: { lat: centerLat, lng: centerLng },
         draft: pendingRouteRecommendDraft,
       });
+      if (routePlanningRequestSeqRef.current !== requestSeq) return;
       setRouteRecommendations(response.recommendations, response.meta);
 
       if (response.recommendations.length === 0) {
@@ -501,6 +511,8 @@ function MapPageContent() {
       setPendingRouteRecommendDraft(null);
       setIsRoutePlanningMode(true);
     } catch (error: unknown) {
+      if (routePlanningRequestSeqRef.current !== requestSeq) return;
+
       const message =
         error instanceof Error ? error.message : "추천 경로를 불러오지 못했어요.";
 
@@ -568,12 +580,15 @@ function MapPageContent() {
         routeError: null,
         drawRoute: false,
       });
+      const requestSeq = routePlanningRequestSeqRef.current + 1;
+      routePlanningRequestSeqRef.current = requestSeq;
 
       try {
         const response = await fetchPoiRouteRecommendations({
           start: myPos,
           poi,
         });
+        if (routePlanningRequestSeqRef.current !== requestSeq) return;
 
         if (response.recommendations.length === 0) {
           throw new Error(
@@ -586,6 +601,8 @@ function MapPageContent() {
         selectRouteRecommendation(firstRecommendation.id);
         applyRecommendationRoute(firstRecommendation);
       } catch (error: unknown) {
+        if (routePlanningRequestSeqRef.current !== requestSeq) return;
+
         const message =
           error instanceof Error ? error.message : "길찾기 경로를 불러오지 못했어요.";
 
@@ -692,6 +709,7 @@ function MapPageContent() {
   );
 
   const returnToHomeAfterWalkingStop = useCallback(() => {
+    invalidateRoutePlanningRequests();
     setPickedPos(null);
     setRouteState({
       route: null,
@@ -712,9 +730,17 @@ function MapPageContent() {
     requestAnimationFrame(() => {
       openBottomSheet(0);
     });
-  }, [clearRouteRecommendations, emit, openBottomSheet, setPickedPos, setRouteState]);
+  }, [
+    clearRouteRecommendations,
+    emit,
+    invalidateRoutePlanningRequests,
+    openBottomSheet,
+    setPickedPos,
+    setRouteState,
+  ]);
 
   const handleRouteEdit = useCallback(() => {
+    invalidateRoutePlanningRequests();
     setPickedPos(null);
     setRouteState({
       route: null,
@@ -751,6 +777,36 @@ function MapPageContent() {
     restorePoiRouteOrigin,
     routePlanningSource,
     setPickedPos,
+    setRouteState,
+    invalidateRoutePlanningRequests,
+  ]);
+
+  const handleRouteLoadingCancel = useCallback(() => {
+    invalidateRoutePlanningRequests();
+    clearRouteRecommendations();
+    setRouteState({
+      route: null,
+      routeRawResponse: null,
+      drawRoute: false,
+      routeLoading: false,
+      routeError: null,
+    });
+
+    if (routePlanningSource === "poi-route" && isRoutePlanningMode) {
+      handleRouteEdit();
+      return;
+    }
+
+    setRoutePlanningSource(null);
+    setPoiRouteReturnTarget(null);
+    setIsRoutePlanningMode(false);
+    setIsStartPointSelectionMode(true);
+  }, [
+    clearRouteRecommendations,
+    handleRouteEdit,
+    invalidateRoutePlanningRequests,
+    isRoutePlanningMode,
+    routePlanningSource,
     setRouteState,
   ]);
 
@@ -992,7 +1048,13 @@ function MapPageContent() {
   }, [resetRouteSceneMode, setRouteExperienceSource]);
 
   useEffect(() => {
-    const shouldHideBottomChrome = isRoutePlanningMode || walking;
+    const shouldShowRouteLoadingSplash =
+      routeRecommendLoading &&
+      routeRecommendations.length === 0 &&
+      ((routePlanningSource === "poi-route" && isRoutePlanningMode) ||
+        (routePlanningSource === "dog-recommend" && isStartPointSelectionMode));
+    const shouldHideBottomChrome =
+      isRoutePlanningMode || walking || shouldShowRouteLoadingSplash;
 
     if (shouldHideBottomChrome) {
       emit({ channel: "ui", type: "UI_BOTTOM_CHROME_HIDE" });
@@ -1000,7 +1062,15 @@ function MapPageContent() {
     }
 
     emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
-  }, [emit, isRoutePlanningMode, walking]);
+  }, [
+    emit,
+    isRoutePlanningMode,
+    isStartPointSelectionMode,
+    routePlanningSource,
+    routeRecommendLoading,
+    routeRecommendations.length,
+    walking,
+  ]);
 
   useEffect(() => {
     if (activeSheetViewMode !== "home") return;
@@ -1184,6 +1254,7 @@ function MapPageContent() {
         routePlanningSource={routePlanningSource}
         isStartPointSelectionMode={isStartPointSelectionMode}
         startPointAddressText={startPointAddressText}
+        onRouteLoadingCancel={handleRouteLoadingCancel}
       />
 
       {focusedPoi ? (

@@ -23,8 +23,14 @@ export default function BottomNavHost() {
     pathname === "/my/support/notices" ||
     pathname === "/my/support/report" ||
     pathname === "/my/support/feedback";
+  const isDebugRouteLoadingRoute = pathname === "/debug/route-loading";
 
-  if (!isBottomChromeVisible || isOnboardingRoute || isSupportSubRoute) {
+  if (
+    !isBottomChromeVisible ||
+    isOnboardingRoute ||
+    isSupportSubRoute ||
+    isDebugRouteLoadingRoute
+  ) {
     return null;
   }
 
