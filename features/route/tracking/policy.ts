@@ -1,4 +1,7 @@
 import {
+  ROUTE_ARRIVAL_PROMPT_DISTANCE_M,
+  ROUTE_ARRIVAL_PROMPT_EXIT_DISTANCE_M,
+  ROUTE_ARRIVAL_ROUND_TRIP_PROGRESS_RATIO,
   ROUTE_REDRAW_MIN_MOVE_M,
   ROUTE_REROUTE_PROMPT_COOLDOWN_MS,
   ROUTE_REROUTE_PROMPT_DISTANCE_M,
@@ -26,6 +29,23 @@ export type RouteRedrawSkipConditionInput = {
   redrawMinMoveM?: number;
 };
 
+export type ArrivalPromptConditionInput = {
+  walking: boolean;
+  remainingDistanceM: number;
+  promptShown: boolean;
+  suppressedUntilExit: boolean;
+  isModalOpen: boolean;
+  isRoundTrip: boolean;
+  progressRatio: number;
+  arrivalDistanceM?: number;
+  roundTripProgressRatio?: number;
+};
+
+export type ArrivalPromptResetConditionInput = {
+  remainingDistanceM: number;
+  exitDistanceM?: number;
+};
+
 export function shouldPromptReroute({
   isOffRoute,
   snapDistM,
@@ -45,6 +65,32 @@ export function shouldPromptReroute({
     !isModalOpen &&
     now - lastPromptAt > promptCooldownMs
   );
+}
+
+export function shouldPromptArrival({
+  walking,
+  remainingDistanceM,
+  promptShown,
+  suppressedUntilExit,
+  isModalOpen,
+  isRoundTrip,
+  progressRatio,
+  arrivalDistanceM = ROUTE_ARRIVAL_PROMPT_DISTANCE_M,
+  roundTripProgressRatio = ROUTE_ARRIVAL_ROUND_TRIP_PROGRESS_RATIO,
+}: ArrivalPromptConditionInput) {
+  if (!walking) return false;
+  if (remainingDistanceM > arrivalDistanceM) return false;
+  if (promptShown || suppressedUntilExit || isModalOpen) return false;
+  if (isRoundTrip && progressRatio < roundTripProgressRatio) return false;
+
+  return true;
+}
+
+export function shouldResetArrivalPrompt({
+  remainingDistanceM,
+  exitDistanceM = ROUTE_ARRIVAL_PROMPT_EXIT_DISTANCE_M,
+}: ArrivalPromptResetConditionInput) {
+  return remainingDistanceM > exitDistanceM;
 }
 
 export function shouldSkipRouteRedraw({

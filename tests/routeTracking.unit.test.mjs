@@ -6,7 +6,9 @@ import {
   hasRenderablePolyline,
 } from "../features/route/tracking/path.ts";
 import {
+  shouldPromptArrival,
   shouldPromptReroute,
+  shouldResetArrivalPrompt,
   shouldSkipRouteRedraw,
 } from "../features/route/tracking/policy.ts";
 import { findNearestSnap } from "../features/route/tracking/snap.ts";
@@ -302,6 +304,89 @@ test("shouldPromptReroute checks gate conditions and cooldown", () => {
 
   assert.equal(canPrompt, true);
   assert.equal(blockedByCooldown, false);
+});
+
+test("shouldPromptArrival opens once when entering the arrival zone on a one-way route", () => {
+  const shouldPrompt = shouldPromptArrival({
+    walking: true,
+    remainingDistanceM: 20,
+    promptShown: false,
+    suppressedUntilExit: false,
+    isModalOpen: false,
+    isRoundTrip: false,
+    progressRatio: 0.72,
+  });
+
+  const blockedAfterShown = shouldPromptArrival({
+    walking: true,
+    remainingDistanceM: 20,
+    promptShown: true,
+    suppressedUntilExit: false,
+    isModalOpen: false,
+    isRoundTrip: false,
+    progressRatio: 0.72,
+  });
+
+  assert.equal(shouldPrompt, true);
+  assert.equal(blockedAfterShown, false);
+});
+
+test("shouldPromptArrival stays suppressed until the user exits the arrival zone", () => {
+  const suppressed = shouldPromptArrival({
+    walking: true,
+    remainingDistanceM: 18,
+    promptShown: true,
+    suppressedUntilExit: true,
+    isModalOpen: false,
+    isRoundTrip: false,
+    progressRatio: 0.91,
+  });
+
+  const stillInsideZone = shouldResetArrivalPrompt({ remainingDistanceM: 42 });
+  const exitedZone = shouldResetArrivalPrompt({ remainingDistanceM: 61 });
+
+  assert.equal(suppressed, false);
+  assert.equal(stillInsideZone, false);
+  assert.equal(exitedZone, true);
+});
+
+test("shouldPromptArrival blocks early prompts on round-trip routes until late progress", () => {
+  const earlyRoundTrip = shouldPromptArrival({
+    walking: true,
+    remainingDistanceM: 15,
+    promptShown: false,
+    suppressedUntilExit: false,
+    isModalOpen: false,
+    isRoundTrip: true,
+    progressRatio: 0.42,
+  });
+
+  const lateRoundTrip = shouldPromptArrival({
+    walking: true,
+    remainingDistanceM: 15,
+    promptShown: false,
+    suppressedUntilExit: false,
+    isModalOpen: false,
+    isRoundTrip: true,
+    progressRatio: 0.9,
+  });
+
+  assert.equal(earlyRoundTrip, false);
+  assert.equal(lateRoundTrip, true);
+});
+
+test("shouldPromptArrival does not open while another modal is already visible", () => {
+  const blockedByModal = shouldPromptArrival({
+    walking: true,
+    remainingDistanceM: 12,
+    promptShown: false,
+    suppressedUntilExit: false,
+    isModalOpen: true,
+    isRoundTrip: false,
+    progressRatio: 0.95,
+  });
+
+  assert.equal(blockedByModal, false);
 });
 
 test("shouldSkipRouteRedraw skips only for tiny projected and progress movement", () => {

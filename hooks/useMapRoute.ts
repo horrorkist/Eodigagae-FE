@@ -7,13 +7,21 @@ import type { LatLng } from "@/types/mapEvents";
 import { projectPointToSegmentMeters } from "@/lib/geo";
 import { walkDebug } from "@/lib/walkDebug";
 import { requestWalkStop } from "@/lib/walkSession";
-import { ROUTE_OFF_ROUTE_DISTANCE_M } from "@/features/route/tracking/constants";
+import {
+  ROUTE_ARRIVAL_ROUND_TRIP_ENDPOINT_DISTANCE_M,
+  ROUTE_OFF_ROUTE_DISTANCE_M,
+} from "@/features/route/tracking/constants";
 import {
   buildRemainingPath,
   hasRenderablePolyline,
   haversineMeters,
 } from "@/features/route/tracking/path";
-import { shouldPromptReroute, shouldSkipRouteRedraw } from "@/features/route/tracking/policy";
+import {
+  shouldPromptArrival,
+  shouldPromptReroute,
+  shouldResetArrivalPrompt,
+  shouldSkipRouteRedraw,
+} from "@/features/route/tracking/policy";
 import { findNearestSnap } from "@/features/route/tracking/snap";
 import {
   findMatchCandidates,
@@ -55,6 +63,8 @@ export function useMapRoute(
   const wasOffRouteRef = useRef(false);
   const offRoutePromptShownRef = useRef(false);
   const lastOffRoutePromptAtRef = useRef(0);
+  const arrivalPromptShownRef = useRef(false);
+  const arrivalPromptSuppressedUntilExitRef = useRef(false);
   const route = useMapStore((s) => s.route);
   const drawRoute = useMapStore((s) => s.drawRoute);
   const myPos = useMapStore((s) => s.myPos);
@@ -107,6 +117,8 @@ export function useMapRoute(
     wasOffRouteRef.current = false;
     offRoutePromptShownRef.current = false;
     lastOffRoutePromptAtRef.current = 0;
+    arrivalPromptShownRef.current = false;
+    arrivalPromptSuppressedUntilExitRef.current = false;
   }, []);
 
   const resetOffRoutePromptState = useCallback(() => {
@@ -118,7 +130,7 @@ export function useMapRoute(
     (snapDistM: number, isOffRoute: boolean) => {
       if (!isOffRoute) {
         offRoutePromptShownRef.current = false;
-        return;
+        return false;
       }
 
       const now = Date.now();
@@ -133,7 +145,7 @@ export function useMapRoute(
           now,
         })
       ) {
-        return;
+        return false;
       }
 
       const stopLabel =
@@ -150,8 +162,76 @@ export function useMapRoute(
           requestWalkStop();
         },
       });
+      return true;
     },
     [isModalOpen, openModal, routeExperienceSource, routeLoading],
+  );
+
+  const maybePromptArrival = useCallback(
+    (distanceAlongRouteM: number, totalDistanceM: number, path: [number, number][]) => {
+      if (path.length < 2 || totalDistanceM <= 0) return false;
+
+      const remainingDistanceM = Math.max(0, totalDistanceM - distanceAlongRouteM);
+      if (
+        shouldResetArrivalPrompt({
+          remainingDistanceM,
+        })
+      ) {
+        arrivalPromptShownRef.current = false;
+        arrivalPromptSuppressedUntilExitRef.current = false;
+        return false;
+      }
+
+      const start = path[0];
+      const end = path[path.length - 1];
+      const isRoundTrip =
+        haversineMeters(
+          { lat: start[1], lng: start[0] },
+          { lat: end[1], lng: end[0] },
+        ) <= ROUTE_ARRIVAL_ROUND_TRIP_ENDPOINT_DISTANCE_M;
+      const progressRatio = Math.min(
+        1,
+        Math.max(0, distanceAlongRouteM / totalDistanceM),
+      );
+
+      if (
+        !shouldPromptArrival({
+          walking,
+          remainingDistanceM,
+          promptShown: arrivalPromptShownRef.current,
+          suppressedUntilExit: arrivalPromptSuppressedUntilExitRef.current,
+          isModalOpen,
+          isRoundTrip,
+          progressRatio,
+        })
+      ) {
+        return false;
+      }
+
+      const isPoiRoute = routeExperienceSource === "poi-route";
+      arrivalPromptShownRef.current = true;
+      openModal({
+        title: isPoiRoute
+          ? "도착지에 거의 도착했어요"
+          : "산책 코스가 거의 끝났어요",
+        body: isPoiRoute
+          ? "길안내를 종료할까요?"
+          : "산책을 종료할까요?",
+        confirmLabel: isPoiRoute ? "길안내 종료" : "산책 종료",
+        cancelLabel: isPoiRoute ? "계속 안내" : "계속 산책",
+        onConfirm: () => {
+          requestWalkStop();
+        },
+        onCancel: () => {
+          arrivalPromptSuppressedUntilExitRef.current = true;
+        },
+        onDismiss: () => {
+          arrivalPromptSuppressedUntilExitRef.current = true;
+        },
+      });
+      return true;
+    },
+    [isModalOpen, openModal, routeExperienceSource, walking],
   );
 
   const clearRouteVisuals = useCallback(() => {
@@ -250,6 +330,11 @@ export function useMapRoute(
   useEffect(() => {
     resetRouteTracking();
   }, [route?.path, resetRouteTracking]);
+
+  useEffect(() => {
+    if (walking && drawRoute) return;
+    resetRouteTracking();
+  }, [drawRoute, resetRouteTracking, walking]);
 
   useEffect(() => {
     if (!sdkReady) return;
@@ -352,7 +437,17 @@ export function useMapRoute(
     const isOffRoute =
       !resolution.ambiguous &&
       activeCursor.snapDistM > ROUTE_OFF_ROUTE_DISTANCE_M;
-    maybePromptOffRoute(activeCursor.snapDistM, isOffRoute);
+    const didPromptOffRoute = maybePromptOffRoute(
+      activeCursor.snapDistM,
+      isOffRoute,
+    );
+    if (!didPromptOffRoute) {
+      maybePromptArrival(
+        activeCursor.distanceAlongRouteM,
+        trackingModel.totalDistanceM,
+        route.path,
+      );
+    }
     const wasOffRoute = wasOffRouteRef.current;
     const prevRenderedCursor = lastRenderedCursorRef.current;
 
@@ -393,6 +488,7 @@ export function useMapRoute(
     walking,
     heading,
     maybePromptOffRoute,
+    maybePromptArrival,
     resetOffRoutePromptState,
     drawRouteLine,
     clearRouteVisuals,
