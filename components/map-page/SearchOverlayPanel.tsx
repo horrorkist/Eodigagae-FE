@@ -16,7 +16,6 @@ import {
   appIconPaw,
   appIconXMark,
 } from "@/components/icons/definitions.generated";
-import { fromTmapPoi } from "@/lib/focusedPoi";
 import type {
   TmapPoi,
   TmapPoiSearchResponse,
@@ -50,6 +49,7 @@ type RecentSearchItem = {
 type SearchOverlayPanelProps = {
   shouldFocusInput?: boolean;
   onClose: () => void;
+  onSelectSearchResultPoi: (poi: TmapPoi) => void;
 };
 
 function getCurrentCenterByGeolocation(): Promise<LatLng> {
@@ -269,12 +269,12 @@ function SearchResultSkeleton() {
 export default function SearchOverlayPanel({
   shouldFocusInput = false,
   onClose,
+  onSelectSearchResultPoi,
 }: SearchOverlayPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const centerRef = useRef<LatLng | null>(null);
   const centerUpdatedAtRef = useRef(0);
   const myPos = useMapStore((s) => s.myPos);
-  const setFocusedPoi = useMapStore((s) => s.setFocusedPoi);
   const clearFocusedPoi = useMapStore((s) => s.clearFocusedPoi);
   const submittedSearchKeyword = useMapStore((s) => s.submittedSearchKeyword);
   const submittedSearchSort = useMapStore((s) => s.submittedSearchSort);
@@ -437,13 +437,11 @@ export default function SearchOverlayPanel({
     });
   }, []);
 
-  const handleSubmitSearch = useCallback(async () => {
-    if (submittingMarkers) return;
-
+  const commitCurrentSearchResults = useCallback(async () => {
+    if (submittingMarkers) return false;
     const query = trimmedKeyword;
-    if (query.length < 2) return;
+    if (query.length < 2) return false;
 
-    inputRef.current?.blur();
     setSubmitError(null);
     setSubmittingMarkers(true);
     setRecentSearches(saveRecentSearch(query));
@@ -468,26 +466,45 @@ export default function SearchOverlayPanel({
       }
 
       commitSubmittedSearchPois(response.items, query, searchSort, center);
-      clearFocusedPoi();
-      onClose();
+      return true;
     } catch (e: unknown) {
       setSubmitError(
         e instanceof Error ? e.message : "검색 요청에 실패했어요.",
       );
+      return false;
     } finally {
       setSubmittingMarkers(false);
     }
   }, [
-    clearFocusedPoi,
     commitSubmittedSearchPois,
     data,
     fetchPois,
     isLoading,
-    onClose,
     searchSort,
     submittingMarkers,
     trimmedKeyword,
   ]);
+
+  const handleSubmitSearch = useCallback(async () => {
+    inputRef.current?.blur();
+    const didCommit = await commitCurrentSearchResults();
+    if (!didCommit) return;
+
+    clearFocusedPoi();
+    onClose();
+  }, [clearFocusedPoi, commitCurrentSearchResults, onClose]);
+
+  const handleSelectSearchResult = useCallback(
+    async (poi: TmapPoi) => {
+      inputRef.current?.blur();
+      const didCommit = await commitCurrentSearchResults();
+      if (!didCommit) return;
+
+      onClose();
+      onSelectSearchResultPoi(poi);
+    },
+    [commitCurrentSearchResults, onClose, onSelectSearchResultPoi],
+  );
 
   return (
     <div className="absolute inset-0 z-[120] flex h-full min-h-0 flex-col overflow-hidden bg-white pt-3 pointer-events-auto">
@@ -537,26 +554,59 @@ export default function SearchOverlayPanel({
             </button>
           )}
         </form>
-        {/* <div className="mt-2 flex w-fit rounded-lg border bg-white/90 p-1 shadow backdrop-blur place-self-end">
-          {SEARCH_SORT_OPTIONS.map((option) => {
-            const active = searchSort === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setSearchSort(option.value)}
-                className={[
-                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                  active
-                    ? "bg-dg-green-500 text-white"
-                    : "text-gray-600 hover:bg-gray-100",
-                ].join(" ")}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div> */}
+        <fieldset
+          className="mt-3 flex items-center gap-4 bg-white py-2"
+          aria-label="검색 결과 정렬"
+        >
+          <div className="inline-flex items-center">
+            <label
+              className="relative flex cursor-pointer items-center"
+              htmlFor="search-overlay-sort-r"
+            >
+              <input
+                type="radio"
+                name="search-overlay-sort"
+                value="R"
+                id="search-overlay-sort-r"
+                checked={searchSort === "R"}
+                disabled={submittingMarkers}
+                onChange={() => setSearchSort("R")}
+                className="peer h-5 w-5 cursor-pointer appearance-none rounded-full border border-slate-300 checked:border-slate-400 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <span className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-dg-green-500 opacity-0 transition-opacity duration-200 peer-checked:opacity-100" />
+            </label>
+            <label
+              className="ml-2 cursor-pointer text-sm text-slate-600"
+              htmlFor="search-overlay-sort-r"
+            >
+              거리순
+            </label>
+          </div>
+          <div className="inline-flex items-center">
+            <label
+              className="relative flex cursor-pointer items-center"
+              htmlFor="search-overlay-sort-a"
+            >
+              <input
+                type="radio"
+                name="search-overlay-sort"
+                value="A"
+                id="search-overlay-sort-a"
+                checked={searchSort === "A"}
+                disabled={submittingMarkers}
+                onChange={() => setSearchSort("A")}
+                className="peer h-5 w-5 cursor-pointer appearance-none rounded-full border border-slate-300 checked:border-slate-400 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <span className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-dg-green-500 opacity-0 transition-opacity duration-200 peer-checked:opacity-100" />
+            </label>
+            <label
+              className="ml-2 cursor-pointer text-sm text-slate-600"
+              htmlFor="search-overlay-sort-a"
+            >
+              정확도순
+            </label>
+          </div>
+        </fieldset>
       </div>
 
       <section className="mx-auto flex h-full w-full max-w-[430px] flex-1 min-h-0 touch-pan-y flex-col overflow-y-auto overscroll-y-contain pb-24 pt-4 [-webkit-overflow-scrolling:touch]">
@@ -661,8 +711,7 @@ export default function SearchOverlayPanel({
                     <button
                       type="button"
                       onClick={() => {
-                        setFocusedPoi(fromTmapPoi(poi));
-                        onClose();
+                        void handleSelectSearchResult(poi);
                       }}
                       className="flex w-full items-start justify-between gap-3 py-4 text-left"
                     >

@@ -359,6 +359,20 @@ function MapPageContent() {
     [captureFocusedEntrySnapshot, closeBottomSheet, setFocusedPoi],
   );
 
+  const handleSelectSearchOverlayResultPoi = useCallback(
+    (poi: TmapPoi) => {
+      focusedEntrySnapshotRef.current = {
+        sheetViewMode: "searchResults",
+        homeTabMode: "main",
+        bottomSheetIsOpen: true,
+        bottomSheetIndex: SEARCH_RESULTS_ENTRY_SNAP_INDEX,
+      };
+      focusedCapturedByLocalHandlerRef.current = true;
+      setFocusedPoi(fromTmapPoi(poi));
+    },
+    [setFocusedPoi],
+  );
+
   const handleFocusedPoiClose = useCallback(() => {
     const snapshot = focusedEntrySnapshotRef.current;
     clearFocusedPoi();
@@ -1238,6 +1252,7 @@ function MapPageContent() {
         <SearchOverlayPanel
           shouldFocusInput={shouldFocusSearchInput}
           onClose={handleCloseSearchOverlay}
+          onSelectSearchResultPoi={handleSelectSearchOverlayResultPoi}
         />
       )}
 
