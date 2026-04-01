@@ -132,6 +132,13 @@ export default function MapOverlay({
   const walkingPausedTotalMs = useMapStore((s) => s.walkingPausedTotalMs);
   const walkedDistanceM = useMapStore((s) => s.walkedDistanceM);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [walkingGuidanceUiState, setWalkingGuidanceUiState] = useState<{
+    sessionKey: number | null;
+    hidden: boolean;
+  }>({
+    sessionKey: null,
+    hidden: false,
+  });
   const [startPointPromptSheetHeightPx, setStartPointPromptSheetHeightPx] =
     useState(0);
   const startPointFloatingControlsExtraBottomPx = useMemo(() => {
@@ -152,6 +159,12 @@ export default function MapOverlay({
       (routePlanningSource === "dog-recommend" && isStartPointSelectionMode)) &&
     !walking;
   const isPoiRouteWalking = walking && routePlanningSource === "poi-route";
+  const hasWalkingGuidance = walking && (route?.guidance?.length ?? 0) > 0;
+  const currentWalkingGuidanceSessionKey = walking ? walkingStartedAt : null;
+  const isWalkingGuidanceHidden =
+    walkingGuidanceUiState.sessionKey === currentWalkingGuidanceSessionKey
+      ? walkingGuidanceUiState.hidden
+      : false;
 
   const elapsedSec = useMemo(() => {
     if (!walkingStartedAt) return 0;
@@ -193,11 +206,21 @@ export default function MapOverlay({
   if (walking) {
     return (
       <div className="pointer-events-none absolute inset-0 z-50">
-        {isPoiRouteWalking ? (
+        {hasWalkingGuidance ? (
           <WalkingGuidanceOverlay
             topOffsetPx={topOffsetPx}
             myPos={myPos}
             guidance={route?.guidance}
+            hidden={isWalkingGuidanceHidden}
+            onToggleHidden={() =>
+              setWalkingGuidanceUiState((current) => ({
+                sessionKey: currentWalkingGuidanceSessionKey,
+                hidden:
+                  current.sessionKey === currentWalkingGuidanceSessionKey
+                    ? !current.hidden
+                    : true,
+              }))
+            }
           />
         ) : null}
         <FloatingControlsOverlay

@@ -87,8 +87,8 @@
 
 ## Upcoming Features
 
-- [ ] Build onboarding page.
-- [ ] Add walking history page and list view.
+- [x] Build onboarding page.
+- [x] Add walking history page and list view.
 - [ ] Support camera switching during walk mode.
 - [ ] Save photos taken during a walk to the walking history.
 - [ ] Design destination marker UI.
