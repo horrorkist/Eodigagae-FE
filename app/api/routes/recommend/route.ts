@@ -64,6 +64,9 @@ export async function POST(req: NextRequest) {
   logRequestSummary(parsed.value);
 
   const upstreamUrl = new URL(STROLL_ROUTE_RECOMMEND_PATH, getStrollApiBaseUrl());
+  console.log(DEFAULT_LOG_PREFIX, "upstream-request", {
+    upstreamUrl: upstreamUrl.toString(),
+  });
 
   try {
     const upstream = await fetch(upstreamUrl.toString(), {
@@ -84,6 +87,7 @@ export async function POST(req: NextRequest) {
         payload = JSON.parse(text);
       } catch {
         console.log(DEFAULT_LOG_PREFIX, "response-non-json", {
+          upstreamUrl: upstreamUrl.toString(),
           status: upstream.status,
           body: text,
         });
@@ -125,6 +129,11 @@ export async function POST(req: NextRequest) {
       error instanceof Error
         ? error.message
         : "추천 경로를 불러오지 못했어요.";
+    console.error(DEFAULT_LOG_PREFIX, "fetch-error", {
+      upstreamUrl: upstreamUrl.toString(),
+      message,
+      error,
+    });
 
     return NextResponse.json({ error: message }, { status: 502 });
   }

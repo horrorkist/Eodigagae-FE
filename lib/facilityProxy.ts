@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
-export const DEFAULT_FACILITY_API_BASE_URL = "http://jhin.iptime.org:8080";
+// export const DEFAULT_FACILITY_API_BASE_URL = "http://jhin.iptime.org:8080";
+export const DEFAULT_FACILITY_API_BASE_URL = "https://api.dogoodogoo.com";
 const DEFAULT_SIZE = 200;
 const MIN_SIZE = 1;
 const MAX_SIZE = 500;
+const DEFAULT_LOG_PREFIX = "[facility-proxy]";
 
 export type FacilityEndpoint = "fountains" | "trash-bins";
 
@@ -89,10 +91,16 @@ function parseBaseBoundsParams(
   if (lngErrors.length > 0) return { ok: false, message: lngErrors[0] };
 
   if (minLat > maxLat) {
-    return { ok: false, message: "minLat must be less than or equal to maxLat" };
+    return {
+      ok: false,
+      message: "minLat must be less than or equal to maxLat",
+    };
   }
   if (minLng > maxLng) {
-    return { ok: false, message: "minLng must be less than or equal to maxLng" };
+    return {
+      ok: false,
+      message: "minLng must be less than or equal to maxLng",
+    };
   }
 
   const rawSize = sp.get("size");
@@ -192,6 +200,28 @@ function createPayload<TReq extends FacilityRequest>(
   };
 }
 
+function describePayload(payload: unknown) {
+  if (Array.isArray(payload)) {
+    return {
+      type: "array",
+      count: payload.length,
+      firstItemType:
+        payload.length > 0 && payload[0] != null ? typeof payload[0] : null,
+    };
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return {
+      type: payload == null ? "null" : typeof payload,
+    };
+  }
+
+  return {
+    type: "object",
+    keys: Object.keys(payload as Record<string, unknown>).slice(0, 12),
+  };
+}
+
 export function toValidationErrorResponse(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
@@ -208,6 +238,12 @@ export async function proxyFacilityRequest<TReq extends FacilityRequest>(
     upstreamUrl.searchParams.set(key, String(value));
   }
 
+  console.log(DEFAULT_LOG_PREFIX, "request", {
+    endpoint,
+    request,
+    upstreamUrl: upstreamUrl.toString(),
+  });
+
   try {
     const upstream = await fetch(upstreamUrl.toString(), {
       cache: "no-store",
@@ -221,6 +257,12 @@ export async function proxyFacilityRequest<TReq extends FacilityRequest>(
     try {
       parsed = JSON.parse(text);
     } catch {
+      console.log(DEFAULT_LOG_PREFIX, "response-non-json", {
+        endpoint,
+        upstreamUrl: upstreamUrl.toString(),
+        upstreamStatus: upstream.status,
+        bodyPreview: text.slice(0, 500),
+      });
       const payload = createPayload(
         endpoint,
         request,
@@ -229,6 +271,17 @@ export async function proxyFacilityRequest<TReq extends FacilityRequest>(
         "Upstream returned non-JSON payload",
       );
       return NextResponse.json(payload, { status: 502 });
+    }
+
+    console.log(DEFAULT_LOG_PREFIX, "response", {
+      endpoint,
+      upstreamUrl: upstreamUrl.toString(),
+      upstreamStatus: upstream.status,
+      ok: upstream.ok,
+      payload: describePayload(parsed),
+    });
+    if (!upstream.ok) {
+      console.dir(parsed, { depth: 6 });
     }
 
     if (!upstream.ok) {
@@ -242,11 +295,23 @@ export async function proxyFacilityRequest<TReq extends FacilityRequest>(
       return NextResponse.json(payload, { status: 502 });
     }
 
-    const payload = createPayload(endpoint, request, upstream.status, parsed, null);
+    const payload = createPayload(
+      endpoint,
+      request,
+      upstream.status,
+      parsed,
+      null,
+    );
     return NextResponse.json(payload, { status: 200 });
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to fetch upstream";
+    console.error(DEFAULT_LOG_PREFIX, "fetch-error", {
+      endpoint,
+      upstreamUrl: upstreamUrl.toString(),
+      message,
+      error,
+    });
     const payload = createPayload(endpoint, request, null, null, message);
     return NextResponse.json(payload, { status: 502 });
   }

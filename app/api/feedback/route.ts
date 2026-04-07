@@ -3,6 +3,7 @@ import { DEFAULT_FACILITY_API_BASE_URL } from "@/lib/facilityProxy";
 import type { FeedbackSubmitRequest } from "@/types/support";
 
 export const runtime = "nodejs";
+const DEFAULT_LOG_PREFIX = "[feedback-proxy]";
 
 type ParseResult<T> =
   | { ok: true; value: T }
@@ -88,6 +89,10 @@ export async function POST(req: NextRequest) {
   }
 
   const upstreamUrl = new URL("/api/v1/feedback", getBaseUrl());
+  console.log(DEFAULT_LOG_PREFIX, "upstream-request", {
+    upstreamUrl: upstreamUrl.toString(),
+    body: parsed.value,
+  });
 
   try {
     const upstream = await fetch(upstreamUrl.toString(), {
@@ -107,6 +112,11 @@ export async function POST(req: NextRequest) {
       try {
         payload = JSON.parse(text);
       } catch {
+        console.log(DEFAULT_LOG_PREFIX, "response-non-json", {
+          upstreamUrl: upstreamUrl.toString(),
+          status: upstream.status,
+          body: text,
+        });
         return NextResponse.json(
           {
             error: "Feedback upstream returned non-JSON payload",
@@ -115,6 +125,16 @@ export async function POST(req: NextRequest) {
           { status: 502 },
         );
       }
+    }
+
+    console.log(DEFAULT_LOG_PREFIX, "response", {
+      upstreamUrl: upstreamUrl.toString(),
+      status: upstream.status,
+      ok: upstream.ok,
+      payloadType: payload == null ? "null" : Array.isArray(payload) ? "array" : typeof payload,
+    });
+    if (!upstream.ok) {
+      console.dir(payload, { depth: 6 });
     }
 
     if (!upstream.ok) {
@@ -131,6 +151,11 @@ export async function POST(req: NextRequest) {
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Failed to fetch feedback upstream";
+    console.error(DEFAULT_LOG_PREFIX, "fetch-error", {
+      upstreamUrl: upstreamUrl.toString(),
+      message,
+      error,
+    });
 
     return NextResponse.json({ error: message }, { status: 502 });
   }
