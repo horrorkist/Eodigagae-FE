@@ -29,6 +29,9 @@ const FLING_OPEN_MOTION: BottomSheetHeightMotion = {
   durationMs: 80,
   easing: "ease-out",
 };
+const TOP_OVERLAY_SELECTOR = '[data-top-overlay-root="true"]';
+const TOP_OVERLAY_CLEARANCE_PX = 12;
+const DEFAULT_FULLY_OPEN_TOP_RATIO = 0.08;
 
 type Props = {
   children: React.ReactNode;
@@ -86,6 +89,7 @@ export default function BottomSheet({
   const [safeBottom, setSafeBottom] = useState<number>(() =>
     typeof window === "undefined" ? 0 : getSafeBottomPx(),
   );
+  const [topOverlayBottom, setTopOverlayBottom] = useState(0);
 
   useEffect(() => {
     const onResize = () => {
@@ -94,6 +98,79 @@ export default function BottomSheet({
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let rafId = 0;
+    let observedOverlay: HTMLElement | null = null;
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(measureTopOverlay);
+          });
+    const mutationObserver =
+      typeof MutationObserver === "undefined"
+        ? null
+        : new MutationObserver(() => {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(measureTopOverlay);
+          });
+
+    const syncObservedOverlay = () => {
+      const nextOverlay = document.querySelector<HTMLElement>(
+        TOP_OVERLAY_SELECTOR,
+      );
+      if (observedOverlay === nextOverlay) return nextOverlay;
+
+      if (observedOverlay && resizeObserver) {
+        resizeObserver.unobserve(observedOverlay);
+      }
+
+      observedOverlay = nextOverlay;
+
+      if (observedOverlay && resizeObserver) {
+        resizeObserver.observe(observedOverlay);
+      }
+
+      return observedOverlay;
+    };
+
+    function measureTopOverlay() {
+      rafId = 0;
+      const overlay = syncObservedOverlay();
+      const nextBottom = overlay
+        ? Math.round(
+            overlay.getBoundingClientRect().bottom + TOP_OVERLAY_CLEARANCE_PX,
+          )
+        : 0;
+
+      setTopOverlayBottom((current) =>
+        current === nextBottom ? current : nextBottom,
+      );
+    }
+
+    measureTopOverlay();
+
+    window.addEventListener("resize", measureTopOverlay);
+    mutationObserver?.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", measureTopOverlay);
+      mutationObserver?.disconnect();
+      if (observedOverlay && resizeObserver) {
+        resizeObserver.unobserve(observedOverlay);
+      }
+      resizeObserver?.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -122,7 +199,14 @@ export default function BottomSheet({
     const maxOpenTop = Math.max(0, closedTop - 1);
     if (maxOpenTop <= 0) return [0];
 
-    const fullyOpenTop = Math.min(Math.round(vh * 0.08), maxOpenTop);
+    const overlayLimitedTop = Math.max(0, Math.round(topOverlayBottom));
+    const fullyOpenTop = Math.min(
+      Math.max(
+        Math.round(vh * DEFAULT_FULLY_OPEN_TOP_RATIO),
+        overlayLimitedTop,
+      ),
+      maxOpenTop,
+    );
     const range = Math.max(0, maxOpenTop - fullyOpenTop);
 
     if (range < 96) return [fullyOpenTop];
@@ -132,7 +216,7 @@ export default function BottomSheet({
     );
 
     return Array.from(new Set(points)).sort((a, b) => a - b);
-  }, [vh, closedTop]);
+  }, [vh, closedTop, topOverlayBottom]);
 
   useEffect(() => {
     if (dynamicSnapPoints.length === 0) return;

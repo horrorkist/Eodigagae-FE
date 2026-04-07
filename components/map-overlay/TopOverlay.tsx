@@ -127,6 +127,7 @@ export default function TopOverlay({
 
   return (
     <div
+      data-top-overlay-root="true"
       className="pointer-events-none absolute left-0 right-0"
       style={{ top: topOffsetPx }}
     >
