@@ -127,7 +127,7 @@ export default function HistoryPage() {
                       <br />
                       오늘 산책 기록이에요
                     </p>
-                    <p className="mt-4 text-sm font-medium tabular-nums text-dg-gray-600">
+                    <p className="mt-4 text-sm font-medium text-dg-gray-600">
                       {todaySummary.durationLabel} &middot;{" "}
                       {todaySummary.distanceLabel}
                     </p>
@@ -160,7 +160,7 @@ export default function HistoryPage() {
                     <p className="text-base font-medium text-dg-gray-600">
                       {item.label}
                     </p>
-                    <p className="mt-1 text-base text-dg-black font-semibold tabular-nums">
+                    <p className="mt-1 text-base text-dg-black font-semibold">
                       {item.value}
                     </p>
                   </div>
@@ -219,7 +219,7 @@ export default function HistoryPage() {
                       key={walk.id}
                       className="rounded-2xl bg-white px-4 py-4 text-dg-black"
                     >
-                      <p className="text-base font-medium tabular-nums text-dg-gray-600">
+                      <p className="text-base font-medium text-dg-gray-600">
                         {walk.dateLabel}
                       </p>
                       <div className="mt-4 space-y-2">
@@ -227,7 +227,7 @@ export default function HistoryPage() {
                           <span className="text-dg-gray-600 font-medium">
                             거리
                           </span>
-                          <span className="font-semibold tabular-nums">
+                          <span className="font-semibold">
                             {walk.distanceLabel}
                           </span>
                         </div>
@@ -235,7 +235,7 @@ export default function HistoryPage() {
                           <span className="text-dg-gray-600 font-medium">
                             시간
                           </span>
-                          <span className="font-semibold tabular-nums">
+                          <span className="font-semibold">
                             {walk.durationLabel}
                           </span>
                         </div>
