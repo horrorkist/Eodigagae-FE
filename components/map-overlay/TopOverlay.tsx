@@ -137,7 +137,7 @@ export default function TopOverlay({
           <div className="pointer-events-auto min-w-0 flex-1 max-w-140">
             <div
               data-coachmark-id="search-bar"
-              className="flex w-full items-center gap-2 rounded-md border bg-white/90 px-3 py-2 shadow backdrop-blur"
+              className="flex w-full items-center gap-2 rounded-md border border-transparent bg-white/90 px-3 py-2 shadow-searchBar backdrop-blur"
             >
               <Link
                 href="/?search=1&focus=1"

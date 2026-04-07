@@ -41,7 +41,10 @@ export default function BottomNav() {
               active ? "text-dg-green-500" : "text-dg-gray-500",
             ].join(" ")}
           >
-            <AppIcon icon={t.icon} className="w-5 h-5" />
+            <AppIcon
+              icon={t.icon}
+              className={t.label === "홈" ? "w-6 h-6" : "w-5 h-5"}
+            />
             <span
               className={[
                 "text-[10px]",
