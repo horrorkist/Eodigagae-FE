@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEmit } from "@/hooks/useEventBus";
@@ -90,6 +90,14 @@ function ComparisonMetric({
 }
 
 export default function WalkResultPage() {
+  return (
+    <Suspense fallback={null}>
+      <WalkResultPageContent />
+    </Suspense>
+  );
+}
+
+function WalkResultPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emit = useEmit();
