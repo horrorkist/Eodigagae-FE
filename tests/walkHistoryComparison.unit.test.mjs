@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildRecentWalkComparisonView } from "../lib/walkHistory.ts";
+import {
+  buildRecentWalkComparisonView,
+  formatHistoryDurationLabel,
+} from "../lib/walkHistory.ts";
 
 function makeEntry({
   id,
@@ -72,7 +75,7 @@ test("buildRecentWalkComparisonView compares against previous 7 calendar days an
 
   assert.equal(view.hasComparison, true);
   assert.equal(view.comparedWalkCount, 3);
-  assert.equal(view.duration?.averageLabel, "21분");
+  assert.equal(view.duration?.averageLabel, "21:00");
   assert.equal(view.distance?.averageLabel, "1.5km");
   assert.equal(view.duration?.message, "평균보다 더 길어요");
   assert.equal(view.distance?.message, "평균보다 더 멀리 걸었어요");
@@ -106,4 +109,45 @@ test("buildRecentWalkComparisonView returns empty state without previous entries
   assert.equal(view.emptyMessage, "지난 기록이 더 쌓이면 비교해드릴게요.");
   assert.equal(view.duration, null);
   assert.equal(view.distance, null);
+});
+
+test("formatHistoryDurationLabel shows seconds in shared labels", () => {
+  assert.equal(formatHistoryDurationLabel(0), "00:00");
+  assert.equal(formatHistoryDurationLabel(545), "09:05");
+  assert.equal(formatHistoryDurationLabel(3723), "01:02:03");
+});
+
+test("buildRecentWalkComparisonView keeps actual percent when message is flat", () => {
+  const currentWalk = {
+    startedAt: "2026-04-11T10:00:00.000Z",
+    endedAt: "2026-04-11T10:30:00.000Z",
+    durationSec: 1800,
+    distanceM: 2100,
+  };
+  const entries = [
+    makeEntry({
+      id: "day-1",
+      startedAt: "2026-04-10T09:00:00.000Z",
+      endedAt: "2026-04-10T09:31:00.000Z",
+      durationSec: 1860,
+      distanceM: 2250,
+    }),
+    makeEntry({
+      id: "day-2",
+      startedAt: "2026-04-09T09:00:00.000Z",
+      endedAt: "2026-04-09T09:31:00.000Z",
+      durationSec: 1860,
+      distanceM: 2250,
+    }),
+  ];
+
+  const view = buildRecentWalkComparisonView({
+    entries,
+    currentWalk,
+  });
+
+  assert.equal(view.duration?.message, "평균과 비슷해요");
+  assert.equal(view.duration?.deltaPercentLabel, "-3%");
+  assert.equal(view.distance?.message, "평균과 비슷해요");
+  assert.equal(view.distance?.deltaPercentLabel, "-7%");
 });

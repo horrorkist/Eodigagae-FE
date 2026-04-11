@@ -116,15 +116,18 @@ export function formatHistoryDistanceLabel(distanceM: number) {
 }
 
 export function formatHistoryDurationLabel(durationSec: number) {
-  if (!Number.isFinite(durationSec) || durationSec <= 0) return "0분";
+  if (!Number.isFinite(durationSec) || durationSec <= 0) return "00:00";
 
-  const totalMinutes = Math.max(1, Math.round(durationSec / 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const totalSeconds = Math.floor(durationSec);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
 
-  if (hours === 0) return `${totalMinutes}분`;
-  if (minutes === 0) return `${hours}시간`;
-  return `${hours}시간 ${minutes}분`;
+  if (hours === 0) {
+    return `${pad2(minutes)}:${pad2(seconds)}`;
+  }
+
+  return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
 }
 
 function buildComparisonMessage(params: {
@@ -167,8 +170,6 @@ function buildComparisonPercentLabel(params: {
   if (!Number.isFinite(averageValue) || averageValue <= 0) {
     return direction === "flat" ? "0%" : null;
   }
-
-  if (direction === "flat") return "0%";
 
   const rawPercent = Math.abs(((currentValue - averageValue) / averageValue) * 100);
   const roundedPercent = Math.max(1, Math.round(rawPercent));
