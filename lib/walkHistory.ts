@@ -32,6 +32,24 @@ export type ActualHistoryView = {
   streakDays: number;
 };
 
+export type RecentWalkComparisonMetricView = {
+  currentLabel: string;
+  averageLabel: string;
+  message: string;
+  direction: "up" | "down" | "flat";
+  deltaPercentLabel: string | null;
+};
+
+export type RecentWalkComparisonView = {
+  title: string;
+  description: string;
+  hasComparison: boolean;
+  emptyMessage: string | null;
+  comparedWalkCount: number;
+  duration: RecentWalkComparisonMetricView | null;
+  distance: RecentWalkComparisonMetricView | null;
+};
+
 type MockSessionPattern = {
   daysAgo: number;
   hour: number;
@@ -42,6 +60,12 @@ type MockSessionPattern = {
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
+}
+
+function startOfDay(value: string | Date) {
+  const date = value instanceof Date ? new Date(value) : new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
 
 export function getWalkDateKey(value: string | Date) {
@@ -103,6 +127,85 @@ export function formatHistoryDurationLabel(durationSec: number) {
   return `${hours}시간 ${minutes}분`;
 }
 
+function buildComparisonMessage(params: {
+  currentValue: number;
+  averageValue: number;
+  flatTolerance: number;
+  upMessage: string;
+  downMessage: string;
+}) {
+  const { currentValue, averageValue, flatTolerance, upMessage, downMessage } =
+    params;
+  const diff = currentValue - averageValue;
+
+  if (Math.abs(diff) <= flatTolerance) {
+    return {
+      direction: "flat" as const,
+      message: "평균과 비슷해요",
+    };
+  }
+
+  if (diff > 0) {
+    return {
+      direction: "up" as const,
+      message: upMessage,
+    };
+  }
+
+  return {
+    direction: "down" as const,
+    message: downMessage,
+  };
+}
+
+function buildComparisonPercentLabel(params: {
+  currentValue: number;
+  averageValue: number;
+  direction: "up" | "down" | "flat";
+}) {
+  const { currentValue, averageValue, direction } = params;
+  if (!Number.isFinite(averageValue) || averageValue <= 0) {
+    return direction === "flat" ? "0%" : null;
+  }
+
+  if (direction === "flat") return "0%";
+
+  const rawPercent = Math.abs(((currentValue - averageValue) / averageValue) * 100);
+  const roundedPercent = Math.max(1, Math.round(rawPercent));
+  return `${direction === "up" ? "+" : "-"}${roundedPercent}%`;
+}
+
+function buildComparisonMetricView(params: {
+  currentValue: number;
+  averageValue: number;
+  flatTolerance: number;
+  formatter: (value: number) => string;
+  upMessage: string;
+  downMessage: string;
+}): RecentWalkComparisonMetricView {
+  const { currentValue, averageValue, flatTolerance, formatter, upMessage, downMessage } =
+    params;
+  const direction = buildComparisonMessage({
+    currentValue,
+    averageValue,
+    flatTolerance,
+    upMessage,
+    downMessage,
+  });
+
+  return {
+    currentLabel: formatter(currentValue),
+    averageLabel: formatter(averageValue),
+    message: direction.message,
+    direction: direction.direction,
+    deltaPercentLabel: buildComparisonPercentLabel({
+      currentValue,
+      averageValue,
+      direction: direction.direction,
+    }),
+  };
+}
+
 export function calculateWalkingDurationSec(params: {
   startedAtMs: number | null;
   endedAtMs: number;
@@ -153,6 +256,75 @@ export function createWalkHistoryEntry(params: {
     distanceM,
     source,
   } satisfies WalkHistoryEntry;
+}
+
+export function buildRecentWalkComparisonView(params: {
+  entries: WalkHistoryEntry[];
+  currentWalk: Pick<
+    WalkHistoryEntry,
+    "startedAt" | "endedAt" | "durationSec" | "distanceM"
+  >;
+}): RecentWalkComparisonView {
+  const { entries, currentWalk } = params;
+  const endedAt = new Date(currentWalk.endedAt);
+  const rangeStart = startOfDay(
+    new Date(endedAt.getFullYear(), endedAt.getMonth(), endedAt.getDate() - 6),
+  ).getTime();
+  const rangeEnd = endedAt.getTime();
+  const comparisonEntries = entries.filter((entry) => {
+    if (
+      entry.startedAt === currentWalk.startedAt &&
+      entry.endedAt === currentWalk.endedAt
+    ) {
+      return false;
+    }
+
+    const entryEndedAtMs = new Date(entry.endedAt).getTime();
+    return entryEndedAtMs >= rangeStart && entryEndedAtMs < rangeEnd;
+  });
+
+  if (comparisonEntries.length === 0) {
+    return {
+      title: "지난 7일과 비교했어요",
+      description: "최근 7일의 산책 기록과 비교한 결과예요.",
+      hasComparison: false,
+      emptyMessage: "지난 기록이 더 쌓이면 비교해드릴게요.",
+      comparedWalkCount: 0,
+      duration: null,
+      distance: null,
+    };
+  }
+
+  const averageDurationSec =
+    comparisonEntries.reduce((sum, entry) => sum + entry.durationSec, 0) /
+    comparisonEntries.length;
+  const averageDistanceM =
+    comparisonEntries.reduce((sum, entry) => sum + entry.distanceM, 0) /
+    comparisonEntries.length;
+
+  return {
+    title: "지난 7일과 비교했어요",
+    description: `지난 7일 기록 ${comparisonEntries.length}회 기준이에요.`,
+    hasComparison: true,
+    emptyMessage: null,
+    comparedWalkCount: comparisonEntries.length,
+    duration: buildComparisonMetricView({
+      currentValue: currentWalk.durationSec,
+      averageValue: averageDurationSec,
+      flatTolerance: 5 * 60,
+      formatter: formatHistoryDurationLabel,
+      upMessage: "평균보다 더 길어요",
+      downMessage: "평균보다 더 짧아요",
+    }),
+    distance: buildComparisonMetricView({
+      currentValue: currentWalk.distanceM,
+      averageValue: averageDistanceM,
+      flatTolerance: 300,
+      formatter: formatHistoryDistanceLabel,
+      upMessage: "평균보다 더 멀리 걸었어요",
+      downMessage: "평균보다 덜 걸었어요",
+    }),
+  };
 }
 
 const DEFAULT_MOCK_SESSION_PATTERN: MockSessionPattern[] = [

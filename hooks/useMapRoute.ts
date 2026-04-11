@@ -71,6 +71,9 @@ export function useMapRoute(
   const walking = useMapStore((s) => s.walking);
   const heading = useMapStore((s) => s.heading);
   const routeExperienceSource = useMapStore((s) => s.routeExperienceSource);
+  const setWalkingGuidanceProgressM = useMapStore(
+    (s) => s.setWalkingGuidanceProgressM,
+  );
   const routeLoading = useMapStore((s) => s.routeLoading);
   const isModalOpen = useModalStore((s) => s.isOpen);
   const openModal = useModalStore((s) => s.open);
@@ -329,17 +332,33 @@ export function useMapRoute(
 
   useEffect(() => {
     resetRouteTracking();
-  }, [route?.path, resetRouteTracking]);
+    setWalkingGuidanceProgressM(null);
+  }, [route?.path, resetRouteTracking, setWalkingGuidanceProgressM]);
 
   useEffect(() => {
     if (walking && drawRoute) return;
     resetRouteTracking();
-  }, [drawRoute, resetRouteTracking, walking]);
+    setWalkingGuidanceProgressM(null);
+  }, [drawRoute, resetRouteTracking, setWalkingGuidanceProgressM, walking]);
+
+  useEffect(() => {
+    if (walking && routeExperienceSource === "dog-recommend" && drawRoute) {
+      return;
+    }
+
+    setWalkingGuidanceProgressM(null);
+  }, [
+    drawRoute,
+    routeExperienceSource,
+    setWalkingGuidanceProgressM,
+    walking,
+  ]);
 
   useEffect(() => {
     if (!sdkReady) return;
 
     if (!drawRoute || !route?.path?.length) {
+      setWalkingGuidanceProgressM(null);
       clearRouteVisuals();
       return;
     }
@@ -351,12 +370,14 @@ export function useMapRoute(
     };
 
     if (!walking || !myPos || route.path.length < 2) {
+      setWalkingGuidanceProgressM(null);
       drawFullRoute();
       return;
     }
 
     const trackingModel = trackingModelRef.current;
     if (!trackingModel || trackingModel.segments.length === 0) {
+      setWalkingGuidanceProgressM(null);
       drawFullRoute();
       return;
     }
@@ -375,12 +396,19 @@ export function useMapRoute(
     );
     pendingCandidateRef.current = resolution.pendingCandidate;
     if (!resolution.confirmedCursor) {
+      setWalkingGuidanceProgressM(null);
       drawFullRoute();
       return;
     }
 
     lastConfirmedCursorRef.current = resolution.confirmedCursor;
     const activeCursor = resolution.confirmedCursor;
+
+    if (routeExperienceSource === "dog-recommend") {
+      setWalkingGuidanceProgressM(activeCursor.distanceAlongRouteM);
+    } else {
+      setWalkingGuidanceProgressM(null);
+    }
 
     const legacySnap = findNearestSnap(
       route.path,
@@ -493,6 +521,8 @@ export function useMapRoute(
     drawRouteLine,
     clearRouteVisuals,
     sdkReady,
+    routeExperienceSource,
+    setWalkingGuidanceProgressM,
   ]);
 
   useEffect(() => {

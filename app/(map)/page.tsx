@@ -50,6 +50,7 @@ import {
   appIconWaterdrop,
 } from "@/components/icons/definitions.generated";
 import { useRouteRecommendStore } from "@/stores/routeRecommendStore";
+import { useWalkCompletionStore } from "@/stores/walkCompletionStore";
 import { fetchRouteRecommendations } from "@/services/routeRecommend";
 import { fetchPoiRouteRecommendations } from "@/services/routes";
 import { fetchTmapPois } from "@/services/tmapPois";
@@ -157,6 +158,7 @@ function MapPageContent() {
   const selectedRouteId = useRouteRecommendStore((s) => s.selectedRouteId);
   const routeRecommendLoading = useRouteRecommendStore((s) => s.loading);
   const routeRecommendError = useRouteRecommendStore((s) => s.error);
+  const walkCompletionSummary = useWalkCompletionStore((s) => s.summary);
   const startRouteRecommendLoading = useRouteRecommendStore(
     (s) => s.startLoading,
   );
@@ -248,6 +250,8 @@ function MapPageContent() {
   const prevWalkingRef = useRef(walking);
   const routePlanningRequestSeqRef = useRef(0);
   const hasAnyPoiSourceOn = petPoiOn || showWater || showBin;
+  const hasPendingWalkCompletion =
+    walkCompletionSummary?.source === "dog-recommend";
   const referencePos = myPos ?? facilitiesProbe.referenceCenter;
   const mergedPoiList = useMemo(
     () =>
@@ -726,6 +730,16 @@ function MapPageContent() {
     setPoiRouteReturnTarget(null);
     setHomeTabMode("main");
     setSheetViewMode("home");
+
+    if (
+      routePlanningSource === "dog-recommend" &&
+      walkCompletionSummary?.source === "dog-recommend"
+    ) {
+      emit({ channel: "ui", type: "UI_BOTTOM_CHROME_HIDE" });
+      router.replace("/walk/result");
+      return;
+    }
+
     emit({ channel: "ui", type: "UI_BOTTOM_CHROME_SHOW" });
     requestAnimationFrame(() => {
       openBottomSheet(0);
@@ -735,8 +749,11 @@ function MapPageContent() {
     emit,
     invalidateRoutePlanningRequests,
     openBottomSheet,
+    routePlanningSource,
+    router,
     setPickedPos,
     setRouteState,
+    walkCompletionSummary,
   ]);
 
   const handleRouteEdit = useCallback(() => {
@@ -1054,7 +1071,10 @@ function MapPageContent() {
       ((routePlanningSource === "poi-route" && isRoutePlanningMode) ||
         (routePlanningSource === "dog-recommend" && isStartPointSelectionMode));
     const shouldHideBottomChrome =
-      isRoutePlanningMode || walking || shouldShowRouteLoadingSplash;
+      isRoutePlanningMode ||
+      walking ||
+      shouldShowRouteLoadingSplash ||
+      hasPendingWalkCompletion;
 
     if (shouldHideBottomChrome) {
       emit({ channel: "ui", type: "UI_BOTTOM_CHROME_HIDE" });
@@ -1066,6 +1086,7 @@ function MapPageContent() {
     emit,
     isRoutePlanningMode,
     isStartPointSelectionMode,
+    hasPendingWalkCompletion,
     routePlanningSource,
     routeRecommendLoading,
     routeRecommendations.length,

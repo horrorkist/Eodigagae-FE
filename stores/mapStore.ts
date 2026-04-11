@@ -30,6 +30,7 @@ type MapState = {
   walkingPausedAt: number | null;
   walkingPausedTotalMs: number;
   walkedDistanceM: number;
+  walkingGuidanceProgressM: number | null;
   heading: number | null;
   routeSceneMode: RouteSceneMode;
   routeExperienceSource: RoutePlanningSource | null;
@@ -60,6 +61,7 @@ type MapState = {
   setWalkingPausedTotalMs: (ms: number) => void;
   setWalkedDistanceM: (m: number) => void;
   addWalkedDistanceM: (deltaM: number) => void;
+  setWalkingGuidanceProgressM: (progressM: number | null) => void;
   setHeading: (deg: number | null) => void;
   setRouteSceneMode: (mode: RouteSceneMode) => void;
   setRouteExperienceSource: (source: RoutePlanningSource | null) => void;
@@ -97,6 +99,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   walkingPausedAt: null,
   walkingPausedTotalMs: 0,
   walkedDistanceM: 0,
+  walkingGuidanceProgressM: null,
   heading: null,
   routeSceneMode: "idle",
   routeExperienceSource: null,
@@ -121,6 +124,8 @@ export const useMapStore = create<MapState>((set, get) => ({
     set((state) => ({
       walkedDistanceM: clampNonNegative(state.walkedDistanceM + deltaM),
     })),
+  setWalkingGuidanceProgressM: (progressM) =>
+    set({ walkingGuidanceProgressM: progressM }),
   setHeading: (deg) => set({ heading: deg }),
   setRouteSceneMode: (mode) => set({ routeSceneMode: mode }),
   setRouteExperienceSource: (source) => set({ routeExperienceSource: source }),
@@ -175,5 +180,6 @@ export const useMapStore = create<MapState>((set, get) => ({
       routeRawResponse: null,
       routeError: null,
       drawRoute: false,
+      walkingGuidanceProgressM: null,
     }),
 }));

@@ -133,6 +133,9 @@ export default function MapOverlay({
   const walkingPausedAt = useMapStore((s) => s.walkingPausedAt);
   const walkingPausedTotalMs = useMapStore((s) => s.walkingPausedTotalMs);
   const walkedDistanceM = useMapStore((s) => s.walkedDistanceM);
+  const walkingGuidanceProgressM = useMapStore(
+    (s) => s.walkingGuidanceProgressM,
+  );
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [walkingGuidanceUiState, setWalkingGuidanceUiState] = useState<{
     sessionKey: number | null;
@@ -161,6 +164,8 @@ export default function MapOverlay({
       (routePlanningSource === "dog-recommend" && isStartPointSelectionMode)) &&
     !walking;
   const isPoiRouteWalking = walking && routePlanningSource === "poi-route";
+  const isDogRecommendWalking =
+    walking && routePlanningSource === "dog-recommend";
   const hasWalkingGuidance = walking && (route?.guidance?.length ?? 0) > 0;
   const currentWalkingGuidanceSessionKey = walking ? walkingStartedAt : null;
   const isWalkingGuidanceHidden =
@@ -212,6 +217,11 @@ export default function MapOverlay({
           <WalkingGuidanceOverlay
             topOffsetPx={topOffsetPx}
             myPos={myPos}
+            path={route?.path}
+            routeProgressM={walkingGuidanceProgressM}
+            progressMode={
+              isDogRecommendWalking ? "route-progress" : "position"
+            }
             guidance={route?.guidance}
             hidden={isWalkingGuidanceHidden}
             onToggleHidden={() =>

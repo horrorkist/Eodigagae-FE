@@ -6,14 +6,19 @@ import { appIconChevronDown } from "@/components/icons/definitions.generated";
 import type { RouteGuidanceStep } from "@/domain/route/types";
 import type { LatLng } from "@/types/mapEvents";
 import {
+  buildRouteProgressGuidanceSteps,
   getWalkingGuidanceSteps,
   resolveCurrentGuidanceIndex,
+  resolveCurrentGuidanceIndexFromProgress,
   toDisplayStep,
 } from "./walkingGuidance";
 
 type WalkingGuidanceOverlayProps = {
   topOffsetPx: number;
   myPos: LatLng | null;
+  path?: [number, number][] | null;
+  routeProgressM?: number | null;
+  progressMode?: "position" | "route-progress";
   guidance?: RouteGuidanceStep[] | null;
   hidden: boolean;
   onToggleHidden: () => void;
@@ -22,11 +27,19 @@ type WalkingGuidanceOverlayProps = {
 export default function WalkingGuidanceOverlay({
   topOffsetPx,
   myPos,
+  path,
+  routeProgressM = null,
+  progressMode = "position",
   guidance,
   hidden,
   onToggleHidden,
 }: WalkingGuidanceOverlayProps) {
   const steps = useMemo(() => getWalkingGuidanceSteps(guidance), [guidance]);
+  const progressSteps = useMemo(
+    () => buildRouteProgressGuidanceSteps({ path, guidance }),
+    [guidance, path],
+  );
+  const resolvedSteps = progressMode === "route-progress" ? progressSteps : steps;
   const lastResolvedIndexRef = useRef(0);
   const [resolvedIndex, dispatchResolvedIndex] = useReducer(
     (_: number, nextIndex: number) => nextIndex,
@@ -36,33 +49,42 @@ export default function WalkingGuidanceOverlay({
   useEffect(() => {
     lastResolvedIndexRef.current = 0;
     dispatchResolvedIndex(0);
-  }, [steps]);
+  }, [progressMode, progressSteps, steps]);
 
   useEffect(() => {
-    const nextIndex = resolveCurrentGuidanceIndex({
-      steps,
-      myPos,
-      lastResolvedIndex: lastResolvedIndexRef.current,
-    });
+    const nextIndex =
+      progressMode === "route-progress"
+        ? resolveCurrentGuidanceIndexFromProgress({
+            steps: progressSteps,
+            progressM: routeProgressM,
+            lastResolvedIndex: lastResolvedIndexRef.current,
+          })
+        : resolveCurrentGuidanceIndex({
+            steps,
+            myPos,
+            lastResolvedIndex: lastResolvedIndexRef.current,
+          });
     if (nextIndex == null || nextIndex === lastResolvedIndexRef.current) return;
 
     lastResolvedIndexRef.current = nextIndex;
     dispatchResolvedIndex(nextIndex);
-  }, [myPos, steps]);
+  }, [myPos, progressMode, progressSteps, routeProgressM, steps]);
 
   const currentIndex =
-    steps.length > 0 ? Math.min(resolvedIndex, steps.length - 1) : null;
+    resolvedSteps.length > 0
+      ? Math.min(resolvedIndex, resolvedSteps.length - 1)
+      : null;
 
   const currentStep = useMemo(() => {
     if (currentIndex == null) return null;
-    return toDisplayStep(steps[currentIndex]);
-  }, [currentIndex, steps]);
+    return toDisplayStep(resolvedSteps[currentIndex]);
+  }, [currentIndex, resolvedSteps]);
 
   const nextStep = useMemo(() => {
     if (currentIndex == null) return null;
-    const next = steps[currentIndex + 1];
+    const next = resolvedSteps[currentIndex + 1];
     return next ? toDisplayStep(next) : null;
-  }, [currentIndex, steps]);
+  }, [currentIndex, resolvedSteps]);
 
   if (!currentStep) return null;
 

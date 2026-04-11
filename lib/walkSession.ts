@@ -4,6 +4,7 @@ import {
   createWalkHistoryEntry,
 } from "@/lib/walkHistory";
 import { useMapStore } from "@/stores/mapStore";
+import { useWalkCompletionStore } from "@/stores/walkCompletionStore";
 import { useWalkHistoryStore } from "@/stores/walkHistoryStore";
 
 let lastStopRequestedStartedAt: number | null = null;
@@ -27,9 +28,22 @@ export function requestWalkStop() {
     walkingPausedAt: mapState.walkingPausedAt,
     walkingPausedTotalMs: mapState.walkingPausedTotalMs,
   });
+  const summarySource = mapState.routeExperienceSource;
+
+  if (summarySource === "dog-recommend" && mapState.walkingStartedAt != null) {
+    useWalkCompletionStore.getState().setSummary({
+      startedAt: new Date(mapState.walkingStartedAt).toISOString(),
+      endedAt: new Date(endedAtMs).toISOString(),
+      durationSec,
+      distanceM: mapState.walkedDistanceM,
+      source: summarySource,
+    });
+  } else {
+    useWalkCompletionStore.getState().clearSummary();
+  }
 
   if (
-    mapState.routeExperienceSource === "dog-recommend" &&
+    summarySource === "dog-recommend" &&
     mapState.walkingStartedAt != null &&
     durationSec > 0
   ) {
@@ -39,7 +53,7 @@ export function requestWalkStop() {
         endedAtMs,
         durationSec,
         distanceM: mapState.walkedDistanceM,
-        source: mapState.routeExperienceSource,
+        source: summarySource,
       }),
     );
   }
