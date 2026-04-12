@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import AppIcon from "@/components/icons/AppIcon";
-import { appIconChevronDown } from "@/components/icons/definitions.generated";
+import {
+  appIconChevronDown,
+  appIconPaw,
+  appIconXMark,
+} from "@/components/icons/definitions.generated";
 import type { RouteGuidanceStep } from "@/domain/route/types";
 import type { LatLng } from "@/types/mapEvents";
 import {
@@ -39,7 +43,8 @@ export default function WalkingGuidanceOverlay({
     () => buildRouteProgressGuidanceSteps({ path, guidance }),
     [guidance, path],
   );
-  const resolvedSteps = progressMode === "route-progress" ? progressSteps : steps;
+  const resolvedSteps =
+    progressMode === "route-progress" ? progressSteps : steps;
   const lastResolvedIndexRef = useRef(0);
   const [resolvedIndex, dispatchResolvedIndex] = useReducer(
     (_: number, nextIndex: number) => nextIndex,
@@ -88,13 +93,13 @@ export default function WalkingGuidanceOverlay({
 
   if (!currentStep) return null;
 
-  return (
-    <div
-      className="pointer-events-none absolute left-0 right-0"
-      style={{ top: topOffsetPx }}
-    >
-      <div className="px-3">
-        {hidden ? (
+  if (hidden) {
+    return (
+      <div
+        className="pointer-events-none absolute left-0 right-0"
+        style={{ top: topOffsetPx }}
+      >
+        <div className="px-3">
           <div className="mx-auto flex max-w-[360px] justify-end">
             <button
               type="button"
@@ -108,49 +113,50 @@ export default function WalkingGuidanceOverlay({
               />
             </button>
           </div>
-        ) : (
-          <div className="mx-auto flex max-w-[360px] flex-col gap-3 rounded-2xl bg-white/95 px-4 py-4 text-dg-black shadow-lg shadow-black/15 backdrop-blur">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="text-xs font-medium text-dg-gray-600">
-                  현재 안내
-                </div>
-                <div className="text-center text-base font-semibold leading-6">
-                  {currentStep.title}
-                </div>
-                {currentStep.subtitle ? (
-                  <div className="text-center text-sm text-dg-gray-600">
-                    {currentStep.subtitle}
-                  </div>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={onToggleHidden}
-                className="pointer-events-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-dg-gray-200 px-2.5 py-1 text-xs font-medium text-dg-gray-700 active:bg-dg-gray-300"
-              >
-                <span>숨기기</span>
-                <AppIcon icon={appIconChevronDown} className="h-3 w-3" />
-              </button>
-            </div>
+        </div>
+      </div>
+    );
+  }
 
-            {nextStep ? (
-              <div className="border-t border-dg-gray-400 pt-3">
-                <div className="text-center text-xs font-medium text-dg-gray-600">
-                  다음 안내
-                </div>
-                <div className="mt-1 text-center text-sm font-medium leading-5 text-dg-black">
-                  {nextStep.title}
-                </div>
-                {nextStep.subtitle ? (
-                  <div className="mt-1 text-center text-xs text-dg-gray-600">
-                    {nextStep.subtitle}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+  return (
+    <div className="pointer-events-none absolute left-0 right-0 top-0">
+      <div className="overflow-hidden shadow-md shadow-black/15">
+        <div
+          className="flex min-h-[96px] items-center bg-dg-green-500 px-4 pb-4 text-white"
+          style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}
+        >
+          <div className="flex min-w-0 flex-1 items-start gap-2 text-left">
+            <AppIcon
+              icon={appIconPaw}
+              className="mt-1 h-4 w-4 shrink-0 text-white"
+            />
+            <div className="min-w-0 flex-1 text-xl font-semibold leading-6 break-words">
+              {currentStep.title}
+            </div>
+            <button
+              type="button"
+              onClick={onToggleHidden}
+              aria-label="안내 숨기기"
+              className="pointer-events-auto inline-flex h-5 w-5 shrink-0 items-center justify-center text-white/80 active:text-white"
+            >
+              <AppIcon icon={appIconXMark} className="h-3.5 w-3.5" />
+            </button>
           </div>
-        )}
+        </div>
+
+        {nextStep ? (
+          <div className="flex min-h-[64px] items-center bg-dg-gray-400 px-4 py-3 text-dg-gray-700/35">
+            <div className="flex min-w-0 items-start gap-2 text-left">
+              <AppIcon
+                icon={appIconPaw}
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-dg-gray-700/30"
+              />
+              <div className="min-w-0 text-base font-medium leading-4 break-words">
+                {nextStep.title}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

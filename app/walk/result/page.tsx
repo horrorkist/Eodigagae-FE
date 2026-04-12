@@ -158,6 +158,13 @@ function ResultChartCarousel({
     ],
     [],
   );
+  const maxValueByKey = useMemo(
+    () => ({
+      distanceM: Math.max(0, ...data.map((item) => item.distanceM)),
+      durationSec: Math.max(0, ...data.map((item) => item.durationSec)),
+    }),
+    [data],
+  );
 
   const handleScroll = useCallback(() => {
     const node = scrollRef.current;
@@ -201,7 +208,15 @@ function ResultChartCarousel({
                       tickLine={false}
                       tick={<ResultChartXAxisTick />}
                     />
-                    <YAxis hide domain={[0, "dataMax"]} />
+                    <YAxis
+                      hide
+                      domain={[
+                        0,
+                        maxValueByKey[slide.valueKey] > 0
+                          ? maxValueByKey[slide.valueKey]
+                          : 1,
+                      ]}
+                    />
                     <Tooltip
                       cursor={{ fill: "rgba(17, 24, 39, 0.04)" }}
                       content={
