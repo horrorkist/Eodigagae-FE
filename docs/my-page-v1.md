@@ -2,6 +2,7 @@
 
 ## IA
 - `/my`: 마이페이지 허브
+- `/my/support/guides`: 안내사항
 - `/my/support/notices`: 공지사항 목록
 - `/my/support/report`: 잘못된 정보 신고
 - `/my/support/feedback`: 의견 남기기

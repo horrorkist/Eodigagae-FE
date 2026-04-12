@@ -12,6 +12,7 @@ import type { Area } from "react-easy-crop";
 import AppIcon from "@/components/icons/AppIcon";
 import {
   appIconBell,
+  appIconBoard,
   appIconCamera,
   appIconChevronRight,
   appIconMessage,
@@ -52,7 +53,7 @@ function RowIcon({
     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-dg-gray-400">
       <AppIcon
         icon={icon}
-        className={["h-3.5 w-3.5", iconClassName].join(" ")}
+        className={["h-4 w-4", iconClassName].join(" ")}
       />
     </span>
   );
@@ -469,6 +470,23 @@ export default function MyPage() {
                     iconClassName="text-dg-violet-sub"
                   />
                   <span>의견 남기기</span>
+                </div>
+                <AppIcon
+                  icon={appIconChevronRight}
+                  className="h-3.5 w-3.5 text-dg-gray-500"
+                />
+              </Link>
+
+              <Link
+                href="/my/support/guides"
+                className="flex items-center justify-between py-3"
+              >
+                <div className="flex items-center gap-2 font-medium text-dg-black">
+                  <RowIcon
+                    icon={appIconBoard}
+                    iconClassName="text-dg-red-sub"
+                  />
+                  <span>안내사항</span>
                 </div>
                 <AppIcon
                   icon={appIconChevronRight}

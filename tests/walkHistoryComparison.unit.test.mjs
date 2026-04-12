@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildRecentWalkChartData,
   buildRecentWalkComparisonView,
   formatHistoryDurationLabel,
 } from "../lib/walkHistory.ts";
@@ -150,4 +151,66 @@ test("buildRecentWalkComparisonView keeps actual percent when message is flat", 
   assert.equal(view.duration?.deltaPercentLabel, "-3%");
   assert.equal(view.distance?.message, "평균과 비슷해요");
   assert.equal(view.distance?.deltaPercentLabel, "-7%");
+});
+
+test("buildRecentWalkChartData aggregates by day, fills empty days, and avoids double-counting current walk", () => {
+  const currentWalk = {
+    startedAt: "2026-04-11T10:00:00.000Z",
+    endedAt: "2026-04-11T10:30:00.000Z",
+    durationSec: 1800,
+    distanceM: 2100,
+  };
+  const entries = [
+    makeEntry({
+      id: "same-day-1",
+      startedAt: "2026-04-10T07:00:00.000Z",
+      endedAt: "2026-04-10T07:20:00.000Z",
+      durationSec: 1200,
+      distanceM: 1500,
+    }),
+    makeEntry({
+      id: "same-day-2",
+      startedAt: "2026-04-10T11:00:00.000Z",
+      endedAt: "2026-04-10T11:10:00.000Z",
+      durationSec: 600,
+      distanceM: 800,
+    }),
+    makeEntry({
+      id: "other-day",
+      startedAt: "2026-04-08T08:00:00.000Z",
+      endedAt: "2026-04-08T08:15:00.000Z",
+      durationSec: 900,
+      distanceM: 1000,
+    }),
+    makeEntry({
+      id: "current-copy",
+      startedAt: currentWalk.startedAt,
+      endedAt: currentWalk.endedAt,
+      durationSec: currentWalk.durationSec,
+      distanceM: currentWalk.distanceM,
+    }),
+  ];
+
+  const data = buildRecentWalkChartData({
+    entries,
+    currentWalk,
+  });
+
+  assert.equal(data.length, 7);
+  assert.deepEqual(
+    data.map((item) => item.dateLabel),
+    ["04.05", "04.06", "04.07", "04.08", "04.09", "04.10", "오늘"],
+  );
+
+  const april10 = data.find((item) => item.dateKey === "2026-04-10");
+  const april11 = data.find((item) => item.dateKey === "2026-04-11");
+  const april09 = data.find((item) => item.dateKey === "2026-04-09");
+
+  assert.equal(april10?.distanceM, 2300);
+  assert.equal(april10?.durationSec, 1800);
+  assert.equal(april11?.distanceM, 2100);
+  assert.equal(april11?.durationSec, 1800);
+  assert.equal(april11?.isCurrentDay, true);
+  assert.equal(april09?.distanceM, 0);
+  assert.equal(april09?.durationSec, 0);
 });

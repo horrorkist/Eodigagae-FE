@@ -50,6 +50,14 @@ export type RecentWalkComparisonView = {
   distance: RecentWalkComparisonMetricView | null;
 };
 
+export type RecentWalkChartDatum = {
+  dateKey: string;
+  dateLabel: string;
+  distanceM: number;
+  durationSec: number;
+  isCurrentDay: boolean;
+};
+
 type MockSessionPattern = {
   daysAgo: number;
   hour: number;
@@ -81,6 +89,12 @@ export function getWalkDateKey(value: string | Date) {
 function getWalkDateLabel(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
   return `${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
 }
 
 function getDayIndex(dateKey: string) {
@@ -328,12 +342,74 @@ export function buildRecentWalkComparisonView(params: {
   };
 }
 
+export function buildRecentWalkChartData(params: {
+  entries: WalkHistoryEntry[];
+  currentWalk: Pick<
+    WalkHistoryEntry,
+    "startedAt" | "endedAt" | "durationSec" | "distanceM"
+  >;
+}): RecentWalkChartDatum[] {
+  const { entries, currentWalk } = params;
+  const currentEndedAt = new Date(currentWalk.endedAt);
+  const currentDateStart = startOfDay(currentEndedAt);
+  const rangeStart = addDays(currentDateStart, -6);
+  const currentWalkKey = `${currentWalk.startedAt}:${currentWalk.endedAt}`;
+  const byDate = new Map<
+    string,
+    {
+      date: Date;
+      distanceM: number;
+      durationSec: number;
+    }
+  >();
+
+  for (let offset = 0; offset < 7; offset += 1) {
+    const date = addDays(rangeStart, offset);
+    const dateKey = getWalkDateKey(date);
+    byDate.set(dateKey, {
+      date,
+      distanceM: 0,
+      durationSec: 0,
+    });
+  }
+
+  for (const entry of entries) {
+    const entryKey = `${entry.startedAt}:${entry.endedAt}`;
+    if (entryKey === currentWalkKey) continue;
+
+    const entryEndedAt = new Date(entry.endedAt);
+    if (entryEndedAt < rangeStart || entryEndedAt > currentEndedAt) continue;
+
+    const dateKey = getWalkDateKey(entryEndedAt);
+    const bucket = byDate.get(dateKey);
+    if (!bucket) continue;
+    bucket.distanceM += entry.distanceM;
+    bucket.durationSec += entry.durationSec;
+  }
+
+  const currentDateKey = getWalkDateKey(currentEndedAt);
+  const currentBucket = byDate.get(currentDateKey);
+  if (currentBucket) {
+    currentBucket.distanceM += currentWalk.distanceM;
+    currentBucket.durationSec += currentWalk.durationSec;
+  }
+
+  return Array.from(byDate.entries()).map(([dateKey, bucket]) => ({
+    dateKey,
+    dateLabel:
+      dateKey === currentDateKey ? "오늘" : getWalkDateLabel(bucket.date),
+    distanceM: bucket.distanceM,
+    durationSec: bucket.durationSec,
+    isCurrentDay: dateKey === currentDateKey,
+  }));
+}
+
 const DEFAULT_MOCK_SESSION_PATTERN: MockSessionPattern[] = [
   { daysAgo: 0, hour: 7, minute: 40, durationSec: 42 * 60, distanceM: 2800 },
   { daysAgo: 1, hour: 19, minute: 10, durationSec: 48 * 60, distanceM: 3100 },
-  { daysAgo: 2, hour: 8, minute: 15, durationSec: 37 * 60, distanceM: 2400 },
+  { daysAgo: 2, hour: 8, minute: 15, durationSec: 54 * 60, distanceM: 3900 },
+  { daysAgo: 2, hour: 18, minute: 35, durationSec: 33 * 60, distanceM: 2700 },
   { daysAgo: 3, hour: 18, minute: 40, durationSec: 55 * 60, distanceM: 3700 },
-  { daysAgo: 4, hour: 7, minute: 50, durationSec: 29 * 60, distanceM: 1900 },
   { daysAgo: 5, hour: 18, minute: 5, durationSec: 41 * 60, distanceM: 2600 },
   { daysAgo: 6, hour: 8, minute: 30, durationSec: 46 * 60, distanceM: 3000 },
   { daysAgo: 7, hour: 18, minute: 25, durationSec: 34 * 60, distanceM: 2200 },

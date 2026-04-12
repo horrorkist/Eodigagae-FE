@@ -11,6 +11,9 @@ type SupportHeaderConfig = {
 };
 
 function getSupportHeaderConfig(pathname: string): SupportHeaderConfig {
+  if (pathname === "/my/support/guides") {
+    return { label: "안내사항", backHref: "/my" };
+  }
   if (pathname === "/my/support/notices") {
     return { label: "공지사항", backHref: "/my" };
   }

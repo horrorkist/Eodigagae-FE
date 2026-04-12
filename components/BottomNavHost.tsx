@@ -20,6 +20,7 @@ export default function BottomNavHost() {
   const isOnboardingRoute =
     pathname === "/onboarding" || pathname.startsWith("/onboarding/");
   const isSupportSubRoute =
+    pathname === "/my/support/guides" ||
     pathname === "/my/support/notices" ||
     pathname === "/my/support/report" ||
     pathname === "/my/support/feedback";
