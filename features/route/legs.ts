@@ -229,13 +229,15 @@ export function buildRouteLegs(params: {
   waypoints?: RouteWaypoint[] | null;
   guidance?: RouteGuidanceStep[] | null;
 }): RouteLeg[] {
-  const { path, waypoints = [], guidance = [] } = params;
-  if (path.length < 2 || waypoints.length === 0) return [];
+  const { path, waypoints, guidance } = params;
+  const normalizedWaypoints = waypoints ?? [];
+  const normalizedGuidance = guidance ?? [];
+  if (path.length < 2 || normalizedWaypoints.length === 0) return [];
 
-  const boundarySnaps = buildBoundarySnaps(path, waypoints);
+  const boundarySnaps = buildBoundarySnaps(path, normalizedWaypoints);
   if (!boundarySnaps || boundarySnaps.length < 2) return [];
 
-  const snappedGuidance = mapGuidanceDistances(path, guidance);
+  const snappedGuidance = mapGuidanceDistances(path, normalizedGuidance);
   const legs: RouteLeg[] = [];
 
   for (let i = 0; i < boundarySnaps.length - 1; i += 1) {

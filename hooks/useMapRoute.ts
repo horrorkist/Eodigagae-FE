@@ -97,7 +97,7 @@ export function useMapRoute(
   const trackedPath =
     walking && routeExperienceSource === "dog-recommend" && activeDogRecommendLeg
       ? activeDogRecommendLeg.path
-      : route?.path ?? null;
+      : route?.path ?? [];
 
   const clearGuidanceMarkers = useCallback(() => {
     clearGuidanceMarkersNaver(guidanceMarkersRef);
