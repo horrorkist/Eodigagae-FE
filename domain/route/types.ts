@@ -38,6 +38,29 @@ export type RouteSegment = {
   end: [number, number]; // [lng, lat]
 };
 
+export type RouteLeg = {
+  index: number;
+  path: [number, number][];
+  guidance?: RouteGuidanceStep[];
+  startWaypointIndex: number | null;
+  endWaypointIndex: number | null;
+  startCoordinate: [number, number];
+  endCoordinate: [number, number];
+  startDistanceM: number;
+  endDistanceM: number;
+};
+
+export type RouteWaypointKind = "start" | "pivot" | "end";
+
+export type RouteWaypointMeta = {
+  coordinate: [number, number];
+  markerCoordinate: [number, number];
+  title: string;
+  order: number;
+  kind: RouteWaypointKind;
+  distanceAlongRouteM: number | null;
+};
+
 export type RouteEndpoints = {
   start?: RouteGuidanceStep;
   end?: RouteGuidanceStep;
@@ -54,6 +77,8 @@ export type RouteResult = {
   path: [number, number][]; // [[lng,lat], ...]
   guidance?: RouteGuidanceStep[];
   segments?: RouteSegment[];
+  waypoints?: RouteWaypointMeta[];
+  legs?: RouteLeg[];
   endpoints?: RouteEndpoints;
   featureStats?: RouteFeatureStats;
 };

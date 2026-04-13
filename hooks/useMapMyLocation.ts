@@ -31,6 +31,10 @@ import { useModalStore } from "@/stores/modal";
 import { useMapControlStore } from "@/stores/mapControlStore";
 import { useCoachmarkStore } from "@/stores/coachmark";
 import { getGeoErrorInfo } from "@/lib/geolocationErrors";
+import {
+  buildRouteMarkerHTML,
+  resolveRouteMarkers,
+} from "@/lib/routeMarker";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 import type { LatLng } from "@/types/mapEvents";
 
@@ -42,7 +46,7 @@ export function useMapMyLocation(
   sdkReady: boolean,
 ) {
   const myMarkerRef = useRef<naver.maps.Marker>(null);
-  const destMarkerRef = useRef<naver.maps.Marker>(null);
+  const routeMarkerRefs = useRef<Map<string, naver.maps.Marker>>(new Map());
   const moveMarkerListenerRef = useRef<naver.maps.MapEventListener | null>(
     null,
   );
@@ -66,6 +70,8 @@ export function useMapMyLocation(
   const walkingPausedAt = useMapStore((s) => s.walkingPausedAt);
   const walkingPausedTotalMs = useMapStore((s) => s.walkingPausedTotalMs);
   const heading = useMapStore((s) => s.heading);
+  const routeExperienceSource = useMapStore((s) => s.routeExperienceSource);
+  const activeRouteLegIndex = useMapStore((s) => s.activeRouteLegIndex);
   const setMyPos = useMapStore((s) => s.setMyPos);
   const setPickedPos = useMapStore((s) => s.setPickedPos);
   const setDrawRoute = useMapStore((s) => s.setDrawRoute);
@@ -76,6 +82,7 @@ export function useMapMyLocation(
   const setWalkingPausedTotalMs = useMapStore((s) => s.setWalkingPausedTotalMs);
   const setWalkedDistanceM = useMapStore((s) => s.setWalkedDistanceM);
   const addWalkedDistanceM = useMapStore((s) => s.addWalkedDistanceM);
+  const setActiveRouteLegIndex = useMapStore((s) => s.setActiveRouteLegIndex);
   const setHeading = useMapStore((s) => s.setHeading);
   const markerPlacementMode = useMapControlStore((s) => s.markerPlacementMode);
   const myLocationRequestSeq = useMapControlStore((s) => s.myLocationRequestSeq);
@@ -185,46 +192,99 @@ export function useMapMyLocation(
     [mapRef, setMyPos],
   );
 
-  const syncDestinationMarker = useCallback(
-    (pos: LatLng | null) => {
+  const clearRouteMarkers = useCallback(() => {
+    for (const marker of routeMarkerRefs.current.values()) {
+      marker.setMap(null);
+    }
+    routeMarkerRefs.current.clear();
+  }, []);
+
+  const syncRouteMarkers = useCallback(
+    (
+      markers: Array<{
+        key: string;
+        coordinate: [number, number];
+        title: string;
+        variant: "start" | "pivot" | "destination";
+        label?: string;
+      }>,
+    ) => {
       if (!window.naver?.maps) return;
 
       const map = mapRef.current;
-      if (!map || !pos) {
-        destMarkerRef.current?.setMap(null);
+      if (!map) {
+        clearRouteMarkers();
         return;
       }
 
-      const markerPos = new window.naver.maps.LatLng(pos.lat, pos.lng);
-
-      if (!destMarkerRef.current) {
-        destMarkerRef.current = new window.naver.maps.Marker({
-          map,
-          position: markerPos,
-        });
-        return;
+      const nextKeys = new Set(markers.map((marker) => marker.key));
+      for (const [key, marker] of routeMarkerRefs.current.entries()) {
+        if (nextKeys.has(key)) continue;
+        marker.setMap(null);
+        routeMarkerRefs.current.delete(key);
       }
 
-      destMarkerRef.current.setPosition(markerPos);
-      destMarkerRef.current.setMap(map);
+      for (const next of markers) {
+        const position = new window.naver.maps.LatLng(
+          next.coordinate[1],
+          next.coordinate[0],
+        );
+        const icon = {
+          content: buildRouteMarkerHTML({
+            variant: next.variant,
+            label: next.label,
+            title: next.title,
+          }),
+          anchor: new window.naver.maps.Point(0, 0),
+        };
+        const existing = routeMarkerRefs.current.get(next.key);
+
+        if (existing) {
+          existing.setPosition(position);
+          existing.setTitle(next.title);
+          existing.setIcon(icon);
+          existing.setMap(map);
+          continue;
+        }
+
+        routeMarkerRefs.current.set(
+          next.key,
+          new window.naver.maps.Marker({
+            map,
+            position,
+            title: next.title,
+            clickable: false,
+            icon,
+            zIndex: 1100,
+          }),
+        );
+      }
     },
-    [mapRef],
+    [clearRouteMarkers, mapRef],
   );
 
-  // 도착지 마커 동기화:
-  // - pickedPos 우선
-  // - pickedPos가 없고 경로가 실제로 그려지는 중이면, 경로 마지막 점으로 fallback
   useEffect(() => {
     if (!sdkReady) return;
-
-    let markerPos: LatLng | null = pickedPos;
-    if (!markerPos && drawRoute && route?.path?.length) {
-      const [lng, lat] = route.path[route.path.length - 1];
-      markerPos = { lat, lng };
-    }
-
-    syncDestinationMarker(markerPos);
-  }, [sdkReady, pickedPos, drawRoute, route?.path, syncDestinationMarker]);
+    syncRouteMarkers(
+      resolveRouteMarkers({
+        route,
+        drawRoute,
+        pickedPos,
+        routeExperienceSource,
+        walking,
+        activeRouteLegIndex,
+      }),
+    );
+  }, [
+    activeRouteLegIndex,
+    drawRoute,
+    pickedPos,
+    route,
+    routeExperienceSource,
+    sdkReady,
+    syncRouteMarkers,
+    walking,
+  ]);
 
   // geolocation 오류 → 모달 표시
   useEffect(() => {
@@ -377,6 +437,7 @@ export function useMapMyLocation(
     setWalkingPausedTotalMs(0);
     setWalkingPausedAt(null);
     setWalkingPaused(false);
+    setActiveRouteLegIndex(0);
     setDrawRoute(Boolean(route?.path?.length));
     seedHeadingFromRoute(route?.path, myPos);
 
@@ -416,6 +477,7 @@ export function useMapMyLocation(
     setWalkingPausedAt(null);
     setWalkingPausedTotalMs(0);
     setWalkedDistanceM(0);
+    setActiveRouteLegIndex(0);
     resetWalkingRefs();
     setHeading(null);
     refresh();
@@ -508,6 +570,7 @@ export function useMapMyLocation(
     updateMyPosition,
     addWalkedDistanceM,
     clearWalkWatch,
+    setActiveRouteLegIndex,
   ]);
 
   // 내 위치/도착지 수동 배치 모드 처리 (지도 클릭 1회)
@@ -537,7 +600,6 @@ export function useMapMyLocation(
         }
 
         const nextPickedPos = { lat, lng };
-        syncDestinationMarker(nextPickedPos);
         setPickedPos(nextPickedPos);
         completeMarkerPlacement();
       },
@@ -555,7 +617,6 @@ export function useMapMyLocation(
     markerPlacementMode,
     sdkReady,
     setPickedPos,
-    syncDestinationMarker,
   ]);
 
   // MOVE_TO → 지도 이동 + 내 마커 이동 + myPos 반영
@@ -593,8 +654,8 @@ export function useMapMyLocation(
         moveMarkerListenerRef.current = null;
         walkWatchIdRef.current = null;
         myMarkerRef.current?.setMap(null);
-        destMarkerRef.current?.setMap(null);
+        clearRouteMarkers();
       }
     };
-  }, [clearMoveMarkerListener, clearWalkWatch, mapRef]);
+  }, [clearMoveMarkerListener, clearRouteMarkers, clearWalkWatch, mapRef]);
 }

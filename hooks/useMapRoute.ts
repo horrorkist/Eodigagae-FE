@@ -8,6 +8,7 @@ import { projectPointToSegmentMeters } from "@/lib/geo";
 import { walkDebug } from "@/lib/walkDebug";
 import { requestWalkStop } from "@/lib/walkSession";
 import {
+  ROUTE_ARRIVAL_PROMPT_DISTANCE_M,
   ROUTE_ARRIVAL_ROUND_TRIP_ENDPOINT_DISTANCE_M,
   ROUTE_OFF_ROUTE_DISTANCE_M,
 } from "@/features/route/tracking/constants";
@@ -71,6 +72,8 @@ export function useMapRoute(
   const walking = useMapStore((s) => s.walking);
   const heading = useMapStore((s) => s.heading);
   const routeExperienceSource = useMapStore((s) => s.routeExperienceSource);
+  const activeRouteLegIndex = useMapStore((s) => s.activeRouteLegIndex);
+  const setActiveRouteLegIndex = useMapStore((s) => s.setActiveRouteLegIndex);
   const setWalkingGuidanceProgressM = useMapStore(
     (s) => s.setWalkingGuidanceProgressM,
   );
@@ -86,6 +89,15 @@ export function useMapRoute(
     guidanceMarkerHardMax,
     guidanceMarkerSizePx,
   } = useMemo(() => resolveRouteOptions(options), [options]);
+  const routeLegs = route?.legs ?? [];
+  const activeDogRecommendLeg =
+    routeExperienceSource === "dog-recommend" && routeLegs.length > 0
+      ? routeLegs[Math.min(activeRouteLegIndex, routeLegs.length - 1)] ?? null
+      : null;
+  const trackedPath =
+    walking && routeExperienceSource === "dog-recommend" && activeDogRecommendLeg
+      ? activeDogRecommendLeg.path
+      : route?.path ?? null;
 
   const clearGuidanceMarkers = useCallback(() => {
     clearGuidanceMarkersNaver(guidanceMarkersRef);
@@ -128,6 +140,40 @@ export function useMapRoute(
     wasOffRouteRef.current = false;
     offRoutePromptShownRef.current = false;
   }, []);
+
+  const maybeAdvanceDogRecommendLeg = useCallback(
+    () => {
+      if (!walking || routeExperienceSource !== "dog-recommend") return false;
+      if (!activeDogRecommendLeg || !myPos || routeLegs.length === 0) {
+        return false;
+      }
+      if (activeRouteLegIndex >= routeLegs.length - 1) return false;
+
+      const distanceToLegEndM = haversineMeters(myPos, {
+        lat: activeDogRecommendLeg.endCoordinate[1],
+        lng: activeDogRecommendLeg.endCoordinate[0],
+      });
+      if (distanceToLegEndM > ROUTE_ARRIVAL_PROMPT_DISTANCE_M) return false;
+
+      setActiveRouteLegIndex(activeRouteLegIndex + 1);
+      setWalkingGuidanceProgressM(null);
+      resetRouteTracking();
+      resetOffRoutePromptState();
+      return true;
+    },
+    [
+      activeDogRecommendLeg,
+      activeRouteLegIndex,
+      myPos,
+      resetOffRoutePromptState,
+      resetRouteTracking,
+      routeExperienceSource,
+      routeLegs.length,
+      setActiveRouteLegIndex,
+      setWalkingGuidanceProgressM,
+      walking,
+    ],
+  );
 
   const maybePromptOffRoute = useCallback(
     (snapDistM: number, isOffRoute: boolean) => {
@@ -325,21 +371,36 @@ export function useMapRoute(
 
   useEffect(() => {
     trackingModelRef.current =
-      route?.path?.length && route.path.length >= 2
-        ? buildTrackingRouteModel(route)
+      trackedPath?.length && trackedPath.length >= 2
+        ? buildTrackingRouteModel({
+            path: trackedPath,
+          })
         : null;
-  }, [route]);
+  }, [trackedPath]);
 
   useEffect(() => {
+    setActiveRouteLegIndex(0);
     resetRouteTracking();
     setWalkingGuidanceProgressM(null);
-  }, [route?.path, resetRouteTracking, setWalkingGuidanceProgressM]);
+  }, [
+    route?.path,
+    resetRouteTracking,
+    setActiveRouteLegIndex,
+    setWalkingGuidanceProgressM,
+  ]);
 
   useEffect(() => {
     if (walking && drawRoute) return;
+    setActiveRouteLegIndex(0);
     resetRouteTracking();
     setWalkingGuidanceProgressM(null);
-  }, [drawRoute, resetRouteTracking, setWalkingGuidanceProgressM, walking]);
+  }, [
+    drawRoute,
+    resetRouteTracking,
+    setActiveRouteLegIndex,
+    setWalkingGuidanceProgressM,
+    walking,
+  ]);
 
   useEffect(() => {
     if (walking && routeExperienceSource === "dog-recommend" && drawRoute) {
@@ -356,8 +417,27 @@ export function useMapRoute(
 
   useEffect(() => {
     if (!sdkReady) return;
+    if (!drawRoute || !walking) return;
+    if (routeExperienceSource !== "dog-recommend") return;
+    if (!activeDogRecommendLeg || trackedPath.length < 2) return;
 
-    if (!drawRoute || !route?.path?.length) {
+    lastRenderedCursorRef.current = null;
+    drawRouteLine(trackedPath, fullRouteStyle);
+  }, [
+    activeDogRecommendLeg,
+    drawRoute,
+    drawRouteLine,
+    fullRouteStyle,
+    routeExperienceSource,
+    sdkReady,
+    trackedPath,
+    walking,
+  ]);
+
+  useEffect(() => {
+    if (!sdkReady) return;
+
+    if (!drawRoute || !trackedPath?.length) {
       setWalkingGuidanceProgressM(null);
       clearRouteVisuals();
       return;
@@ -366,10 +446,10 @@ export function useMapRoute(
     const drawFullRoute = () => {
       lastRenderedCursorRef.current = null;
       resetOffRoutePromptState();
-      drawRouteLine(route.path, fullRouteStyle);
+      drawRouteLine(trackedPath, fullRouteStyle);
     };
 
-    if (!walking || !myPos || route.path.length < 2) {
+    if (!walking || !myPos || trackedPath.length < 2) {
       setWalkingGuidanceProgressM(null);
       drawFullRoute();
       return;
@@ -411,7 +491,7 @@ export function useMapRoute(
     }
 
     const legacySnap = findNearestSnap(
-      route.path,
+      trackedPath,
       myPos,
       legacyProgressSegIdxRef.current,
     );
@@ -423,12 +503,12 @@ export function useMapRoute(
       legacyProgressSegIdxRef.current = legacyProgressSegIdx;
 
       const legacySegA: LatLng = {
-        lat: route.path[legacyProgressSegIdx][1],
-        lng: route.path[legacyProgressSegIdx][0],
+        lat: trackedPath[legacyProgressSegIdx][1],
+        lng: trackedPath[legacyProgressSegIdx][0],
       };
       const legacySegB: LatLng = {
-        lat: route.path[legacyProgressSegIdx + 1][1],
-        lng: route.path[legacyProgressSegIdx + 1][0],
+        lat: trackedPath[legacyProgressSegIdx + 1][1],
+        lng: trackedPath[legacyProgressSegIdx + 1][0],
       };
       const legacyProjected = projectPointToSegmentMeters(
         myPos,
@@ -470,10 +550,14 @@ export function useMapRoute(
       isOffRoute,
     );
     if (!didPromptOffRoute) {
+      if (maybeAdvanceDogRecommendLeg()) {
+        return;
+      }
+
       maybePromptArrival(
         activeCursor.distanceAlongRouteM,
         trackingModel.totalDistanceM,
-        route.path,
+        trackedPath,
       );
     }
     const wasOffRoute = wasOffRouteRef.current;
@@ -497,7 +581,7 @@ export function useMapRoute(
       isOffRoute,
       snapDistM: activeCursor.snapDistM,
       myPos,
-      path: route.path,
+      path: trackedPath,
       cursor: activeCursor,
     });
 
@@ -521,8 +605,10 @@ export function useMapRoute(
     drawRouteLine,
     clearRouteVisuals,
     sdkReady,
+    maybeAdvanceDogRecommendLeg,
     routeExperienceSource,
     setWalkingGuidanceProgressM,
+    trackedPath,
   ]);
 
   useEffect(() => {

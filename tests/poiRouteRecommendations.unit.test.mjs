@@ -69,6 +69,18 @@ test("buildPoiRouteRecommendations preserves option order and labels", () => {
     recommendations.map((item) => item.route.summary?.distance),
     [1000, 1200, 1400],
   );
+  assert.equal(recommendations[0].waypoints.length, 1);
+  assert.equal(recommendations[0].waypoints[0].title, "테스트 장소");
+  assert.deepEqual(recommendations[0].route.waypoints, [
+    {
+      coordinate: [127.0, 37.5],
+      markerCoordinate: [127.001, 37.501],
+      title: "테스트 장소",
+      order: 0,
+      kind: "end",
+      distanceAlongRouteM: null,
+    },
+  ]);
 });
 
 test("buildPoiRouteRecommendations keeps successful routes on partial failure", () => {

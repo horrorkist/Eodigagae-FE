@@ -1,4 +1,11 @@
-import type { RouteGuidanceStep, RouteResult } from "@/domain/route/types";
+import type {
+  RouteGuidanceStep,
+  RouteResult,
+  RouteWaypointKind,
+  RouteWaypointMeta,
+} from "@/domain/route/types";
+import { buildRouteLegs } from "../features/route/legs.ts";
+import { projectRouteWaypoints } from "../features/route/waypoints.ts";
 import type {
   RouteRecommendation,
   RouteRecommendMeta,
@@ -186,33 +193,55 @@ function pickFallbackWaypoint(
   };
 }
 
-function toWaypoint(
+type NormalizedWaypoint = {
+  waypoint: RouteWaypoint;
+  routeWaypoint: Omit<RouteWaypointMeta, "markerCoordinate" | "distanceAlongRouteM">;
+  category: string | null;
+};
+
+function toRouteWaypointKind(category: string | null): RouteWaypointKind {
+  switch (category) {
+    case "START":
+      return "start";
+    case "END":
+      return "end";
+    default:
+      return "pivot";
+  }
+}
+
+function normalizeWaypoints(
   rawWaypoints: UpstreamStrollRoute["waypoints"],
-  path: [number, number][],
   strollName: string,
-): RouteWaypoint {
-  if (Array.isArray(rawWaypoints)) {
-    const sorted = [...rawWaypoints].sort((a, b) => {
-      const left = toFiniteNumber(a?.sequence) ?? Number.MAX_SAFE_INTEGER;
-      const right = toFiniteNumber(b?.sequence) ?? Number.MAX_SAFE_INTEGER;
-      return left - right;
-    });
+): NormalizedWaypoint[] {
+  if (!Array.isArray(rawWaypoints)) return [];
 
-    for (const waypoint of sorted) {
-      const latitude = toFiniteNumber(waypoint?.latitude);
-      const longitude = toFiniteNumber(waypoint?.longitude);
-      if (latitude == null || longitude == null) continue;
+  const waypoints: NormalizedWaypoint[] = [];
+  for (const [index, waypoint] of rawWaypoints.entries()) {
+    const latitude = toFiniteNumber(waypoint?.latitude);
+    const longitude = toFiniteNumber(waypoint?.longitude);
+    if (latitude == null || longitude == null) continue;
+    const category = readString(waypoint?.category)?.toUpperCase() ?? null;
+    const title = readString(waypoint?.name) ?? strollName;
 
-      return {
+    waypoints.push({
+      waypoint: {
         lat: latitude,
         lng: longitude,
-        title: readString(waypoint?.name) ?? strollName,
+        title,
         source: "stroll-api",
-      };
-    }
+      },
+      routeWaypoint: {
+        coordinate: [longitude, latitude],
+        title,
+        order: index,
+        kind: toRouteWaypointKind(category),
+      },
+      category,
+    });
   }
 
-  return pickFallbackWaypoint(path, strollName);
+  return waypoints;
 }
 
 export function normalizeUpstreamRoutes(
@@ -252,8 +281,25 @@ export function mapUpstreamRouteToRecommendation(
   }
 
   const source: RouteRecommendationSource = "stroll-api";
-  const waypoint = toWaypoint(route.waypoints, path, strollName);
+  const normalizedWaypoints = normalizeWaypoints(route.waypoints, strollName);
+  const waypoints = normalizedWaypoints.map(({ waypoint }) => waypoint);
+  const projectedRouteWaypoints = projectRouteWaypoints({
+    path,
+    waypoints: normalizedWaypoints.map(({ routeWaypoint }) => routeWaypoint),
+  });
+  const legBoundaryWaypoints = normalizedWaypoints
+    .filter(({ routeWaypoint }) => routeWaypoint.kind === "pivot")
+    .map(({ waypoint }) => waypoint);
+  const waypoint =
+    legBoundaryWaypoints[0] ??
+    waypoints[0] ??
+    pickFallbackWaypoint(path, strollName);
   const guidance = toGuidanceSteps(route.navigationGuides);
+  const legs = buildRouteLegs({
+    path,
+    waypoints: legBoundaryWaypoints,
+    guidance,
+  });
   const routeResult: RouteResult = {
     summary: {
       distance: totalDistance,
@@ -261,6 +307,10 @@ export function mapUpstreamRouteToRecommendation(
     },
     path,
     guidance,
+    ...(projectedRouteWaypoints.length > 0
+      ? { waypoints: projectedRouteWaypoints }
+      : {}),
+    ...(legs.length > 0 ? { legs } : {}),
     segments: [],
   };
 
@@ -270,6 +320,7 @@ export function mapUpstreamRouteToRecommendation(
     displayLabel: `경로 ${index + 1}`,
     source,
     waypoint,
+    waypoints,
     route: routeResult,
     metrics: {
       score: toFiniteNumber(route.matchScore) ?? 0,

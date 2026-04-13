@@ -17,6 +17,7 @@ export type RouteRecommendation = {
   source: RouteRecommendationSource;
   route: RouteResult;
   waypoint: RouteWaypoint;
+  waypoints: RouteWaypoint[];
   metrics: {
     score: number;
     distanceFit: number;

@@ -20,6 +20,12 @@ export type PoiRouteRecommendation = {
     title: string;
     source: "synthetic";
   };
+  waypoints: Array<{
+    lat: number;
+    lng: number;
+    title: string;
+    source: "synthetic";
+  }>;
   metrics: {
     score: number;
     distanceFit: number;
@@ -75,7 +81,29 @@ export function buildPoiRouteRecommendations(params: {
         title: poi.name,
         source: "synthetic",
       },
-      route: entry.value.route,
+      waypoints: [
+        {
+          lat: poi.lat,
+          lng: poi.lng,
+          title: poi.name,
+          source: "synthetic",
+        },
+      ],
+      route: {
+        ...entry.value.route,
+        waypoints: [
+          {
+            coordinate: [poi.lng, poi.lat],
+            markerCoordinate:
+              entry.value.route.path[entry.value.route.path.length - 1] ??
+              [poi.lng, poi.lat],
+            title: poi.name,
+            order: 0,
+            kind: "end",
+            distanceAlongRouteM: null,
+          },
+        ],
+      },
       metrics: {
         score: 0,
         distanceFit: 0,

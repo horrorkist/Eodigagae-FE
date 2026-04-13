@@ -125,6 +125,7 @@ function MapPageContent() {
   );
   const setPickedPos = useMapStore((s) => s.setPickedPos);
   const setRouteState = useMapStore((s) => s.setRouteState);
+  const setActiveRouteLegIndex = useMapStore((s) => s.setActiveRouteLegIndex);
   const walking = useMapStore((s) => s.walking);
   const setRouteSceneMode = useMapStore((s) => s.setRouteSceneMode);
   const setRouteExperienceSource = useMapStore(
@@ -401,9 +402,16 @@ function MapPageContent() {
 
   const applyRecommendationRoute = useCallback(
     (recommendation: RouteRecommendation) => {
+      const destinationCoordinate =
+        recommendation.source === "stroll-api"
+          ? recommendation.route.path[recommendation.route.path.length - 1] ??
+            [recommendation.waypoint.lng, recommendation.waypoint.lat]
+          : [recommendation.waypoint.lng, recommendation.waypoint.lat];
+
+      setActiveRouteLegIndex(0);
       setPickedPos({
-        lat: recommendation.waypoint.lat,
-        lng: recommendation.waypoint.lng,
+        lat: destinationCoordinate[1],
+        lng: destinationCoordinate[0],
       });
       setRouteState({
         route: recommendation.route,
@@ -413,7 +421,7 @@ function MapPageContent() {
         drawRoute: true,
       });
     },
-    [setPickedPos, setRouteState],
+    [setActiveRouteLegIndex, setPickedPos, setRouteState],
   );
 
   const invalidateRoutePlanningRequests = useCallback(() => {
