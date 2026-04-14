@@ -28,7 +28,7 @@ test("getWalkingGuidanceSteps excludes start points", () => {
   assert.equal(steps[0]?.description, "우회전");
 });
 
-test("resolveCurrentGuidanceIndex advances only forward when a step is reached", () => {
+test("resolveCurrentGuidanceIndex keeps the current step until the next step is reached", () => {
   const steps = [
     {
       order: 0,
@@ -42,7 +42,7 @@ test("resolveCurrentGuidanceIndex advances only forward when a step is reached",
     },
     {
       order: 2,
-      coordinate: [127.0004, 37.5],
+      coordinate: [127.0005, 37.5],
       description: "셋째 안내",
     },
   ];
@@ -58,7 +58,7 @@ test("resolveCurrentGuidanceIndex advances only forward when a step is reached",
     lastResolvedIndex: 2,
   });
 
-  assert.equal(advancedIndex, 2);
+  assert.equal(advancedIndex, 1);
   assert.equal(stableForwardIndex, 2);
 });
 
@@ -91,7 +91,7 @@ test("buildRouteProgressGuidanceSteps keeps round-trip guidance in route order",
   assert.equal(progressSteps[1].segmentIndex, 2);
 });
 
-test("resolveCurrentGuidanceIndexFromProgress advances monotonically on a linear route", () => {
+test("resolveCurrentGuidanceIndexFromProgress keeps the current instruction until the next step threshold", () => {
   const steps = buildRouteProgressGuidanceSteps({
     path: [
       [127.0, 37.5],
@@ -130,13 +130,19 @@ test("resolveCurrentGuidanceIndexFromProgress advances monotonically on a linear
   });
   const thirdIndex = resolveCurrentGuidanceIndexFromProgress({
     steps,
-    progressM: steps[1].distanceAlongRouteM + 5,
+    progressM: steps[1].distanceAlongRouteM - 5,
     lastResolvedIndex: secondIndex,
+  });
+  const fourthIndex = resolveCurrentGuidanceIndexFromProgress({
+    steps,
+    progressM: steps[2].distanceAlongRouteM + 5,
+    lastResolvedIndex: thirdIndex,
   });
 
   assert.equal(firstIndex, 0);
-  assert.equal(secondIndex, 1);
-  assert.equal(thirdIndex, 2);
+  assert.equal(secondIndex, 0);
+  assert.equal(thirdIndex, 1);
+  assert.equal(fourthIndex, 2);
 });
 
 test("resolveCurrentGuidanceIndexFromProgress can skip multiple reached steps", () => {
@@ -174,7 +180,7 @@ test("resolveCurrentGuidanceIndexFromProgress can skip multiple reached steps", 
 
   const nextIndex = resolveCurrentGuidanceIndexFromProgress({
     steps,
-    progressM: steps[2].distanceAlongRouteM + 3,
+    progressM: steps[3].distanceAlongRouteM + 3,
     lastResolvedIndex: 0,
   });
 

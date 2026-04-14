@@ -51,6 +51,7 @@ export type RouteLeg = {
 };
 
 export type RouteWaypointKind = "start" | "pivot" | "end";
+export type RouteWaypointFacilityKind = "trash-bin" | "fountain";
 
 export type RouteWaypointMeta = {
   coordinate: [number, number];
@@ -58,6 +59,7 @@ export type RouteWaypointMeta = {
   title: string;
   order: number;
   kind: RouteWaypointKind;
+  facilityKind?: RouteWaypointFacilityKind | null;
   distanceAlongRouteM: number | null;
 };
 

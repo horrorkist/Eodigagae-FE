@@ -205,8 +205,9 @@ export function useMapMyLocation(
         key: string;
         coordinate: [number, number];
         title: string;
-        variant: "start" | "pivot" | "destination";
+        variant: "start" | "pivot" | "facility" | "destination";
         label?: string;
+        facilitySource?: "trash-bin" | "fountain";
       }>,
     ) => {
       if (!window.naver?.maps) return;
@@ -234,6 +235,7 @@ export function useMapMyLocation(
             variant: next.variant,
             label: next.label,
             title: next.title,
+            facilitySource: next.facilitySource,
           }),
           anchor: new window.naver.maps.Point(0, 0),
         };

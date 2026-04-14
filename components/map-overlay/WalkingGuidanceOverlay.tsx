@@ -84,12 +84,18 @@ export default function WalkingGuidanceOverlay({
     if (currentIndex == null) return null;
     return toDisplayStep(resolvedSteps[currentIndex]);
   }, [currentIndex, resolvedSteps]);
+  const currentStepNumber =
+    currentIndex == null ? null : String(currentIndex + 11);
 
   const nextStep = useMemo(() => {
     if (currentIndex == null) return null;
     const next = resolvedSteps[currentIndex + 1];
     return next ? toDisplayStep(next) : null;
   }, [currentIndex, resolvedSteps]);
+  const nextStepNumber =
+    currentIndex != null && resolvedSteps[currentIndex + 1]
+      ? String(currentIndex + 12)
+      : null;
 
   if (!currentStep) return null;
 
@@ -126,10 +132,14 @@ export default function WalkingGuidanceOverlay({
           style={{ paddingTop: "calc(var(--safe-top) + 12px)" }}
         >
           <div className="flex min-w-0 flex-1 items-start gap-2 text-left">
-            <AppIcon
-              icon={appIconPaw}
-              className="mt-1 h-4 w-4 shrink-0 text-white"
-            />
+            <div className="relative mt-0.5 h-5 w-5 shrink-0">
+              <AppIcon icon={appIconPaw} className="h-5 w-5 text-white" />
+              {currentStepNumber ? (
+                <span className="absolute left-1/2 top-[71%] -translate-x-1/2 -translate-y-1/2 text-[8px] font-black leading-none text-dg-green-500">
+                  {currentStepNumber}
+                </span>
+              ) : null}
+            </div>
             <div className="min-w-0 flex-1 text-xl font-semibold leading-6 break-words">
               {currentStep.title}
             </div>
@@ -147,10 +157,17 @@ export default function WalkingGuidanceOverlay({
         {nextStep ? (
           <div className="flex min-h-[64px] items-center bg-dg-gray-400 px-4 py-3 text-dg-gray-700/35">
             <div className="flex min-w-0 items-start gap-2 text-left">
-              <AppIcon
-                icon={appIconPaw}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-dg-gray-700/30"
-              />
+              <div className="relative h-4 w-4 shrink-0">
+                <AppIcon
+                  icon={appIconPaw}
+                  className="h-4 w-4 text-dg-gray-700/45"
+                />
+                {nextStepNumber ? (
+                  <span className="absolute left-1/2 top-[71%] -translate-x-1/2 -translate-y-1/2 text-[6px] font-black leading-none text-white">
+                    {nextStepNumber}
+                  </span>
+                ) : null}
+              </div>
               <div className="min-w-0 text-base font-medium leading-4 break-words">
                 {nextStep.title}
               </div>

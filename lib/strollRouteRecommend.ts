@@ -1,4 +1,5 @@
 import type {
+  RouteWaypointFacilityKind,
   RouteGuidanceStep,
   RouteResult,
   RouteWaypointKind,
@@ -210,6 +211,19 @@ function toRouteWaypointKind(category: string | null): RouteWaypointKind {
   }
 }
 
+function toRouteWaypointFacilityKind(
+  category: string | null,
+): RouteWaypointFacilityKind | null {
+  switch (category) {
+    case "TRASH_BIN":
+      return "trash-bin";
+    case "FOUNTAIN":
+      return "fountain";
+    default:
+      return null;
+  }
+}
+
 function normalizeWaypoints(
   rawWaypoints: UpstreamStrollRoute["waypoints"],
   strollName: string,
@@ -236,6 +250,7 @@ function normalizeWaypoints(
         title,
         order: index,
         kind: toRouteWaypointKind(category),
+        facilityKind: toRouteWaypointFacilityKind(category),
       },
       category,
     });

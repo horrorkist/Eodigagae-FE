@@ -4,7 +4,15 @@ import {
   appIconPaw,
   type AppIconDefinition,
 } from "../components/icons/definitions.generated.ts";
-import type { RouteResult, RouteWaypointMeta } from "../domain/route/types.ts";
+import type {
+  RouteResult,
+  RouteWaypointFacilityKind,
+  RouteWaypointMeta,
+} from "../domain/route/types.ts";
+import {
+  buildFacilityPinMarkerHTML,
+  type FacilityMarkerSource,
+} from "./facilityMarker.ts";
 import { escapeHtml, stripSvgFilters } from "./markerShell.ts";
 import type { LatLng } from "../types/mapEvents.ts";
 import type { RoutePlanningSource } from "../types/routePlanning.ts";
@@ -15,12 +23,13 @@ const MARKER_TIP_OFFSET_Y_PX = 38.5;
 const MARKER_CENTER_TOP_PERCENT = 38;
 
 const ROUTE_MARKER_WRAPPER_BODY = stripSvgFilters(appIconMarker.body);
-const PIVOT_MARKER_BG = "#0f9f5a";
+const PIVOT_MARKER_BG = "#08a400";
 const DESTINATION_MARKER_BG = "#111827";
 
 export type RouteMarkerVariant =
   | "start"
   | "pivot"
+  | "facility"
   | "destination";
 
 export type RouteMarkerDescriptor = {
@@ -29,6 +38,7 @@ export type RouteMarkerDescriptor = {
   title: string;
   variant: RouteMarkerVariant;
   label?: string;
+  facilitySource?: FacilityMarkerSource;
 };
 
 function applyColorToSvgBody(svgBody: string, color: string) {
@@ -143,8 +153,9 @@ export function buildRouteMarkerHTML(params: {
   variant: RouteMarkerVariant;
   label?: string;
   title?: string;
+  facilitySource?: FacilityMarkerSource;
 }) {
-  const { variant, label, title = "" } = params;
+  const { variant, label, title = "", facilitySource } = params;
 
   if (variant === "start") {
     return buildMarkerShell({
@@ -160,6 +171,10 @@ export function buildRouteMarkerHTML(params: {
       centerHtml: buildPivotCenter(label ?? ""),
       title,
     });
+  }
+
+  if (variant === "facility" && facilitySource) {
+    return buildFacilityPinMarkerHTML(facilitySource, title);
   }
 
   return buildMarkerShell({
@@ -219,6 +234,30 @@ function buildPivotMarker(
   };
 }
 
+function toFacilitySource(
+  facilityKind: RouteWaypointFacilityKind | null | undefined,
+): FacilityMarkerSource | null {
+  if (facilityKind === "trash-bin" || facilityKind === "fountain") {
+    return facilityKind;
+  }
+  return null;
+}
+
+function buildRawFacilityMarker(
+  waypoint: RouteWaypointMeta,
+): RouteMarkerDescriptor | null {
+  const facilitySource = toFacilitySource(waypoint.facilityKind);
+  if (!facilitySource) return null;
+
+  return {
+    key: `facility-${waypoint.order}`,
+    coordinate: waypoint.coordinate,
+    title: waypoint.title,
+    variant: "facility",
+    facilitySource,
+  };
+}
+
 export function resolveRouteMarkers(params: {
   route: RouteResult | null;
   drawRoute: boolean;
@@ -252,6 +291,10 @@ export function resolveRouteMarkers(params: {
     );
 
     if (!walking) {
+      const rawFacilityMarkers = pivotWaypoints
+        .map((waypoint) => buildRawFacilityMarker(waypoint))
+        .filter((marker): marker is RouteMarkerDescriptor => marker != null);
+
       return [
         ...(startWaypoint
           ? [
@@ -266,12 +309,19 @@ export function resolveRouteMarkers(params: {
         ...pivotWaypoints.map((waypoint) =>
           buildPivotMarker(waypoint, pivotLabelMap),
         ),
+        ...rawFacilityMarkers,
       ];
     }
 
     if (activeRouteLegIndex < pivotWaypoints.length) {
       const currentPivot = pivotWaypoints[activeRouteLegIndex];
-      return [buildPivotMarker(currentPivot, pivotLabelMap)];
+      return [
+        buildPivotMarker(currentPivot, pivotLabelMap),
+        ...(() => {
+          const marker = buildRawFacilityMarker(currentPivot);
+          return marker ? [marker] : [];
+        })(),
+      ];
     }
 
     const destinationCoordinate =

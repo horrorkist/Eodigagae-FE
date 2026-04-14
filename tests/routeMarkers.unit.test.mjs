@@ -32,17 +32,19 @@ function createDogRoute() {
       {
         coordinate: [127.0016, 37.5004],
         markerCoordinate: [127.002, 37.5],
-        title: "경유지 2",
+        title: "쓰레기통",
         order: 2,
         kind: "pivot",
+        facilityKind: "trash-bin",
         distanceAlongRouteM: 200,
       },
       {
         coordinate: [127.0027, 37.5003],
         markerCoordinate: [127.003, 37.5],
-        title: "경유지 3",
+        title: "음수대",
         order: 3,
         kind: "pivot",
+        facilityKind: "fountain",
         distanceAlongRouteM: 300,
       },
       {
@@ -146,7 +148,7 @@ test("resolveRouteMarkers returns a destination marker for poi-route", () => {
   ]);
 });
 
-test("resolveRouteMarkers shows the start marker and snapped waypoint markers in preview", () => {
+test("resolveRouteMarkers shows snapped waypoint markers and raw facility markers in preview", () => {
   const markers = resolveRouteMarkers({
     route: createDogRoute(),
     drawRoute: true,
@@ -173,16 +175,30 @@ test("resolveRouteMarkers shows the start marker and snapped waypoint markers in
     {
       key: "pivot-2",
       coordinate: [127.002, 37.5],
-      title: "경유지 2",
+      title: "쓰레기통",
       variant: "pivot",
       label: "2",
     },
     {
       key: "pivot-3",
       coordinate: [127.003, 37.5],
-      title: "경유지 3",
+      title: "음수대",
       variant: "pivot",
       label: "3",
+    },
+    {
+      key: "facility-2",
+      coordinate: [127.0016, 37.5004],
+      title: "쓰레기통",
+      variant: "facility",
+      facilitySource: "trash-bin",
+    },
+    {
+      key: "facility-3",
+      coordinate: [127.0027, 37.5003],
+      title: "음수대",
+      variant: "facility",
+      facilitySource: "fountain",
     },
   ]);
 });
@@ -201,9 +217,16 @@ test("resolveRouteMarkers shows the current waypoint marker while walking", () =
     {
       key: "pivot-2",
       coordinate: [127.002, 37.5],
-      title: "경유지 2",
+      title: "쓰레기통",
       variant: "pivot",
       label: "2",
+    },
+    {
+      key: "facility-2",
+      coordinate: [127.0016, 37.5004],
+      title: "쓰레기통",
+      variant: "facility",
+      facilitySource: "trash-bin",
     },
   ]);
 });

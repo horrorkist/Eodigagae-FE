@@ -103,6 +103,7 @@ test("mapUpstreamRouteToRecommendation maps upstream route shape", () => {
     127.0007, 37.5005,
   ]);
   assert.equal(recommendation?.route.waypoints?.[0].kind, "pivot");
+  assert.equal(recommendation?.route.waypoints?.[0].facilityKind, null);
   assert.ok(recommendation?.route.waypoints?.[0].distanceAlongRouteM != null);
   assert.deepEqual(recommendation?.route.waypoints?.[1].coordinate, [
     127.0009, 37.5008,
@@ -111,6 +112,7 @@ test("mapUpstreamRouteToRecommendation maps upstream route shape", () => {
     127.0009, 37.5008,
   ]);
   assert.equal(recommendation?.route.waypoints?.[1].kind, "pivot");
+  assert.equal(recommendation?.route.waypoints?.[1].facilityKind, null);
   assert.ok(recommendation?.route.waypoints?.[1].distanceAlongRouteM != null);
   assert.equal(recommendation?.route.guidance?.[0].name, "삼성월드타워");
   assert.equal(
@@ -317,14 +319,17 @@ test("mapUpstreamRouteToRecommendation snaps all non-start/end waypoints onto th
 
   assert.ok(recommendation);
   assert.equal(recommendation?.route.waypoints?.[1].kind, "pivot");
+  assert.equal(recommendation?.route.waypoints?.[1].facilityKind, null);
   assert.notDeepEqual(recommendation?.route.waypoints?.[1].markerCoordinate, [
     127.0014, 37.5002,
   ]);
   assert.equal(recommendation?.route.waypoints?.[2].kind, "pivot");
+  assert.equal(recommendation?.route.waypoints?.[2].facilityKind, "trash-bin");
   assert.notDeepEqual(recommendation?.route.waypoints?.[2].markerCoordinate, [
     127.0025, 37.5003,
   ]);
   assert.equal(recommendation?.route.waypoints?.[3].kind, "pivot");
+  assert.equal(recommendation?.route.waypoints?.[3].facilityKind, "fountain");
   assert.notDeepEqual(recommendation?.route.waypoints?.[3].markerCoordinate, [
     127.0035, 37.5004,
   ]);

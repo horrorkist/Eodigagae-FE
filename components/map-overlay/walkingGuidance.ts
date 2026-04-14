@@ -203,28 +203,17 @@ export function resolveCurrentGuidanceIndex(params: {
 
   if (steps.length === 0) return null;
 
-  const startIndex = Math.min(Math.max(0, lastResolvedIndex), steps.length - 1);
-  if (!myPos) return startIndex;
+  let nextIndex = Math.min(Math.max(0, lastResolvedIndex), steps.length - 1);
+  if (!myPos) return nextIndex;
 
-  let closestIndex = startIndex;
-  let closestDistanceM = Number.POSITIVE_INFINITY;
-
-  for (let i = startIndex; i < steps.length; i += 1) {
-    const distanceM = haversineMeters(myPos, toLatLng(steps[i].coordinate));
-    if (distanceM < closestDistanceM) {
-      closestDistanceM = distanceM;
-      closestIndex = i;
-    }
+  while (nextIndex < steps.length - 1) {
+    const candidateIndex = nextIndex + 1;
+    const distanceM = haversineMeters(myPos, toLatLng(steps[candidateIndex].coordinate));
+    if (distanceM > stepReachedDistanceM) break;
+    nextIndex = candidateIndex;
   }
 
-  if (
-    closestDistanceM <= stepReachedDistanceM &&
-    closestIndex < steps.length - 1
-  ) {
-    return closestIndex + 1;
-  }
-
-  return closestIndex;
+  return nextIndex;
 }
 
 export function resolveCurrentGuidanceIndexFromProgress(params: {
@@ -247,7 +236,7 @@ export function resolveCurrentGuidanceIndexFromProgress(params: {
 
   while (
     nextIndex < steps.length - 1 &&
-    progressM >= steps[nextIndex].distanceAlongRouteM - stepReachedDistanceM
+    progressM >= steps[nextIndex + 1].distanceAlongRouteM - stepReachedDistanceM
   ) {
     nextIndex += 1;
   }
