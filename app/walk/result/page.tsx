@@ -291,6 +291,26 @@ function ResultChartCarousel({
   );
 }
 
+function findScrollContainer(element: HTMLElement | null): HTMLElement | null {
+  let current = element?.parentElement ?? null;
+
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    const isScrollable =
+      (overflowY === "auto" || overflowY === "scroll") &&
+      current.scrollHeight > current.clientHeight + 1;
+
+    if (isScrollable) {
+      return current;
+    }
+
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
 export default function WalkResultPage() {
   return (
     <Suspense fallback={null}>
@@ -408,21 +428,38 @@ function WalkResultContent({
     const target = contentEndRef.current;
     if (!target) return;
 
-    setIsContentEndVisible(
-      target.getBoundingClientRect().bottom <= window.innerHeight,
-    );
+    const scrollContainer = findScrollContainer(target);
+    const viewport = window.visualViewport;
+    const updateVisibility = () => {
+      const targetBottom = target.getBoundingClientRect().bottom;
+      const containerBottom = scrollContainer
+        ? scrollContainer.getBoundingClientRect().bottom
+        : viewport?.height ?? window.innerHeight;
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsContentEndVisible(entry.isIntersecting);
-      },
-      { threshold: 1 },
-    );
+      setIsContentEndVisible(targetBottom <= containerBottom + 4);
+    };
 
-    observer.observe(target);
+    updateVisibility();
+
+    window.addEventListener("resize", updateVisibility);
+    scrollContainer?.addEventListener("scroll", updateVisibility, {
+      passive: true,
+    });
+    viewport?.addEventListener("resize", updateVisibility);
+    viewport?.addEventListener("scroll", updateVisibility);
+
+    const resizeObserver = new ResizeObserver(updateVisibility);
+    resizeObserver.observe(target);
+    if (scrollContainer) {
+      resizeObserver.observe(scrollContainer);
+    }
 
     return () => {
-      observer.disconnect();
+      window.removeEventListener("resize", updateVisibility);
+      scrollContainer?.removeEventListener("scroll", updateVisibility);
+      viewport?.removeEventListener("resize", updateVisibility);
+      viewport?.removeEventListener("scroll", updateVisibility);
+      resizeObserver.disconnect();
     };
   }, [isSummaryRevealed]);
 
