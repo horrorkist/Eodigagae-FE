@@ -293,8 +293,8 @@ function ResultChartCarousel({
   }, [slides.length]);
 
   return (
-    <div className="space-y-4">
-      <div className="overflow-hidden rounded-lg">
+    <div>
+      <div className="overflow-hidden rounded-lg bg-white">
         <div
           ref={scrollRef}
           onScroll={handleScroll}
@@ -447,32 +447,32 @@ function ResultChartCarousel({
             </div>
           ))}
         </div>
-      </div>
 
-      <div className="flex items-center justify-center gap-2">
-        {slides.map((slide, index) => (
-          <button
-            key={slide.key}
-            type="button"
-            onClick={() => {
-              const node = scrollRef.current;
-              if (!node) return;
-              node.scrollTo({
-                left: node.clientWidth * index,
-                behavior: "smooth",
-              });
-              setActiveIndex(index);
-            }}
-            className={[
-              "h-2 rounded-full transition-all focus:outline-none focus-visible:ring-0",
-              activeIndex === index
-                ? "w-5 bg-dg-green-500"
-                : "w-2 bg-dg-gray-500/50",
-            ].join(" ")}
-            aria-label={`${slide.chartTitle} 보기`}
-            aria-pressed={activeIndex === index}
-          />
-        ))}
+        <div className="flex items-center justify-center gap-2 px-4 py-5">
+          {slides.map((slide, index) => (
+            <button
+              key={slide.key}
+              type="button"
+              onClick={() => {
+                const node = scrollRef.current;
+                if (!node) return;
+                node.scrollTo({
+                  left: node.clientWidth * index,
+                  behavior: "smooth",
+                });
+                setActiveIndex(index);
+              }}
+              className={[
+                "h-2 rounded-full transition-all focus:outline-none focus-visible:ring-0",
+                activeIndex === index
+                  ? "w-5 bg-dg-green-500"
+                  : "w-2 bg-dg-gray-500/50",
+              ].join(" ")}
+              aria-label={`${slide.chartTitle} 보기`}
+              aria-pressed={activeIndex === index}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
