@@ -15,6 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   Cell,
   ResponsiveContainer,
   Tooltip,
@@ -77,11 +78,85 @@ function ResultPetAvatar({
 
 type ResultChartSlide = {
   key: "distanceM" | "durationSec";
-  title: string;
   valueKey: "distanceM" | "durationSec";
+  chartTitle: string;
   formatter: (value: number) => string;
-  subtitle: string;
+  averageFormatter: (value: number) => string;
+  averageSuffix: string;
 };
+
+function getNiceChartScale(
+  valueKey: ResultChartSlide["valueKey"],
+  maxValue: number,
+) {
+  if (maxValue <= 0) {
+    return { ticks: [0], domainMax: 1 };
+  }
+
+  const labelCandidates =
+    valueKey === "distanceM"
+      ? [
+          100, 200, 300, 400, 500, 750, 1000, 1500, 2000, 2500, 3000, 4000,
+          5000, 7000, 8000, 9000, 10000, 12000, 15000, 20000,
+        ]
+      : [
+          60, 120, 180, 300, 600, 900, 1200, 1800, 2400, 3600, 5400, 7200,
+          10800,
+        ];
+  const topTick =
+    [...labelCandidates]
+      .reverse()
+      .find((candidate) => candidate <= maxValue) ?? labelCandidates[0];
+  const middleTarget = topTick / 2;
+  const middleTick =
+    [...labelCandidates]
+      .reverse()
+      .find(
+      (candidate) =>
+        candidate <= middleTarget && candidate > 0 && candidate < topTick,
+    ) ?? Math.round(middleTarget);
+
+  return {
+    ticks: [0, middleTick, topTick],
+    domainMax: maxValue,
+  };
+}
+
+function formatDurationAxisLabel(durationSec: number) {
+  if (!Number.isFinite(durationSec) || durationSec <= 0) return "0분";
+
+  const totalMinutes = Math.round(durationSec / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours <= 0) {
+    return `${minutes}분`;
+  }
+
+  if (minutes <= 0) {
+    return `${hours}시간`;
+  }
+
+  return `${hours}시간 ${minutes}분`;
+}
+
+function formatDurationAverageLabel(durationSec: number) {
+  if (!Number.isFinite(durationSec) || durationSec <= 0) return "0분";
+
+  const totalMinutes = Math.floor(durationSec / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours <= 0) {
+    return `${totalMinutes}분`;
+  }
+
+  if (minutes <= 0) {
+    return `${hours}시간`;
+  }
+
+  return `${hours}시간 ${minutes}분`;
+}
 
 function ResultChartXAxisTick({
   x = 0,
@@ -139,21 +214,28 @@ function ResultChartCarousel({
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const chartLeftMarginPx = 8;
+  const chartRightMarginPx = 0;
+  const chartTopMarginPx = 36;
+  const chartXAxisHeightPx = 30;
+  const bestBadgeGapPx = 12;
   const slides = useMemo<ResultChartSlide[]>(
     () => [
       {
         key: "distanceM",
-        title: "산책 거리",
         valueKey: "distanceM",
+        chartTitle: "산책 거리",
         formatter: formatHistoryDistanceLabel,
-        subtitle: "최근 7일 동안 걸은 거리예요.",
+        averageFormatter: formatHistoryDistanceLabel,
+        averageSuffix: "걸었어요",
       },
       {
         key: "durationSec",
-        title: "산책 시간",
         valueKey: "durationSec",
+        chartTitle: "산책 시간",
         formatter: formatHistoryDurationLabel,
-        subtitle: "최근 7일 동안 산책한 시간이예요.",
+        averageFormatter: formatDurationAverageLabel,
+        averageSuffix: "산책했어요",
       },
     ],
     [],
@@ -162,6 +244,43 @@ function ResultChartCarousel({
     () => ({
       distanceM: Math.max(0, ...data.map((item) => item.distanceM)),
       durationSec: Math.max(0, ...data.map((item) => item.durationSec)),
+    }),
+    [data],
+  );
+  const highlightedBarIndexByKey = useMemo(
+    () => ({
+      distanceM:
+        maxValueByKey.distanceM > 0
+          ? data.findIndex((item) => item.distanceM === maxValueByKey.distanceM)
+          : -1,
+      durationSec:
+        maxValueByKey.durationSec > 0
+          ? data.findIndex(
+              (item) => item.durationSec === maxValueByKey.durationSec,
+            )
+          : -1,
+    }),
+    [data, maxValueByKey],
+  );
+  const chartScaleByKey = useMemo(
+    () => ({
+      distanceM: getNiceChartScale("distanceM", maxValueByKey.distanceM),
+      durationSec: getNiceChartScale("durationSec", maxValueByKey.durationSec),
+    }),
+    [maxValueByKey],
+  );
+  const chartYAxisWidthByKey = useMemo(
+    () => ({
+      distanceM: 42,
+      durationSec: 46,
+    }),
+    [],
+  );
+  const averageValueByKey = useMemo(
+    () => ({
+      distanceM: data.reduce((sum, item) => sum + item.distanceM, 0) / data.length,
+      durationSec:
+        data.reduce((sum, item) => sum + item.durationSec, 0) / data.length,
     }),
     [data],
   );
@@ -186,22 +305,89 @@ function ResultChartCarousel({
               key={slide.key}
               className="w-full shrink-0 snap-center bg-white px-4 py-5 text-dg-black shadow-sm"
             >
-              <div>
-                <p className="text-base font-semibold text-dg-black">
-                  {slide.title}
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-dg-gray-700">
+                  {slide.chartTitle}
                 </p>
-                <p className="mt-1 text-sm font-medium text-dg-gray-600">
-                  {slide.subtitle}
+                <p className="text-xl font-semibold leading-tight text-dg-black">
+                  평균{" "}
+                  <span className="text-dg-green-500">
+                    {slide.averageFormatter(averageValueByKey[slide.valueKey])}
+                  </span>{" "}
+                  {slide.averageSuffix}
                 </p>
               </div>
 
-              <div className="mt-5 h-56">
+              <div
+                className="relative mt-5 h-56 [&_.recharts-cartesian-axis-tick]:outline-none [&_.recharts-cartesian-axis-tick_text]:outline-none [&_.recharts-cartesian-grid-horizontal]:outline-none [&_.recharts-cartesian-grid-horizontal_line]:outline-none [&_.recharts-surface]:outline-none [&_.recharts-wrapper]:outline-none [&_svg]:outline-none"
+                style={{ WebkitTapHighlightColor: "transparent" }}
+              >
+                {(() => {
+                  const bestIndex = highlightedBarIndexByKey[slide.valueKey];
+                  const bestValue =
+                    bestIndex >= 0 ? data[bestIndex]?.[slide.valueKey] : 0;
+                  const plotHeight = 224 - chartTopMarginPx - chartXAxisHeightPx;
+                  const topRatio =
+                    chartScaleByKey[slide.valueKey].domainMax > 0 &&
+                    typeof bestValue === "number"
+                      ? bestValue / chartScaleByKey[slide.valueKey].domainMax
+                      : 0;
+                  const badgeTop = Math.max(
+                    0,
+                    chartTopMarginPx +
+                      (1 - topRatio) * plotHeight -
+                      bestBadgeGapPx,
+                  );
+
+                  if (
+                    bestIndex < 0 ||
+                    typeof bestValue !== "number" ||
+                    bestValue <= 0
+                  ) {
+                    return null;
+                  }
+
+                  return (
+                    <div
+                      className="pointer-events-none absolute left-0 right-0 z-10"
+                      aria-hidden="true"
+                      style={{ top: badgeTop }}
+                    >
+                      <div
+                        className="absolute -translate-x-1/2 -translate-y-full"
+                        style={{
+                          left: `calc(${chartLeftMarginPx}px + ${
+                            (bestIndex + 0.5) / data.length
+                          } * (100% - ${chartLeftMarginPx + chartRightMarginPx + chartYAxisWidthByKey[slide.valueKey]}px))`,
+                        }}
+                      >
+                        <div className="relative will-change-transform rounded-md bg-dg-green-500 px-2 py-1 text-[11px] font-medium text-white shadow">
+                          BEST!
+                          <span className="absolute left-1/2 top-full -translate-x-1/2 border-x-4 border-t-4 border-x-transparent border-t-dg-green-500" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={data}
                     accessibilityLayer={false}
-                    margin={{ top: 8, right: 8, bottom: 0, left: 8 }}
+                    tabIndex={-1}
+                    margin={{
+                      top: chartTopMarginPx,
+                      right: chartRightMarginPx,
+                      bottom: 0,
+                      left: chartLeftMarginPx,
+                    }}
                   >
+                    <CartesianGrid
+                      vertical={false}
+                      stroke="rgba(151, 151, 151, 0.28)"
+                      syncWithTicks
+                      horizontalValues={chartScaleByKey[slide.valueKey].ticks}
+                      pointerEvents="none"
+                    />
                     <XAxis
                       dataKey="dateLabel"
                       axisLine={false}
@@ -209,13 +395,24 @@ function ResultChartCarousel({
                       tick={<ResultChartXAxisTick />}
                     />
                     <YAxis
-                      hide
-                      domain={[
-                        0,
-                        maxValueByKey[slide.valueKey] > 0
-                          ? maxValueByKey[slide.valueKey]
-                          : 1,
-                      ]}
+                      orientation="right"
+                      width={chartYAxisWidthByKey[slide.valueKey]}
+                      axisLine={false}
+                      tickLine={false}
+                      tickMargin={2}
+                      tick={{
+                        fill: "var(--color-dg-gray-600)",
+                        fontSize: 11,
+                        pointerEvents: "none",
+                      }}
+                      ticks={chartScaleByKey[slide.valueKey].ticks}
+                      tickFormatter={(value: number) =>
+                        slide.valueKey === "durationSec"
+                          ? formatDurationAxisLabel(value)
+                          : slide.formatter(value)
+                      }
+                      domain={[0, chartScaleByKey[slide.valueKey].domainMax]}
+                      pointerEvents="none"
                     />
                     <Tooltip
                       cursor={{ fill: "rgba(17, 24, 39, 0.04)" }}
@@ -247,16 +444,6 @@ function ResultChartCarousel({
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-dg-gray-400/55 px-3 py-3 text-sm">
-                <span className="font-medium text-dg-gray-600">오늘 기록</span>
-                <span className="font-semibold text-dg-black">
-                  {slide.formatter(
-                    data.find((item) => item.isCurrentDay)?.[slide.valueKey] ??
-                      0,
-                  )}
-                </span>
-              </div>
             </div>
           ))}
         </div>
@@ -282,7 +469,7 @@ function ResultChartCarousel({
                 ? "w-5 bg-dg-green-500"
                 : "w-2 bg-dg-gray-500/50",
             ].join(" ")}
-            aria-label={`${slide.title} 차트 보기`}
+            aria-label={`${slide.chartTitle} 보기`}
             aria-pressed={activeIndex === index}
           />
         ))}
