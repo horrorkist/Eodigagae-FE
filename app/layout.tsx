@@ -17,7 +17,8 @@ config.autoAddCss = false;
 
 export const metadata: Metadata = {
   title: "어디가개",
-  description: "모바일 중심 Next.js UI 스캐폴딩",
+  description:
+    "반려견 정보와 위치 기반 데이터를 결합해 산책 장소 탐색, 추천 경로 선택, 산책 기록 관리까지 이어지는 모바일 지도 앱",
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
