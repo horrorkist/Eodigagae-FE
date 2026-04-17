@@ -85,7 +85,7 @@ export default function WalkingGuidanceOverlay({
     return toDisplayStep(resolvedSteps[currentIndex]);
   }, [currentIndex, resolvedSteps]);
   const currentStepNumber =
-    currentIndex == null ? null : String(currentIndex + 11);
+    currentIndex == null ? null : String(currentIndex + 1);
 
   const nextStep = useMemo(() => {
     if (currentIndex == null) return null;
@@ -94,7 +94,7 @@ export default function WalkingGuidanceOverlay({
   }, [currentIndex, resolvedSteps]);
   const nextStepNumber =
     currentIndex != null && resolvedSteps[currentIndex + 1]
-      ? String(currentIndex + 12)
+      ? String(currentIndex + 2)
       : null;
 
   if (!currentStep) return null;
