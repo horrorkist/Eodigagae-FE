@@ -43,7 +43,7 @@ export default function MySupportLayout({
     isFeedbackPage ? "min-h-dvh" : "min-h-full",
   ].join(" ");
   const sectionClassName = [
-    "mx-auto max-w-[430px] px-4 pt-4",
+    "app-shell-content-width mx-auto px-4 pt-4",
     sectionPaddingBottomClass,
     isFeedbackPage ? "flex min-h-dvh flex-col" : "",
   ].join(" ");

@@ -73,6 +73,7 @@ export default function BottomSheet({
 
   const minSnap = useMemo(() => Math.min(...snapPoints), [snapPoints]);
   const maxSnap = useMemo(() => Math.max(...snapPoints), [snapPoints]);
+  const clipBoundaryRef = useRef<HTMLDivElement>(null);
 
   const getSafeBottomPx = () => {
     if (typeof window === "undefined") return 0;
@@ -83,22 +84,10 @@ export default function BottomSheet({
     return Number.isFinite(n) ? n : 0;
   };
 
-  const [vh, setVh] = useState<number>(() =>
-    typeof window === "undefined" ? 0 : window.innerHeight,
-  );
   const [safeBottom, setSafeBottom] = useState<number>(() =>
     typeof window === "undefined" ? 0 : getSafeBottomPx(),
   );
   const [topOverlayBottom, setTopOverlayBottom] = useState(0);
-
-  useEffect(() => {
-    const onResize = () => {
-      setVh(window.innerHeight);
-      setSafeBottom(getSafeBottomPx());
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -183,6 +172,45 @@ export default function BottomSheet({
   const activeBottomInset = closedBottomInset;
   const backdropZIndexClass = "z-100";
   const clipZIndexClass = "z-101";
+  const measureSheetViewportHeight = useCallback(() => {
+    if (typeof window === "undefined") return 0;
+
+    const clipBoundary = clipBoundaryRef.current;
+    if (!clipBoundary) return window.innerHeight;
+
+    const clipHeight = Math.round(clipBoundary.getBoundingClientRect().height);
+    return clipHeight + activeBottomInset;
+  }, [activeBottomInset]);
+  const [vh, setVh] = useState<number>(() =>
+    typeof window === "undefined" ? 0 : window.innerHeight,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateViewportMetrics = () => {
+      setVh(measureSheetViewportHeight());
+      setSafeBottom(getSafeBottomPx());
+    };
+
+    updateViewportMetrics();
+
+    const clipBoundary = clipBoundaryRef.current;
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" || !clipBoundary
+        ? null
+        : new ResizeObserver(() => {
+            updateViewportMetrics();
+          });
+
+    resizeObserver?.observe(clipBoundary);
+    window.addEventListener("resize", updateViewportMetrics);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateViewportMetrics);
+    };
+  }, [measureSheetViewportHeight]);
 
   const closedTop = useMemo(
     () => Math.max(0, vh - closedBottomInset - peekHeight),
@@ -694,7 +722,7 @@ export default function BottomSheet({
       {showBackdrop && (
         <div
           className={[
-            "fixed left-0 right-0 top-0 transition-opacity duration-300",
+            "absolute left-0 right-0 top-0 transition-opacity duration-300",
             backdropZIndexClass,
             isOpen
               ? "opacity-100 pointer-events-auto"
@@ -725,8 +753,9 @@ export default function BottomSheet({
 
       {/* Clip boundary */}
       <div
+        ref={clipBoundaryRef}
         className={[
-          "fixed inset-0 overflow-hidden pointer-events-none",
+          "absolute inset-0 overflow-hidden pointer-events-none",
           clipZIndexClass,
         ].join(" ")}
         style={{ bottom: activeBottomInset }}
@@ -738,7 +767,7 @@ export default function BottomSheet({
           role="dialog"
           aria-modal={isOpen ? "true" : "false"}
           aria-label={title ?? "bottom sheet"}
-          className="absolute inset-x-0 top-0 h-full bg-white rounded-t-2xl shadow-[0_-12px_24px_rgba(0,0,0,0.1)] pointer-events-auto"
+          className="absolute inset-x-0 top-0 h-full bg-white rounded-t-2xl shadow-[0_-2px_6px_rgba(0,0,0,0.08)] pointer-events-auto"
           style={{
             willChange: "transform",
             // SSR/hydration 이전 프레임에서도 닫힌 위치로 시작해 초기 오픈 플래시를 막는다.

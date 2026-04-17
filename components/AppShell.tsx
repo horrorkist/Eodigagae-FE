@@ -8,9 +8,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isGlobalPersist = isGlobalMapPersistEnabled;
 
   return (
-    <div className="h-dvh bg-neutral-100 overflow-hidden">
+    <div className="app-shell-root h-dvh overflow-hidden bg-neutral-100">
       {/* 가운데 정렬 + 모바일 폭 제한 */}
-      <div className="mx-auto h-dvh w-full max-w-[430px] bg-white shadow-sm flex flex-col overflow-hidden relative">
+      <div className="app-shell-frame mx-auto h-dvh w-full max-w-[var(--app-shell-max-width)] bg-white shadow-sm flex flex-col overflow-hidden relative">
         {/* 상단바 */}
         {/* <div
           className="shrink-0 border-b bg-white"

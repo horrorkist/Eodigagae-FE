@@ -37,7 +37,7 @@ export default function StartPointPromptSheet({
   return (
     <div
       ref={rootRef}
-      className="pointer-events-none fixed left-1/2 z-[112] w-full max-w-[430px] -translate-x-1/2"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-[112] w-full"
       style={{
         bottom: `calc(var(--safe-bottom) + ${BOTTOM_CHROME_HEIGHT_PX}px)`,
       }}

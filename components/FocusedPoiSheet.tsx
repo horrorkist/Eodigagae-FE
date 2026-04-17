@@ -161,7 +161,7 @@ export default function FocusedPoiSheet({
   return (
     <div
       ref={rootRef}
-      className="fixed left-0 z-[112] w-full max-w-[430px] pointer-events-auto"
+      className="absolute inset-x-0 z-[112] w-full pointer-events-auto"
       style={{
         bottom: `calc(var(--safe-bottom) + ${BOTTOM_CHROME_HEIGHT_PX}px)`,
       }}

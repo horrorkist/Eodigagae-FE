@@ -139,7 +139,7 @@ export default function OnboardingPageClient({
   };
 
   return (
-    <section className="flex h-full flex-col px-5 py-6 text-dg-black pointer-events-auto">
+    <section className="app-shell-content-width mx-auto flex h-full flex-col px-5 py-6 text-dg-black pointer-events-auto">
       <div className="flex flex-col flex-1 justify-center">
         <article className="w-full text-center">
           <div className="relative mx-auto mb-6 h-[220px] w-full max-w-[350px] overflow-hidden rounded-3xl bg-dg-gray-400/40">

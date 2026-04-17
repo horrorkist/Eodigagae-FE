@@ -39,7 +39,7 @@ export default function BottomNavHost() {
     <div
       data-coachmark-id="bottom-nav-host"
       className={[
-        "fixed bottom-0 left-1/2 w-full max-w-[430px] -translate-x-1/2 bg-white shadow-[0_-6px_18px_rgba(15,23,42,0.08)]",
+        "absolute inset-x-0 bottom-0 w-full bg-white shadow-[0_-6px_18px_rgba(15,23,42,0.08)]",
         hasFocusedPoi ? "z-[113]" : "z-101",
       ].join(" ")}
       style={{ paddingBottom: "var(--safe-bottom)" }}

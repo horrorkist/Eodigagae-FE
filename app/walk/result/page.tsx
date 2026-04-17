@@ -392,6 +392,7 @@ function ResultChartCarousel({
                       dataKey="dateLabel"
                       axisLine={false}
                       tickLine={false}
+                      interval={0}
                       tick={<ResultChartXAxisTick />}
                     />
                     <YAxis
@@ -663,7 +664,7 @@ function WalkResultContent({
   return (
     <div className="pointer-events-auto flex min-h-full flex-col bg-dg-blue-500">
       <div className="flex-1 px-5 pt-8">
-        <div className="mx-auto flex w-full max-w-[430px] flex-col">
+        <div className="app-shell-content-width mx-auto flex flex-col">
           <div className="relative pt-6 text-center">
             <AppIcon
               icon={appIconCloud}
@@ -756,10 +757,10 @@ function WalkResultContent({
       {isSummaryRevealed ? (
         isPrimaryActionVisible ? (
           <div
-            className="fixed inset-x-0 bottom-0 z-20 px-5 pb-5 pt-5 bg-white"
+            className="sticky inset-x-0 bottom-0 z-20 px-5 pb-5 pt-5 bg-white"
             style={{ paddingBottom: "calc(var(--safe-bottom) + 16px)" }}
           >
-            <div className="mx-auto w-full max-w-[430px]">
+            <div className="app-shell-content-width mx-auto">
               <button
                 type="button"
                 onClick={handlePrimaryAction}
@@ -775,7 +776,7 @@ function WalkResultContent({
           className="px-5 pb-5 pt-3"
           style={{ paddingBottom: "calc(var(--safe-bottom) + 16px)" }}
         >
-          <div className="mx-auto w-full max-w-[430px]">
+          <div className="app-shell-content-width mx-auto">
             <button
               type="button"
               onClick={handlePrimaryAction}

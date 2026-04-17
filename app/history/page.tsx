@@ -108,7 +108,7 @@ export default function HistoryPage() {
 
   return (
     <div className="min-h-full bg-dg-gray-400 pointer-events-auto">
-      <section className="mx-auto w-full max-w-[430px] px-4 pb-24 pt-5">
+      <section className="app-shell-content-width mx-auto px-4 pb-24 pt-5">
         <div className="space-y-7">
           <section className="space-y-3">
             <div className="space-y-1">

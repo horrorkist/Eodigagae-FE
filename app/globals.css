@@ -4,6 +4,11 @@
 :root {
   --safe-top: env(safe-area-inset-top);
   --safe-bottom: env(safe-area-inset-bottom);
+  --app-shell-max-width: 430px;
+  --app-shell-desktop-frame-inset: 16px;
+  --app-shell-desktop-radius: 8px;
+  --app-shell-desktop-border: rgba(15, 23, 42, 0.08);
+  --app-shell-desktop-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
 }
 
 html,
@@ -14,6 +19,7 @@ body {
 /* 모바일에서 튕김/드래그 감성 조절 */
 body {
   overscroll-behavior-y: none;
+  background: #f5f5f5;
   font-family:
     "Pretendard",
     "Pretendard Variable",
@@ -23,6 +29,27 @@ body {
     "Malgun Gothic",
     "Segoe UI",
     sans-serif;
+}
+
+.app-shell-content-width {
+  width: 100%;
+  max-width: var(--app-shell-max-width);
+}
+
+@media (min-width: 1024px) {
+  .app-shell-root {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--app-shell-desktop-frame-inset);
+  }
+
+  .app-shell-frame {
+    height: calc(100dvh - (var(--app-shell-desktop-frame-inset) * 2));
+    border: 1px solid var(--app-shell-desktop-border);
+    border-radius: var(--app-shell-desktop-radius);
+    box-shadow: var(--app-shell-desktop-shadow);
+  }
 }
 
 @keyframes route-loading-bounce {

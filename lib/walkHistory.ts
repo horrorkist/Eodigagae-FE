@@ -88,7 +88,7 @@ export function getWalkDateKey(value: string | Date) {
 
 function getWalkDateLabel(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
-  return `${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`;
+  return `${date.getMonth() + 1}.${pad2(date.getDate())}`;
 }
 
 function addDays(date: Date, days: number) {

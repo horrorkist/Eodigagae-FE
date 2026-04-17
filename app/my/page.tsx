@@ -393,7 +393,7 @@ export default function MyPage() {
 
   return (
     <div className="min-h-full bg-white pointer-events-auto">
-      <section className="mx-auto max-w-[430px] px-4 pt-5 pb-24">
+      <section className="app-shell-content-width mx-auto px-4 pt-5 pb-24">
         {dog ? renderPetRegisteredState() : renderPetEmptyState()}
 
         <div className="-mx-4 h-2 bg-dg-gray-400" />
