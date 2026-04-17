@@ -203,7 +203,9 @@ export default function BottomSheet({
             updateViewportMetrics();
           });
 
-    resizeObserver?.observe(clipBoundary);
+    if (resizeObserver && clipBoundary) {
+      resizeObserver.observe(clipBoundary);
+    }
     window.addEventListener("resize", updateViewportMetrics);
 
     return () => {
