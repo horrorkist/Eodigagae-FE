@@ -85,6 +85,23 @@ type ResultChartSlide = {
   averageSuffix: string;
 };
 
+const RESULT_RETURN_CTA_BASE_HEIGHT_PX = 88;
+const RESULT_RETURN_CTA_CONTENT_GAP_PX = 12;
+const RESULT_RETURN_CTA_SHOW_THRESHOLD_PX = 4;
+const RESULT_RETURN_CTA_HIDE_THRESHOLD_PX = 28;
+
+function getSafeBottomInsetPx() {
+  if (typeof window === "undefined") return 0;
+
+  const rawValue = window
+    .getComputedStyle(document.documentElement)
+    .getPropertyValue("--safe-bottom")
+    .trim();
+  const parsed = Number.parseFloat(rawValue);
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function getNiceChartScale(
   valueKey: ResultChartSlide["valueKey"],
   maxValue: number,
@@ -606,47 +623,104 @@ function WalkResultContent({
   onReturnHome: () => void;
 }) {
   const [isSummaryRevealed, setIsSummaryRevealed] = useState(false);
-  const [isContentEndVisible, setIsContentEndVisible] = useState(true);
+  const [needsReturnScroll, setNeedsReturnScroll] = useState(false);
+  const [isContentEndVisible, setIsContentEndVisible] = useState(false);
+  const needsReturnScrollRef = useRef(false);
+  const isContentEndVisibleRef = useRef(false);
+  const contentBodyEndRef = useRef<HTMLDivElement | null>(null);
   const contentEndRef = useRef<HTMLDivElement | null>(null);
   const resultHeadline = dogName ? `${dogName} 산책 완료!` : "산책 완료!";
 
   useLayoutEffect(() => {
-    if (!isSummaryRevealed) return;
+    if (!isSummaryRevealed) {
+      needsReturnScrollRef.current = false;
+      isContentEndVisibleRef.current = false;
+      setNeedsReturnScroll(false);
+      setIsContentEndVisible(false);
+      return;
+    }
 
+    const bodyEnd = contentBodyEndRef.current;
     const target = contentEndRef.current;
-    if (!target) return;
+    if (!bodyEnd || !target) return;
 
     const scrollContainer = findScrollContainer(target);
     const viewport = window.visualViewport;
-    const updateVisibility = () => {
-      const targetBottom = target.getBoundingClientRect().bottom;
-      const containerBottom = scrollContainer
+    const getViewportHeight = () =>
+      scrollContainer?.clientHeight ?? viewport?.height ?? window.innerHeight;
+    const getContainerBottom = () =>
+      scrollContainer
         ? scrollContainer.getBoundingClientRect().bottom
         : viewport?.height ?? window.innerHeight;
+    const updateNeedsReturnScroll = () => {
+      const returnCtaClearancePx =
+        RESULT_RETURN_CTA_BASE_HEIGHT_PX +
+        RESULT_RETURN_CTA_CONTENT_GAP_PX +
+        getSafeBottomInsetPx();
+      const bodyBottomOffset = scrollContainer
+        ? bodyEnd.getBoundingClientRect().bottom -
+          scrollContainer.getBoundingClientRect().top +
+          scrollContainer.scrollTop
+        : bodyEnd.getBoundingClientRect().bottom + window.scrollY;
+      const shouldRequireScroll =
+        bodyBottomOffset + returnCtaClearancePx > getViewportHeight();
 
-      setIsContentEndVisible(targetBottom <= containerBottom + 4);
+      needsReturnScrollRef.current = shouldRequireScroll;
+      setNeedsReturnScroll((current) =>
+        current === shouldRequireScroll ? current : shouldRequireScroll,
+      );
+
+      return shouldRequireScroll;
+    };
+    const updateVisibility = (
+      shouldRequireScroll = needsReturnScrollRef.current,
+    ) => {
+      const containerBottom = getContainerBottom();
+      const targetBottom = target.getBoundingClientRect().bottom;
+      const nextIsContentEndVisible = !shouldRequireScroll
+        ? true
+        : isContentEndVisibleRef.current
+          ? targetBottom <=
+            containerBottom + RESULT_RETURN_CTA_HIDE_THRESHOLD_PX
+          : targetBottom <=
+            containerBottom + RESULT_RETURN_CTA_SHOW_THRESHOLD_PX;
+
+      isContentEndVisibleRef.current = nextIsContentEndVisible;
+      setIsContentEndVisible((current) =>
+        current === nextIsContentEndVisible
+          ? current
+          : nextIsContentEndVisible,
+      );
+    };
+    const updateLayoutState = () => {
+      const shouldRequireScroll = updateNeedsReturnScroll();
+      updateVisibility(shouldRequireScroll);
+    };
+    const handleVisibilityScroll = () => {
+      updateVisibility();
     };
 
-    updateVisibility();
+    updateLayoutState();
 
-    window.addEventListener("resize", updateVisibility);
-    scrollContainer?.addEventListener("scroll", updateVisibility, {
+    window.addEventListener("resize", updateLayoutState);
+    scrollContainer?.addEventListener("scroll", handleVisibilityScroll, {
       passive: true,
     });
-    viewport?.addEventListener("resize", updateVisibility);
-    viewport?.addEventListener("scroll", updateVisibility);
+    viewport?.addEventListener("resize", updateLayoutState);
+    viewport?.addEventListener("scroll", handleVisibilityScroll);
 
-    const resizeObserver = new ResizeObserver(updateVisibility);
+    const resizeObserver = new ResizeObserver(updateLayoutState);
+    resizeObserver.observe(bodyEnd);
     resizeObserver.observe(target);
     if (scrollContainer) {
       resizeObserver.observe(scrollContainer);
     }
 
     return () => {
-      window.removeEventListener("resize", updateVisibility);
-      scrollContainer?.removeEventListener("scroll", updateVisibility);
-      viewport?.removeEventListener("resize", updateVisibility);
-      viewport?.removeEventListener("scroll", updateVisibility);
+      window.removeEventListener("resize", updateLayoutState);
+      scrollContainer?.removeEventListener("scroll", handleVisibilityScroll);
+      viewport?.removeEventListener("resize", updateLayoutState);
+      viewport?.removeEventListener("scroll", handleVisibilityScroll);
       resizeObserver.disconnect();
     };
   }, [isSummaryRevealed]);
@@ -659,7 +733,13 @@ function WalkResultContent({
 
     onReturnHome();
   }, [isSummaryRevealed, onReturnHome]);
-  const isPrimaryActionVisible = !isSummaryRevealed || isContentEndVisible;
+  const returnCtaSpacerHeight = needsReturnScroll
+    ? `calc(var(--safe-bottom) + ${
+        RESULT_RETURN_CTA_BASE_HEIGHT_PX + RESULT_RETURN_CTA_CONTENT_GAP_PX
+      }px)`
+    : "24px";
+  const isPrimaryActionVisible =
+    !isSummaryRevealed || !needsReturnScroll || isContentEndVisible;
 
   return (
     <div className="pointer-events-auto flex min-h-full flex-col bg-dg-blue-500">
@@ -742,11 +822,12 @@ function WalkResultContent({
               </motion.div>
             ) : null}
           </AnimatePresence>
+          <div ref={contentBodyEndRef} className="h-px" aria-hidden="true" />
           <div
             aria-hidden="true"
             style={{
               height: isSummaryRevealed
-                ? "calc(var(--safe-bottom) + 112px)"
+                ? returnCtaSpacerHeight
                 : "32px",
             }}
           />
@@ -757,18 +838,16 @@ function WalkResultContent({
       {isSummaryRevealed ? (
         isPrimaryActionVisible ? (
           <div
-            className="sticky inset-x-0 bottom-0 z-20 px-5 pb-5 pt-5 bg-white"
+            className="fixed bottom-0 left-1/2 z-20 w-full max-w-[var(--app-shell-max-width)] -translate-x-1/2 bg-white px-5 pt-4 shadow-[0_-8px_24px_rgba(17,24,39,0.08)]"
             style={{ paddingBottom: "calc(var(--safe-bottom) + 16px)" }}
           >
-            <div className="app-shell-content-width mx-auto">
-              <button
-                type="button"
-                onClick={handlePrimaryAction}
-                className="flex h-14 w-full items-center justify-center rounded-lg bg-dg-green-500 px-4 text-base font-semibold text-white active:bg-dg-green-600"
-              >
-                돌아가기
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handlePrimaryAction}
+              className="flex h-14 w-full items-center justify-center rounded-lg bg-dg-green-500 px-4 text-base font-semibold text-white active:bg-dg-green-600"
+            >
+              돌아가기
+            </button>
           </div>
         ) : null
       ) : (
