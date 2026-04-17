@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {
+  ROUTE_FACILITY_MARKER_Z_INDEX,
+  ROUTE_WAYPOINT_MARKER_Z_INDEX,
+} from "../lib/mapMarkerZIndex.ts";
 import { resolveRouteMarkers } from "../lib/routeMarker.ts";
 
 function createDogRoute() {
@@ -144,6 +148,7 @@ test("resolveRouteMarkers returns a destination marker for poi-route", () => {
       coordinate: [127.002, 37.502],
       title: "도착지",
       variant: "destination",
+      zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
     },
   ]);
 });
@@ -164,12 +169,14 @@ test("resolveRouteMarkers shows snapped waypoint markers and raw facility marker
       coordinate: [127.0, 37.5],
       title: "출발지",
       variant: "start",
+      zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
     },
     {
       key: "pivot-1",
       coordinate: [127.001, 37.5],
       title: "경유지 1",
       variant: "pivot",
+      zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
       label: "1",
     },
     {
@@ -177,6 +184,7 @@ test("resolveRouteMarkers shows snapped waypoint markers and raw facility marker
       coordinate: [127.002, 37.5],
       title: "쓰레기통",
       variant: "pivot",
+      zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
       label: "2",
     },
     {
@@ -184,6 +192,7 @@ test("resolveRouteMarkers shows snapped waypoint markers and raw facility marker
       coordinate: [127.003, 37.5],
       title: "음수대",
       variant: "pivot",
+      zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
       label: "3",
     },
     {
@@ -191,6 +200,7 @@ test("resolveRouteMarkers shows snapped waypoint markers and raw facility marker
       coordinate: [127.0016, 37.5004],
       title: "쓰레기통",
       variant: "facility",
+      zIndex: ROUTE_FACILITY_MARKER_Z_INDEX,
       facilitySource: "trash-bin",
     },
     {
@@ -198,9 +208,13 @@ test("resolveRouteMarkers shows snapped waypoint markers and raw facility marker
       coordinate: [127.0027, 37.5003],
       title: "음수대",
       variant: "facility",
+      zIndex: ROUTE_FACILITY_MARKER_Z_INDEX,
       facilitySource: "fountain",
     },
   ]);
+
+  assert.ok(markers[2].zIndex > markers[4].zIndex);
+  assert.ok(markers[3].zIndex > markers[5].zIndex);
 });
 
 test("resolveRouteMarkers shows the current waypoint marker while walking", () => {
@@ -219,6 +233,7 @@ test("resolveRouteMarkers shows the current waypoint marker while walking", () =
       coordinate: [127.002, 37.5],
       title: "쓰레기통",
       variant: "pivot",
+      zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
       label: "2",
     },
     {
@@ -226,6 +241,7 @@ test("resolveRouteMarkers shows the current waypoint marker while walking", () =
       coordinate: [127.0016, 37.5004],
       title: "쓰레기통",
       variant: "facility",
+      zIndex: ROUTE_FACILITY_MARKER_Z_INDEX,
       facilitySource: "trash-bin",
     },
   ]);
@@ -247,6 +263,7 @@ test("resolveRouteMarkers shows the final destination on the last dog leg", () =
       coordinate: [127.004, 37.5],
       title: "도착지",
       variant: "destination",
+      zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
     },
   ]);
 });

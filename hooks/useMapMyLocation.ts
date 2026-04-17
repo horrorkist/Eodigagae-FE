@@ -206,6 +206,7 @@ export function useMapMyLocation(
         coordinate: [number, number];
         title: string;
         variant: "start" | "pivot" | "facility" | "destination";
+        zIndex: number;
         label?: string;
         facilitySource?: "trash-bin" | "fountain";
       }>,
@@ -245,6 +246,7 @@ export function useMapMyLocation(
           existing.setPosition(position);
           existing.setTitle(next.title);
           existing.setIcon(icon);
+          existing.setZIndex(next.zIndex);
           existing.setMap(map);
           continue;
         }
@@ -257,7 +259,7 @@ export function useMapMyLocation(
             title: next.title,
             clickable: false,
             icon,
-            zIndex: 1100,
+            zIndex: next.zIndex,
           }),
         );
       }

@@ -11,10 +11,12 @@ import {
   createOrUpdateClusterer,
   disposeClusterer,
 } from "@/lib/naverMarkerCluster";
+import {
+  FACILITY_CLUSTER_Z_INDEX,
+  FACILITY_MARKER_Z_INDEX,
+} from "@/lib/mapMarkerZIndex";
 import { useMapStore } from "@/stores/mapStore";
 import type { FacilityHomePoiListItem } from "@/types/homePoi";
-
-const FACILITY_MARKER_Z_INDEX = 950;
 
 type MarkerEntry = {
   key: string;
@@ -128,6 +130,8 @@ export function useMapFacilitiesPoi(
       const titleChanged = entry.poi.title !== next.poi.title;
       const sourceChanged = entry.poi.source !== next.poi.source;
 
+      entry.marker.setZIndex(FACILITY_MARKER_Z_INDEX);
+
       if (moved) {
         entry.marker.setPosition(new window.naver.maps.LatLng(next.lat, next.lng));
       }
@@ -235,14 +239,14 @@ export function useMapFacilitiesPoi(
       map,
       markers: fountainMarkers,
       source: "fountain",
-      zIndex: 940,
+      zIndex: FACILITY_CLUSTER_Z_INDEX,
     });
     const trashBinClusterer = createOrUpdateClusterer({
       clustererRef: trashBinClustererRef,
       map,
       markers: trashBinMarkers,
       source: "trash-bin",
-      zIndex: 940,
+      zIndex: FACILITY_CLUSTER_Z_INDEX,
     });
 
     const registry = getFacilityLayerRegistry();

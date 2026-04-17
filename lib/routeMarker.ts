@@ -13,6 +13,10 @@ import {
   buildFacilityPinMarkerHTML,
   type FacilityMarkerSource,
 } from "./facilityMarker.ts";
+import {
+  ROUTE_FACILITY_MARKER_Z_INDEX,
+  ROUTE_WAYPOINT_MARKER_Z_INDEX,
+} from "./mapMarkerZIndex.ts";
 import { escapeHtml, stripSvgFilters } from "./markerShell.ts";
 import type { LatLng } from "../types/mapEvents.ts";
 import type { RoutePlanningSource } from "../types/routePlanning.ts";
@@ -37,6 +41,7 @@ export type RouteMarkerDescriptor = {
   coordinate: [number, number];
   title: string;
   variant: RouteMarkerVariant;
+  zIndex: number;
   label?: string;
   facilitySource?: FacilityMarkerSource;
 };
@@ -206,6 +211,7 @@ function buildDestinationDescriptor(
     coordinate,
     title,
     variant: "destination",
+    zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
   };
 }
 
@@ -218,6 +224,7 @@ function buildStartDescriptor(
     coordinate,
     title,
     variant: "start",
+    zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
   };
 }
 
@@ -230,6 +237,7 @@ function buildPivotMarker(
     coordinate: waypoint.markerCoordinate,
     title: waypoint.title,
     variant: "pivot",
+    zIndex: ROUTE_WAYPOINT_MARKER_Z_INDEX,
     label: pivotLabelMap.get(waypoint.order) ?? "",
   };
 }
@@ -254,6 +262,7 @@ function buildRawFacilityMarker(
     coordinate: waypoint.coordinate,
     title: waypoint.title,
     variant: "facility",
+    zIndex: ROUTE_FACILITY_MARKER_Z_INDEX,
     facilitySource,
   };
 }

@@ -112,9 +112,33 @@ export function projectRouteWaypoints(params: {
   }
 
   const cumulativeDistancesM = buildCumulativeDistances(path);
+  const totalDistanceM = cumulativeDistancesM[cumulativeDistancesM.length - 1] ?? 0;
   let previousDistanceAlongRouteM = -PROJECTION_FORWARD_EPSILON_M * 2;
 
   return waypoints.map((waypoint) => {
+    if (waypoint.kind === "start") {
+      previousDistanceAlongRouteM = Math.max(previousDistanceAlongRouteM, 0);
+
+      return {
+        ...waypoint,
+        markerCoordinate: waypoint.coordinate,
+        distanceAlongRouteM: 0,
+      };
+    }
+
+    if (waypoint.kind === "end") {
+      previousDistanceAlongRouteM = Math.max(
+        previousDistanceAlongRouteM,
+        totalDistanceM,
+      );
+
+      return {
+        ...waypoint,
+        markerCoordinate: waypoint.coordinate,
+        distanceAlongRouteM: totalDistanceM,
+      };
+    }
+
     const candidate = resolveProjectionCandidate(
       findProjectionCandidates(path, waypoint.coordinate, cumulativeDistancesM),
       previousDistanceAlongRouteM,
@@ -132,10 +156,7 @@ export function projectRouteWaypoints(params: {
 
     return {
       ...waypoint,
-      markerCoordinate:
-        waypoint.kind === "start" || waypoint.kind === "end"
-          ? waypoint.coordinate
-          : candidate.projected,
+      markerCoordinate: candidate.projected,
       distanceAlongRouteM: candidate.distanceAlongRouteM,
     };
   });
