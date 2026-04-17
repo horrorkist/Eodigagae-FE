@@ -71,7 +71,7 @@ export function buildMarkerShellHTML({
       color:${innerIconColor};
       pointer-events:none;
     ">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="${innerIconViewBox}" width="16" height="16" style="display:block;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="${innerIconViewBox}" width="16" height="16" style="display:block;overflow:visible;">
         ${innerBody}
       </svg>
     </span>
