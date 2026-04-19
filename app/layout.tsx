@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
-    apple: "/images/favicon.png",
+    apple: "/pwa/icons/apple-touch-icon.png",
   },
 };
 
@@ -32,6 +32,7 @@ export const viewport = {
   maximumScale: 1,
   viewportFit: "cover", // iOS safe-area
   userScalable: false,
+  themeColor: "#0bdc00",
 };
 
 export default function RootLayout({
