@@ -6,7 +6,9 @@ import {
   hasRenderablePolyline,
 } from "../features/route/tracking/path.ts";
 import {
+  shouldAdvanceDogRecommendLeg,
   shouldPromptArrival,
+  shouldPromptArrivalOnCurrentPath,
   shouldPromptReroute,
   shouldResetArrivalPrompt,
   shouldSkipRouteRedraw,
@@ -387,6 +389,61 @@ test("shouldPromptArrival does not open while another modal is already visible",
   });
 
   assert.equal(blockedByModal, false);
+});
+
+test("shouldPromptArrivalOnCurrentPath blocks intermediate dog-recommend legs", () => {
+  assert.equal(
+    shouldPromptArrivalOnCurrentPath({
+      routeExperienceSource: "dog-recommend",
+      activeRouteLegIndex: 0,
+      routeLegCount: 3,
+    }),
+    false,
+  );
+
+  assert.equal(
+    shouldPromptArrivalOnCurrentPath({
+      routeExperienceSource: "dog-recommend",
+      activeRouteLegIndex: 2,
+      routeLegCount: 3,
+    }),
+    true,
+  );
+
+  assert.equal(
+    shouldPromptArrivalOnCurrentPath({
+      routeExperienceSource: "poi-route",
+      activeRouteLegIndex: 0,
+      routeLegCount: 3,
+    }),
+    true,
+  );
+});
+
+test("shouldAdvanceDogRecommendLeg allows progress-based leg transitions", () => {
+  assert.equal(
+    shouldAdvanceDogRecommendLeg({
+      walking: true,
+      routeExperienceSource: "dog-recommend",
+      activeRouteLegIndex: 0,
+      routeLegCount: 3,
+      distanceToLegEndM: 41,
+      remainingDistanceM: 12,
+    }),
+    true,
+  );
+
+  assert.equal(
+    shouldAdvanceDogRecommendLeg({
+      walking: true,
+      routeExperienceSource: "dog-recommend",
+      activeRouteLegIndex: 2,
+      routeLegCount: 3,
+      distanceToLegEndM: 8,
+      remainingDistanceM: 8,
+    }),
+    false,
+  );
 });
 
 test("shouldSkipRouteRedraw skips only for tiny projected and progress movement", () => {

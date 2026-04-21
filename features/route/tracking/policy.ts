@@ -46,6 +46,22 @@ export type ArrivalPromptResetConditionInput = {
   exitDistanceM?: number;
 };
 
+export type ArrivalPromptPathScopeInput = {
+  routeExperienceSource: "dog-recommend" | "poi-route" | null;
+  activeRouteLegIndex: number;
+  routeLegCount: number;
+};
+
+export type DogRecommendLegAdvanceConditionInput = {
+  walking: boolean;
+  routeExperienceSource: "dog-recommend" | "poi-route" | null;
+  activeRouteLegIndex: number;
+  routeLegCount: number;
+  distanceToLegEndM: number | null;
+  remainingDistanceM: number | null;
+  arrivalDistanceM?: number;
+};
+
 export function shouldPromptReroute({
   isOffRoute,
   snapDistM,
@@ -91,6 +107,37 @@ export function shouldResetArrivalPrompt({
   exitDistanceM = ROUTE_ARRIVAL_PROMPT_EXIT_DISTANCE_M,
 }: ArrivalPromptResetConditionInput) {
   return remainingDistanceM > exitDistanceM;
+}
+
+export function shouldPromptArrivalOnCurrentPath({
+  routeExperienceSource,
+  activeRouteLegIndex,
+  routeLegCount,
+}: ArrivalPromptPathScopeInput) {
+  if (routeExperienceSource !== "dog-recommend") return true;
+  return routeLegCount <= 1 || activeRouteLegIndex >= routeLegCount - 1;
+}
+
+export function shouldAdvanceDogRecommendLeg({
+  walking,
+  routeExperienceSource,
+  activeRouteLegIndex,
+  routeLegCount,
+  distanceToLegEndM,
+  remainingDistanceM,
+  arrivalDistanceM = ROUTE_ARRIVAL_PROMPT_DISTANCE_M,
+}: DogRecommendLegAdvanceConditionInput) {
+  if (!walking || routeExperienceSource !== "dog-recommend") return false;
+  if (routeLegCount <= 0 || activeRouteLegIndex >= routeLegCount - 1) {
+    return false;
+  }
+
+  const isNearLegEndByPosition =
+    distanceToLegEndM != null && distanceToLegEndM <= arrivalDistanceM;
+  const isNearLegEndByProgress =
+    remainingDistanceM != null && remainingDistanceM <= arrivalDistanceM;
+
+  return isNearLegEndByPosition || isNearLegEndByProgress;
 }
 
 export function shouldSkipRouteRedraw({
