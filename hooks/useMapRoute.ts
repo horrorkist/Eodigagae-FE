@@ -618,7 +618,10 @@ export function useMapRoute(
     });
 
     if (!hasRenderablePolyline(remainingPath)) {
-      drawFullRoute();
+      // Near the destination the remaining path can collapse to just a few
+      // meters. Keep the active-route rendering instead of snapping back to
+      // the full route while guidance is still ongoing.
+      drawRouteLine(remainingPath, activeRouteStyle);
       return;
     }
 
