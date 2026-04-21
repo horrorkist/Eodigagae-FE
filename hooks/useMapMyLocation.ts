@@ -2,13 +2,10 @@
 
 import {
   RefObject,
-  createElement,
   useCallback,
   useEffect,
   useRef,
 } from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLocationDot } from "@fortawesome/free-solid-svg-icons";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import {
   requestOrientationPermissionIfNeeded,
@@ -35,6 +32,7 @@ import {
   buildRouteMarkerHTML,
   resolveRouteMarkers,
 } from "@/lib/routeMarker";
+import { modalPresets } from "@/lib/modalPresets";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 import type { LatLng } from "@/types/mapEvents";
 
@@ -108,23 +106,7 @@ export function useMapMyLocation(
       if (shouldDeferGeolocation) return;
       const info = getGeoErrorInfo(geoErr);
 
-      openModal({
-        title: info.title,
-        icon: createElement(FontAwesomeIcon, {
-          icon: faLocationDot,
-          className: "w-8 h-8 text-red-400",
-        }),
-        body: createElement(
-          "div",
-          { className: "space-y-1" },
-          createElement("p", null, info.description),
-          createElement(
-            "p",
-            { className: "text-xs text-gray-400" },
-            info.suggestion,
-          ),
-        ),
-      });
+      openModal(modalPresets.locationError({ info }));
     },
     [openModal, shouldDeferGeolocation],
   );

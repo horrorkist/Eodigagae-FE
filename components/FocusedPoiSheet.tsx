@@ -1,6 +1,7 @@
 "use client";
 
 import formatDist from "@/lib/formatDist";
+import { modalPresets } from "@/lib/modalPresets";
 import type { FocusedPoi } from "@/types/focusedPoi";
 import { useModalStore } from "@/stores/modal";
 import { BOTTOM_CHROME_HEIGHT_PX } from "@/lib/bottomChromeMetrics";
@@ -8,6 +9,7 @@ import AppIcon from "./icons/AppIcon";
 import {
   appIconChevronDown,
   appIconCopy,
+  appIconImagePlaceholder,
   appIconMapPin,
   appIconPuppy,
   appIconTrashbin,
@@ -146,15 +148,9 @@ export default function FocusedPoiSheet({
 
     try {
       await copyTextToClipboard(value);
-      openModal({
-        title: "주소 복사 완료",
-        body: `${label} 주소를 클립보드에 복사했어요.`,
-      });
+      openModal(modalPresets.copyAddressSuccess({ label }));
     } catch {
-      openModal({
-        title: "주소 복사 실패",
-        body: "클립보드에 복사하지 못했어요. 다시 시도해 주세요.",
-      });
+      openModal(modalPresets.copyAddressFailure());
     }
   };
 
@@ -278,9 +274,12 @@ export default function FocusedPoiSheet({
                 onError={() => setFailedThumbnail(thumbnail)}
               />
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-y-2 text-dg-gray-600">
-                <AppIcon icon={sourceIcon} className="h-8 w-8" />
-                <span className="text-sm">이미지 없음</span>
+              <div className="flex h-full w-full flex-col items-center justify-center gap-y-2 bg-dg-gray-400 text-dg-gray-600">
+                <AppIcon
+                  icon={appIconImagePlaceholder}
+                  className="h-14 w-14"
+                />
+                <span className="text-sm">등록된 사진이 없어요</span>
               </div>
             )}
           </div>

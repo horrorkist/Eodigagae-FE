@@ -1,10 +1,17 @@
 "use client";
 
-import { RefObject, useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import { useMapStore } from "@/stores/mapStore";
 import { useModalStore } from "@/stores/modal";
 import type { LatLng } from "@/types/mapEvents";
 import { projectPointToSegmentMeters } from "@/lib/geo";
+import { modalPresets } from "@/lib/modalPresets";
 import { walkDebug } from "@/lib/walkDebug";
 import { requestWalkStop } from "@/lib/walkSession";
 import {
@@ -236,11 +243,8 @@ export function useMapRoute(
       offRouteDetectionCountRef.current = 0;
       lastOffRoutePromptAtRef.current = now;
       openModal({
-        title: "경로를 벗어났어요",
-        body: `현재 경로에서 약 ${Math.round(snapDistM)}m 벗어났어요. 지금 상태를 유지할까요, 아니면 ${stopLabel}할까요?`,
-        confirmLabel: "유지",
-        cancelLabel: stopLabel,
-        onCancel: () => {
+        ...modalPresets.offRoute({ distanceM: snapDistM, stopLabel }),
+        onConfirm: () => {
           requestWalkStop();
         },
       });
@@ -302,14 +306,7 @@ export function useMapRoute(
       const isPoiRoute = routeExperienceSource === "poi-route";
       arrivalPromptShownRef.current = true;
       openModal({
-        title: isPoiRoute
-          ? "도착지에 거의 도착했어요"
-          : "산책 코스가 거의 끝났어요",
-        body: isPoiRoute
-          ? "길안내를 종료할까요?"
-          : "산책을 종료할까요?",
-        confirmLabel: isPoiRoute ? "길안내 종료" : "산책 종료",
-        cancelLabel: isPoiRoute ? "계속 안내" : "계속 산책",
+        ...modalPresets.arrival({ isPoiRoute }),
         onConfirm: () => {
           requestWalkStop();
         },

@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import { appIconMapPin } from "@/components/icons/definitions.generated";
 import { fromTmapPoi } from "@/lib/focusedPoi";
-import { buildMarkerShellHTML } from "@/lib/markerShell";
 import {
   CLUSTER_MAX_ZOOM,
   createOrUpdateClusterer,
   disposeClusterer,
 } from "@/lib/naverMarkerCluster";
+import { buildSearchResultMarkerHTML } from "@/lib/searchResultMarker";
 import { buildSearchResultMarkerLayout } from "@/lib/searchResultMarkerLayout";
 import { useMapStore } from "@/stores/mapStore";
 import type { TmapPoi } from "@/types/tmapPoi";
@@ -31,18 +30,6 @@ type NormalizedPoi = {
   lat: number;
   lng: number;
 };
-
-const SEARCH_RESULT_MARKER_COLOR = "#4b5563";
-
-function buildSearchResultMarkerHTML(title = "") {
-  return buildMarkerShellHTML({
-    wrapperColor: SEARCH_RESULT_MARKER_COLOR,
-    innerIconBody: appIconMapPin.body,
-    innerIconViewBox: appIconMapPin.viewBox,
-    innerIconColor: "#ffffff",
-    title,
-  });
-}
 
 function toPoiKey(poi: TmapPoi) {
   const id = String(poi.id ?? "").trim();

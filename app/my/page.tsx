@@ -25,6 +25,7 @@ import {
 import PetProfileModal from "@/components/my-page/PetProfileModal";
 import PetPhotoPreviewOverlay from "@/components/my-page/PetPhotoPreviewOverlay";
 import { createCroppedImageFile } from "@/lib/images/cropImageClient";
+import { modalPresets } from "@/lib/modalPresets";
 import {
   COACHMARK_COOKIE_NAME,
   ONBOARDING_COOKIE_NAME,
@@ -260,15 +261,7 @@ export default function MyPage() {
 
   const handleOpenCacheClearModal = () => {
     openModal({
-      title: "캐시 데이터 삭제",
-      body: (
-        <p>
-          캐시 데이터를 삭제하면 산책 기록과 설정이 함께 삭제됩니다. 소중한
-          기록이 사라질 수 있으니 다시 한 번 확인해주세요.
-        </p>
-      ),
-      cancelLabel: "취소",
-      confirmLabel: "삭제",
+      ...modalPresets.cacheClearConfirm(),
       onConfirm: handleConfirmCacheClear,
     });
   };
@@ -288,16 +281,7 @@ export default function MyPage() {
 
   const handleOpenPetDeleteModal = () => {
     openModal({
-      title: "반려동물 정보 삭제",
-      body: (
-        <p>
-          반려동물 정보를 삭제하시겠어요?
-          <br />
-          삭제된 정보는 되돌릴 수 없습니다.
-        </p>
-      ),
-      cancelLabel: "취소",
-      confirmLabel: "삭제",
+      ...modalPresets.petDeleteConfirm(),
       onConfirm: handleConfirmPetDelete,
     });
   };

@@ -1,8 +1,7 @@
 import {
-  appIconLocation,
   appIconMarker,
-  appIconPaw,
-  type AppIconDefinition,
+  appIconPinEnd,
+  appIconPinStart,
 } from "../components/icons/definitions.generated.ts";
 import type {
   RouteResult,
@@ -25,10 +24,14 @@ const MARKER_WIDTH_PX = 47;
 const MARKER_HEIGHT_PX = 51;
 const MARKER_TIP_OFFSET_Y_PX = 38.5;
 const MARKER_CENTER_TOP_PERCENT = 38;
+const ROUTE_PIN_WIDTH_PX = 55;
+const ROUTE_PIN_HEIGHT_PX = 61;
+const ROUTE_PIN_TIP_OFFSET_Y_PX = 48.5;
+const ROUTE_START_PIN_COLOR = "var(--color-dg-green-500)";
+const ROUTE_DESTINATION_PIN_COLOR = "var(--color-dg-red-sub)";
 
 const ROUTE_MARKER_WRAPPER_BODY = stripSvgFilters(appIconMarker.body);
 const PIVOT_MARKER_BG = "#08a400";
-const DESTINATION_MARKER_BG = "#111827";
 
 export type RouteMarkerVariant =
   | "start"
@@ -48,19 +51,6 @@ export type RouteMarkerDescriptor = {
 
 function applyColorToSvgBody(svgBody: string, color: string) {
   return svgBody.replace(/\bcurrentColor\b/g, color);
-}
-
-function renderInlineIcon(params: {
-  icon: AppIconDefinition;
-  color: string;
-  sizePx: number;
-}) {
-  const { icon, color, sizePx } = params;
-  const body = applyColorToSvgBody(icon.body, color);
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${icon.viewBox}" width="${sizePx}" height="${sizePx}" style="display:block;">
-    ${body}
-  </svg>`;
 }
 
 function buildMarkerShell(params: {
@@ -91,6 +81,30 @@ function buildMarkerShell(params: {
   </div>`;
 }
 
+function buildStandalonePinMarker(params: {
+  icon: typeof appIconPinStart;
+  color: string;
+  title?: string;
+}) {
+  const { icon, color, title = "" } = params;
+  const safeTitle = escapeHtml(title.trim());
+  const markerBody = applyColorToSvgBody(stripSvgFilters(icon.body), color);
+
+  return `<div data-route-marker="true" data-title="${safeTitle}" style="
+    position:relative;
+    width:${ROUTE_PIN_WIDTH_PX}px;
+    height:${ROUTE_PIN_HEIGHT_PX}px;
+    transform:translate(-${ROUTE_PIN_WIDTH_PX / 2}px,-${ROUTE_PIN_TIP_OFFSET_Y_PX}px);
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.25));
+    pointer-events:none;
+    user-select:none;
+  ">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="${icon.viewBox}" width="${ROUTE_PIN_WIDTH_PX}" height="${ROUTE_PIN_HEIGHT_PX}" fill="none" style="display:block;">
+      ${markerBody}
+    </svg>
+  </div>`;
+}
+
 function buildPivotCenter(label: string) {
   const safeLabel = escapeHtml(label.trim());
 
@@ -116,44 +130,6 @@ function buildPivotCenter(label: string) {
   ">${safeLabel}</span>`;
 }
 
-function buildStartCenter() {
-  return `
-    <span style="
-      position:absolute;
-      left:50%;
-      top:${MARKER_CENTER_TOP_PERCENT}%;
-      transform:translate(-50%,-50%);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      width:16px;
-      height:16px;
-      color:#ffffff;
-      pointer-events:none;
-    ">
-      ${renderInlineIcon({ icon: appIconPaw, color: "#ffffff", sizePx: 14 })}
-    </span>
-  `;
-}
-
-function buildDestinationCenter() {
-  return `<span style="
-    position:absolute;
-    left:50%;
-    top:${MARKER_CENTER_TOP_PERCENT}%;
-    transform:translate(-50%,-50%);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    width:16px;
-    height:16px;
-    color:#ffffff;
-    pointer-events:none;
-  ">
-    ${renderInlineIcon({ icon: appIconLocation, color: "#ffffff", sizePx: 16 })}
-  </span>`;
-}
-
 export function buildRouteMarkerHTML(params: {
   variant: RouteMarkerVariant;
   label?: string;
@@ -163,9 +139,9 @@ export function buildRouteMarkerHTML(params: {
   const { variant, label, title = "", facilitySource } = params;
 
   if (variant === "start") {
-    return buildMarkerShell({
-      wrapperColor: PIVOT_MARKER_BG,
-      centerHtml: buildStartCenter(),
+    return buildStandalonePinMarker({
+      icon: appIconPinStart,
+      color: ROUTE_START_PIN_COLOR,
       title,
     });
   }
@@ -182,9 +158,9 @@ export function buildRouteMarkerHTML(params: {
     return buildFacilityPinMarkerHTML(facilitySource, title);
   }
 
-  return buildMarkerShell({
-    wrapperColor: DESTINATION_MARKER_BG,
-    centerHtml: buildDestinationCenter(),
+  return buildStandalonePinMarker({
+    icon: appIconPinEnd,
+    color: ROUTE_DESTINATION_PIN_COLOR,
     title,
   });
 }

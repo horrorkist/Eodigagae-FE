@@ -11,11 +11,17 @@ export default function Modal() {
   const body = useModalStore((s) => s.body);
   const icon = useModalStore((s) => s.icon);
   const confirmLabel = useModalStore((s) => s.confirmLabel);
+  const confirmTone = useModalStore((s) => s.confirmTone);
   const cancelLabel = useModalStore((s) => s.cancelLabel);
   const onConfirm = useModalStore((s) => s.onConfirm);
   const onCancel = useModalStore((s) => s.onCancel);
   const onDismiss = useModalStore((s) => s.onDismiss);
   const close = useModalStore((s) => s.close);
+
+  const confirmButtonClassName =
+    confirmTone === "danger"
+      ? "flex-1 py-2.5 rounded-xl bg-dg-red-sub text-sm font-medium text-white active:brightness-95 transition-[filter,colors]"
+      : "flex-1 py-2.5 rounded-xl bg-dg-green-500 text-sm font-medium text-white active:bg-dg-green-600 transition-colors";
 
   const handleDismiss = () => {
     onDismiss?.();
@@ -86,7 +92,7 @@ export default function Modal() {
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 active:bg-gray-50 transition-colors"
+                    className="flex-1 rounded-xl bg-dg-gray-400 py-2.5 text-sm font-medium text-dg-gray-600 active:brightness-95 transition-[filter,colors]"
                   >
                     {cancelLabel}
                   </button>
@@ -94,7 +100,7 @@ export default function Modal() {
                 <button
                   type="button"
                   onClick={handleConfirm}
-                  className="flex-1 py-2.5 rounded-xl bg-dg-green-500 text-sm font-medium text-white active:bg-dg-green-600 transition-colors"
+                  className={confirmButtonClassName}
                 >
                   {confirmLabel}
                 </button>

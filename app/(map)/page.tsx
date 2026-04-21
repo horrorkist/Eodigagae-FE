@@ -29,11 +29,10 @@ import { usePetPoiController } from "@/hooks/usePetPoiController";
 import { useMapRuntime } from "@/hooks/useMapRuntime";
 import { useStartPointAddress } from "@/hooks/useStartPointAddress";
 import { useMapFacilitiesProbe } from "@/hooks/useMapFacilitiesProbe";
+import { modalPresets } from "@/lib/modalPresets";
 import type { DogInfoFormDraft } from "@/stores/dogStore";
 import { useModalStore } from "@/stores/modal";
 import { useEmit } from "@/hooks/useEventBus";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
 import { fromHomePoiListItem, fromTmapPoi } from "@/lib/focusedPoi";
 import { mergeAndSortHomePois } from "@/lib/homePoiNormalizer";
 import WalkDebugPanel from "@/components/WalkDebugPanel";
@@ -465,10 +464,7 @@ function MapPageContent() {
   const handleStartPointConfirm = useCallback(async () => {
     if (routeRecommendLoading) return;
     if (!pendingRouteRecommendDraft) {
-      openModal({
-        title: "추천 정보를 확인할 수 없어요",
-        body: <p>반려견 정보를 다시 입력한 뒤 시도해 주세요.</p>,
-      });
+      openModal(modalPresets.recommendationDraftMissing());
       return;
     }
 
@@ -477,10 +473,7 @@ function MapPageContent() {
     const centerLng = isLatLngCoord(center) ? center.lng() : NaN;
 
     if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) {
-      openModal({
-        title: "지도 중심 좌표를 확인할 수 없어요",
-        body: <p>지도가 로드된 뒤 다시 시도해 주세요.</p>,
-      });
+      openModal(modalPresets.mapCenterUnavailable());
       return;
     }
 
@@ -506,10 +499,7 @@ function MapPageContent() {
         setIsStartPointSelectionMode(false);
         setPendingRouteRecommendDraft(null);
         reopenRouteRecommendForm();
-        openModal({
-          title: "추천 경로를 찾지 못했어요",
-          body: <p>{message}</p>,
-        });
+        openModal(modalPresets.recommendationEmpty({ message }));
         return;
       }
 
@@ -535,10 +525,7 @@ function MapPageContent() {
       setIsStartPointSelectionMode(false);
       setPendingRouteRecommendDraft(null);
       reopenRouteRecommendForm();
-      openModal({
-        title: "추천 경로를 불러오지 못했어요",
-        body: <p>{message}</p>,
-      });
+      openModal(modalPresets.recommendationLoadFailed({ message }));
     }
   }, [
     applyRecommendationRoute,
@@ -571,10 +558,7 @@ function MapPageContent() {
   const startPoiRoutePlanning = useCallback(
     async (poi: FocusedPoi, returnTarget: Exclude<PoiRouteReturnTarget, null>) => {
       if (!myPos) {
-        openModal({
-          title: "현재 위치가 필요해요",
-          body: <p>위치 권한을 허용하거나 현재 위치를 먼저 확인한 뒤 다시 시도해 주세요.</p>,
-        });
+        openModal(modalPresets.currentLocationRequired());
         return;
       }
 
@@ -623,10 +607,7 @@ function MapPageContent() {
         setRoutePlanningSource(null);
         setPoiRouteReturnTarget(null);
         restorePoiRouteOrigin(returnTarget);
-        openModal({
-          title: "길찾기 경로를 불러오지 못했어요",
-          body: <p>{message}</p>,
-        });
+        openModal(modalPresets.poiRouteLoadFailed({ message }));
       }
     },
     [
@@ -1144,18 +1125,7 @@ function MapPageContent() {
 
     lastPetPoiErrorRef.current = petPoiError;
     openModal({
-      title: "동반 가능 정보를 불러오지 못했어요",
-      icon: (
-        <FontAwesomeIcon
-          icon={faTriangleExclamation}
-          className="w-8 h-8 text-red-400"
-        />
-      ),
-      body: (
-        <p className="whitespace-pre-line">
-          {"일시적인 오류가 발생했어요.\n잠시 후 다시 시도해 주세요."}
-        </p>
-      ),
+      ...modalPresets.dataLoadFailed({ subject: "동반 가능" }),
       onDismiss: clearPetPoiError,
       onConfirm: clearPetPoiError,
     });
@@ -1170,20 +1140,7 @@ function MapPageContent() {
     if (lastWaterErrorRef.current === waterError) return;
 
     lastWaterErrorRef.current = waterError;
-    openModal({
-      title: "음수대 정보를 불러오지 못했어요",
-      icon: (
-        <FontAwesomeIcon
-          icon={faTriangleExclamation}
-          className="w-8 h-8 text-red-400"
-        />
-      ),
-      body: (
-        <p className="whitespace-pre-line">
-          {"일시적인 오류가 발생했어요.\n잠시 후 다시 시도해 주세요."}
-        </p>
-      ),
-    });
+    openModal(modalPresets.dataLoadFailed({ subject: "음수대" }));
   }, [facilitiesProbe.water.error, openModal]);
 
   useEffect(() => {
@@ -1195,20 +1152,7 @@ function MapPageContent() {
     if (lastTrashErrorRef.current === trashError) return;
 
     lastTrashErrorRef.current = trashError;
-    openModal({
-      title: "쓰레기통 정보를 불러오지 못했어요",
-      icon: (
-        <FontAwesomeIcon
-          icon={faTriangleExclamation}
-          className="w-8 h-8 text-red-400"
-        />
-      ),
-      body: (
-        <p className="whitespace-pre-line">
-          {"일시적인 오류가 발생했어요.\n잠시 후 다시 시도해 주세요."}
-        </p>
-      ),
-    });
+    openModal(modalPresets.dataLoadFailed({ subject: "쓰레기통" }));
   }, [facilitiesProbe.trash.error, openModal]);
 
   return (

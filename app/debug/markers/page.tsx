@@ -2,12 +2,11 @@
 
 import Script from "next/script";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { appIconMapPin } from "@/components/icons/definitions.generated";
 import { buildFacilityPinMarkerHTML } from "@/lib/facilityMarker";
 import { buildClusterBadgeHTML } from "@/lib/naverMarkerCluster";
 import { buildLabelMarkerHTML, buildPinMarkerHTML } from "@/lib/poiMarker";
 import { buildRouteMarkerHTML } from "@/lib/routeMarker";
-import { buildMarkerShellHTML } from "@/lib/markerShell";
+import { buildSearchResultMarkerHTML } from "@/lib/searchResultMarker";
 
 type PreviewItem = {
   key: string;
@@ -44,16 +43,6 @@ function offsetPosition(eastM: number, northM: number) {
     lat: MAP_CENTER.lat + latDelta,
     lng: MAP_CENTER.lng + lngDelta,
   };
-}
-
-function buildSearchResultMarkerHTML(title = "") {
-  return buildMarkerShellHTML({
-    wrapperColor: "#4b5563",
-    innerIconBody: appIconMapPin.body,
-    innerIconViewBox: appIconMapPin.viewBox,
-    innerIconColor: "#ffffff",
-    title,
-  });
 }
 
 function buildGroups(): PreviewGroup[] {

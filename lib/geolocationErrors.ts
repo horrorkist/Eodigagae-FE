@@ -1,4 +1,4 @@
-type GeoErrorInfo = {
+export type GeoErrorInfo = {
   title: string;
   description: string;
   suggestion: string;

@@ -1,16 +1,8 @@
 import { create } from "zustand";
 import type { ReactNode } from "react";
+import type { ModalButtonTone, ModalConfig } from "@/types/modal";
 
-type ModalConfig = {
-  title?: string;
-  body: ReactNode;
-  icon?: ReactNode;
-  confirmLabel?: string;
-  cancelLabel?: string | null;
-  onConfirm?: () => void;
-  onCancel?: () => void;
-  onDismiss?: () => void;
-};
+export type { ModalButtonTone, ModalConfig } from "@/types/modal";
 
 type ModalState = {
   isOpen: boolean;
@@ -18,6 +10,7 @@ type ModalState = {
   body: ReactNode | null;
   icon: ReactNode | null;
   confirmLabel: string;
+  confirmTone: ModalButtonTone;
   cancelLabel: string | null;
   onConfirm: (() => void) | null;
   onCancel: (() => void) | null;
@@ -33,6 +26,7 @@ export const useModalStore = create<ModalState>((set) => ({
   body: null,
   icon: null,
   confirmLabel: "확인",
+  confirmTone: "default",
   cancelLabel: null,
   onConfirm: null,
   onCancel: null,
@@ -45,6 +39,7 @@ export const useModalStore = create<ModalState>((set) => ({
       body: config.body,
       icon: config.icon ?? null,
       confirmLabel: config.confirmLabel ?? "확인",
+      confirmTone: config.confirmTone ?? "default",
       cancelLabel: config.cancelLabel ?? null,
       onConfirm: config.onConfirm ?? null,
       onCancel: config.onCancel ?? null,
