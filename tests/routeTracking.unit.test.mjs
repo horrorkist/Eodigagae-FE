@@ -9,6 +9,7 @@ import {
   shouldAdvanceDogRecommendLeg,
   shouldPromptArrival,
   shouldPromptArrivalOnCurrentPath,
+  shouldConfirmReroutePrompt,
   shouldPromptReroute,
   shouldResetArrivalPrompt,
   shouldSkipRouteRedraw,
@@ -306,6 +307,35 @@ test("shouldPromptReroute checks gate conditions and cooldown", () => {
 
   assert.equal(canPrompt, true);
   assert.equal(blockedByCooldown, false);
+});
+
+test("shouldConfirmReroutePrompt requires consecutive off-route detections", () => {
+  assert.equal(
+    shouldConfirmReroutePrompt({
+      isOffRoute: true,
+      snapDistM: 70,
+      consecutiveDetections: 1,
+    }),
+    false,
+  );
+
+  assert.equal(
+    shouldConfirmReroutePrompt({
+      isOffRoute: true,
+      snapDistM: 70,
+      consecutiveDetections: 2,
+    }),
+    true,
+  );
+
+  assert.equal(
+    shouldConfirmReroutePrompt({
+      isOffRoute: true,
+      snapDistM: 45,
+      consecutiveDetections: 3,
+    }),
+    false,
+  );
 });
 
 test("shouldPromptArrival opens once when entering the arrival zone on a one-way route", () => {

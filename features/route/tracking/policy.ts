@@ -21,6 +21,14 @@ export type ReroutePromptConditionInput = {
   promptCooldownMs?: number;
 };
 
+export type ReroutePromptConfirmationInput = {
+  isOffRoute: boolean;
+  snapDistM: number;
+  consecutiveDetections: number;
+  promptDistanceM?: number;
+  requiredConsecutiveDetections?: number;
+};
+
 export type RouteRedrawSkipConditionInput = {
   isOffRoute: boolean;
   wasOffRoute: boolean;
@@ -80,6 +88,20 @@ export function shouldPromptReroute({
     !routeLoading &&
     !isModalOpen &&
     now - lastPromptAt > promptCooldownMs
+  );
+}
+
+export function shouldConfirmReroutePrompt({
+  isOffRoute,
+  snapDistM,
+  consecutiveDetections,
+  promptDistanceM = ROUTE_REROUTE_PROMPT_DISTANCE_M,
+  requiredConsecutiveDetections = 2,
+}: ReroutePromptConfirmationInput) {
+  return (
+    isOffRoute &&
+    snapDistM >= promptDistanceM &&
+    consecutiveDetections >= requiredConsecutiveDetections
   );
 }
 

@@ -11,6 +11,7 @@ import {
   ROUTE_ARRIVAL_PROMPT_DISTANCE_M,
   ROUTE_ARRIVAL_ROUND_TRIP_ENDPOINT_DISTANCE_M,
   ROUTE_OFF_ROUTE_DISTANCE_M,
+  ROUTE_REROUTE_PROMPT_DISTANCE_M,
 } from "@/features/route/tracking/constants";
 import {
   buildRemainingPath,
@@ -21,6 +22,7 @@ import {
   shouldAdvanceDogRecommendLeg,
   shouldPromptArrival,
   shouldPromptArrivalOnCurrentPath,
+  shouldConfirmReroutePrompt,
   shouldPromptReroute,
   shouldResetArrivalPrompt,
   shouldSkipRouteRedraw,
@@ -65,6 +67,7 @@ export function useMapRoute(
   const legacyProgressSegIdxRef = useRef<number | null>(null);
   const wasOffRouteRef = useRef(false);
   const offRoutePromptShownRef = useRef(false);
+  const offRouteDetectionCountRef = useRef(0);
   const lastOffRoutePromptAtRef = useRef(0);
   const arrivalPromptShownRef = useRef(false);
   const arrivalPromptSuppressedUntilExitRef = useRef(false);
@@ -133,6 +136,7 @@ export function useMapRoute(
     legacyProgressSegIdxRef.current = null;
     wasOffRouteRef.current = false;
     offRoutePromptShownRef.current = false;
+    offRouteDetectionCountRef.current = 0;
     lastOffRoutePromptAtRef.current = 0;
     arrivalPromptShownRef.current = false;
     arrivalPromptSuppressedUntilExitRef.current = false;
@@ -141,6 +145,7 @@ export function useMapRoute(
   const resetOffRoutePromptState = useCallback(() => {
     wasOffRouteRef.current = false;
     offRoutePromptShownRef.current = false;
+    offRouteDetectionCountRef.current = 0;
   }, []);
 
   const maybeAdvanceDogRecommendLeg = useCallback(
@@ -189,8 +194,23 @@ export function useMapRoute(
 
   const maybePromptOffRoute = useCallback(
     (snapDistM: number, isOffRoute: boolean) => {
+      const shouldObserveForPrompt = shouldConfirmReroutePrompt({
+        isOffRoute,
+        snapDistM,
+        consecutiveDetections: offRouteDetectionCountRef.current + 1,
+      });
+
+      if (isOffRoute && snapDistM >= ROUTE_REROUTE_PROMPT_DISTANCE_M) {
+        offRouteDetectionCountRef.current += 1;
+      } else {
+        offRouteDetectionCountRef.current = 0;
+      }
+
       if (!isOffRoute) {
         offRoutePromptShownRef.current = false;
+        return false;
+      }
+      if (!shouldObserveForPrompt) {
         return false;
       }
 
@@ -213,6 +233,7 @@ export function useMapRoute(
         routeExperienceSource === "poi-route" ? "길안내 종료" : "산책 종료";
 
       offRoutePromptShownRef.current = true;
+      offRouteDetectionCountRef.current = 0;
       lastOffRoutePromptAtRef.current = now;
       openModal({
         title: "경로를 벗어났어요",
