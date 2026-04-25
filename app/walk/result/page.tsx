@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -38,6 +39,11 @@ import { useDogStore } from "@/stores/dogStore";
 import { useMySettingsStore } from "@/stores/mySettingsStore";
 import { useWalkHistoryStore } from "@/stores/walkHistoryStore";
 import { useWalkCompletionStore } from "@/stores/walkCompletionStore";
+import {
+  downloadWalkDebugHistory,
+  hasWalkDebugLogs,
+  subscribeWalkDebugUpdates,
+} from "@/lib/walkDebug";
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {
   return (
@@ -533,6 +539,11 @@ function WalkResultPageContent() {
   const clearSummary = useWalkCompletionStore((s) => s.clearSummary);
   const historyEntries = useWalkHistoryStore((s) => s.entries);
   const mockHistoryEntries = useMySettingsStore((s) => s.mockHistoryEntries);
+  const showDebugDownload = useSyncExternalStore(
+    subscribeWalkDebugUpdates,
+    hasWalkDebugLogs,
+    () => false,
+  );
   const dogName = dog?.name?.trim() ? dog.name.trim() : null;
   const dogPhotoUrl = dog?.photo?.variantUrl ?? null;
   const isDebugPreview = searchParams.get("debug") === "1";
@@ -580,6 +591,10 @@ function WalkResultPageContent() {
     router.replace("/");
   }, [clearSummary, emit, router, summary]);
 
+  const handleDownloadDebugLog = useCallback(() => {
+    downloadWalkDebugHistory();
+  }, []);
+
   if (!effectiveSummary) {
     return null;
   }
@@ -602,6 +617,8 @@ function WalkResultPageContent() {
       durationLabel={formatHistoryDurationLabel(effectiveSummary.durationSec)}
       distanceLabel={formatHistoryDistanceLabel(effectiveSummary.distanceM)}
       chartData={chartData}
+      showDebugDownload={showDebugDownload}
+      onDownloadDebugLog={handleDownloadDebugLog}
       onReturnHome={handleReturnHome}
     />
   );
@@ -613,6 +630,8 @@ function WalkResultContent({
   durationLabel,
   distanceLabel,
   chartData,
+  showDebugDownload,
+  onDownloadDebugLog,
   onReturnHome,
 }: {
   dogName: string | null;
@@ -620,6 +639,8 @@ function WalkResultContent({
   durationLabel: string;
   distanceLabel: string;
   chartData: ReturnType<typeof buildRecentWalkChartData>;
+  showDebugDownload: boolean;
+  onDownloadDebugLog: () => void;
   onReturnHome: () => void;
 }) {
   const [isSummaryRevealed, setIsSummaryRevealed] = useState(false);
@@ -841,13 +862,29 @@ function WalkResultContent({
             className="fixed bottom-0 left-1/2 z-20 w-full max-w-[var(--app-shell-max-width)] -translate-x-1/2 bg-white px-5 pt-4 shadow-[0_-8px_24px_rgba(17,24,39,0.08)]"
             style={{ paddingBottom: "calc(var(--safe-bottom) + 16px)" }}
           >
-            <button
-              type="button"
-              onClick={handlePrimaryAction}
-              className="flex h-14 w-full items-center justify-center rounded-lg bg-dg-green-500 px-4 text-base font-semibold text-white active:bg-dg-green-600"
+            <div
+              className={[
+                "flex items-center",
+                showDebugDownload ? "gap-3" : "",
+              ].join(" ")}
             >
-              돌아가기
-            </button>
+              {showDebugDownload ? (
+                <button
+                  type="button"
+                  onClick={onDownloadDebugLog}
+                  className="flex h-14 shrink-0 items-center justify-center rounded-lg border border-dg-green-500 bg-white px-4 text-sm font-semibold text-dg-green-600 active:bg-dg-green-50"
+                >
+                  디버그 로그 다운로드
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={handlePrimaryAction}
+                className="flex h-14 w-full items-center justify-center rounded-lg bg-dg-green-500 px-4 text-base font-semibold text-white active:bg-dg-green-600"
+              >
+                돌아가기
+              </button>
+            </div>
           </div>
         ) : null
       ) : (

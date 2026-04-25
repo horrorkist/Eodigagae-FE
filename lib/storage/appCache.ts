@@ -9,7 +9,7 @@ const LOCAL_STORAGE_KEYS = [
   WALK_HISTORY_STORAGE_KEY,
 ] as const;
 
-const SESSION_STORAGE_KEYS = ["search:page-state"] as const;
+const SESSION_STORAGE_KEYS = ["search:page-state", "walkDebugSession"] as const;
 
 type RemovalStat = {
   removed: number;

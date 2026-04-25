@@ -30,6 +30,13 @@ export type EvaluateWalkSampleResult = {
   speedMps: number | null;
   nextLowSpeedAnchorPos: LatLng | null;
   distanceToAddM: number;
+  rejectReason:
+    | "accuracy-too-low"
+    | "throttled"
+    | "below-move-threshold"
+    | "stationary-drift"
+    | null;
+  lowSpeed: boolean;
 };
 
 export function haversineMeters(a: LatLng, b: LatLng) {
@@ -67,6 +74,8 @@ export function evaluateWalkSample(
       speedMps: null,
       nextLowSpeedAnchorPos: lowSpeedAnchorPos,
       distanceToAddM: 0,
+      rejectReason: "accuracy-too-low",
+      lowSpeed: true,
     };
   }
 
@@ -78,6 +87,8 @@ export function evaluateWalkSample(
       speedMps: null,
       nextLowSpeedAnchorPos: lowSpeedAnchorPos,
       distanceToAddM: 0,
+      rejectReason: "throttled",
+      lowSpeed: true,
     };
   }
 
@@ -108,6 +119,8 @@ export function evaluateWalkSample(
       speedMps,
       nextLowSpeedAnchorPos: lowSpeedAnchorPos,
       distanceToAddM: 0,
+      rejectReason: "below-move-threshold",
+      lowSpeed: isLowSpeed,
     };
   }
 
@@ -133,6 +146,8 @@ export function evaluateWalkSample(
         speedMps,
         nextLowSpeedAnchorPos: nextAnchor,
         distanceToAddM: 0,
+        rejectReason: "stationary-drift",
+        lowSpeed: true,
       };
     }
   }
@@ -146,6 +161,7 @@ export function evaluateWalkSample(
     speedMps,
     nextLowSpeedAnchorPos: nextAnchor,
     distanceToAddM,
+    rejectReason: null,
+    lowSpeed: isLowSpeed,
   };
 }
-

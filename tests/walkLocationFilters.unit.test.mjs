@@ -21,6 +21,7 @@ test("evaluateWalkSample rejects when throttled", () => {
   });
 
   assert.equal(sample.accept, false);
+  assert.equal(sample.rejectReason, "throttled");
 });
 
 test("evaluateWalkSample rejects inaccurate position", () => {
@@ -35,6 +36,7 @@ test("evaluateWalkSample rejects inaccurate position", () => {
   });
 
   assert.equal(sample.accept, false);
+  assert.equal(sample.rejectReason, "accuracy-too-low");
 });
 
 test("evaluateWalkSample keeps anchor when low-speed drift is too small", () => {
@@ -51,6 +53,7 @@ test("evaluateWalkSample keeps anchor when low-speed drift is too small", () => 
 
   assert.equal(sample.accept, false);
   assert.deepEqual(sample.nextLowSpeedAnchorPos, BASE_POS);
+  assert.equal(sample.rejectReason, "stationary-drift");
 });
 
 test("evaluateWalkSample accepts valid movement and returns additive distance", () => {
@@ -70,6 +73,7 @@ test("evaluateWalkSample accepts valid movement and returns additive distance", 
   assert.ok(sample.movedM > 0);
   assert.ok(sample.distanceToAddM > 0);
   assert.deepEqual(sample.nextLowSpeedAnchorPos, nextPos);
+  assert.equal(sample.rejectReason, null);
 });
 
 test("evaluateWalkSample nulls speed when accuracy is above speed threshold", () => {
@@ -85,5 +89,5 @@ test("evaluateWalkSample nulls speed when accuracy is above speed threshold", ()
 
   assert.equal(sample.accept, true);
   assert.equal(sample.speedMps, null);
+  assert.equal(sample.rejectReason, null);
 });
-

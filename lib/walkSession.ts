@@ -1,4 +1,5 @@
 import { bus } from "@/lib/eventBus";
+import { finishWalkDebugSession, walkDebug } from "@/lib/walkDebug";
 import {
   calculateWalkingDurationSec,
   createWalkHistoryEntry,
@@ -57,6 +58,20 @@ export function requestWalkStop() {
       }),
     );
   }
+
+  const endedAtIso = new Date(endedAtMs).toISOString();
+  walkDebug("walk:session:stop", {
+    endedAt: endedAtIso,
+    durationSec,
+    distanceM: mapState.walkedDistanceM,
+    routeExperienceSource: summarySource,
+    myPos: mapState.myPos,
+    activeRouteLegIndex: mapState.activeRouteLegIndex,
+  });
+  finishWalkDebugSession({
+    endedAt: endedAtIso,
+    routeExperienceSource: summarySource,
+  });
 
   bus.emit({ channel: "map", type: "STOP_WALKING" });
 }

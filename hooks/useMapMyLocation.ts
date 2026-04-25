@@ -32,6 +32,7 @@ import {
   buildRouteMarkerHTML,
   resolveRouteMarkers,
 } from "@/lib/routeMarker";
+import { startWalkDebugSession, walkDebug } from "@/lib/walkDebug";
 import { modalPresets } from "@/lib/modalPresets";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 import type { LatLng } from "@/types/mapEvents";
@@ -415,6 +416,7 @@ export function useMapMyLocation(
   }, [coords?.latitude, coords?.longitude, emit, myLocationRequestSeq, refresh]);
 
   useOn("map", "START_WALKING", () => {
+    const startedAt = new Date().toISOString();
     manualPosRef.current = false;
     lastGeoRef.current = null;
     resetWalkingRefs();
@@ -425,6 +427,18 @@ export function useMapMyLocation(
     setWalkingPaused(false);
     setActiveRouteLegIndex(0);
     setDrawRoute(Boolean(route?.path?.length));
+    startWalkDebugSession({
+      startedAt,
+      routeExperienceSource,
+    });
+    walkDebug("walk:session:start", {
+      startedAt,
+      myPos,
+      pickedPos,
+      routeExperienceSource,
+      activeRouteLegIndex: 0,
+      pathPointCount: route?.path?.length ?? 0,
+    });
     seedHeadingFromRoute(route?.path, myPos);
 
     requestOrientationPermissionIfNeeded();
@@ -434,8 +448,16 @@ export function useMapMyLocation(
 
   useOn("map", "PAUSE_WALKING", () => {
     if (!walking || walkingPaused) return;
+    const pausedAt = Date.now();
+    walkDebug("walk:session:pause", {
+      pausedAt: new Date(pausedAt).toISOString(),
+      myPos,
+      routeExperienceSource,
+      activeRouteLegIndex,
+      walkedDistanceM: useMapStore.getState().walkedDistanceM,
+    });
     setWalkingPaused(true);
-    setWalkingPausedAt(Date.now());
+    setWalkingPausedAt(pausedAt);
     resetWalkingIntervalRefs();
   });
 
@@ -443,6 +465,14 @@ export function useMapMyLocation(
     if (!walking || !walkingPaused) return;
 
     const now = Date.now();
+    walkDebug("walk:session:resume", {
+      resumedAt: new Date(now).toISOString(),
+      myPos,
+      routeExperienceSource,
+      activeRouteLegIndex,
+      pausedDurationMs:
+        walkingPausedAt != null ? Math.max(0, now - walkingPausedAt) : 0,
+    });
     setWalkingPausedTotalMs(
       accumulatePausedTotalMs(walkingPausedTotalMs, walkingPausedAt, now),
     );
@@ -495,6 +525,13 @@ export function useMapMyLocation(
           typeof c.accuracy === "number" && Number.isFinite(c.accuracy)
             ? c.accuracy
             : null;
+        walkDebug("walk:location:received", {
+          myPos: nextPos,
+          accuracyM,
+          speedMps: rawSpeedMps,
+          activeRouteLegIndex,
+          routeExperienceSource,
+        });
         const sample = evaluateWalkSample({
           nowMs: now,
           lastWalkAtMs: lastWalkAtRef.current,
@@ -506,17 +543,65 @@ export function useMapMyLocation(
         });
         if (!sample.accept) {
           lowSpeedAnchorPosRef.current = sample.nextLowSpeedAnchorPos;
+          walkDebug("walk:location:rejected", {
+            myPos: nextPos,
+            accuracyM,
+            speedMps: sample.speedMps,
+            activeRouteLegIndex,
+            routeExperienceSource,
+            movedM: sample.movedM,
+            reason: sample.rejectReason,
+          });
+          if (sample.lowSpeed) {
+            walkDebug("walk:motion:low-speed", {
+              myPos: nextPos,
+              accuracyM,
+              speedMps: sample.speedMps,
+              activeRouteLegIndex,
+              routeExperienceSource,
+              movedM: sample.movedM,
+              reason: sample.rejectReason,
+            });
+          }
           return;
         }
 
         if (sample.distanceToAddM > 0) {
           addWalkedDistanceM(sample.distanceToAddM);
+          walkDebug("walk:distance:updated", {
+            myPos: nextPos,
+            accuracyM,
+            speedMps: sample.speedMps,
+            activeRouteLegIndex,
+            routeExperienceSource,
+            distanceAddedM: sample.distanceToAddM,
+          });
         }
 
         lastWalkAtRef.current = now;
         lastWalkPosRef.current = nextPos;
         lowSpeedAnchorPosRef.current = sample.nextLowSpeedAnchorPos;
 
+        walkDebug("walk:location:accepted", {
+          myPos: nextPos,
+          accuracyM,
+          speedMps: sample.speedMps,
+          activeRouteLegIndex,
+          routeExperienceSource,
+          movedM: sample.movedM,
+          distanceAddedM: sample.distanceToAddM,
+        });
+        if (sample.lowSpeed) {
+          walkDebug("walk:motion:low-speed", {
+            myPos: nextPos,
+            accuracyM,
+            speedMps: sample.speedMps,
+            activeRouteLegIndex,
+            routeExperienceSource,
+            movedM: sample.movedM,
+            reason: "accepted-low-speed",
+          });
+        }
         updateMyPosition(nextPos);
 
         const gpsHeading =
@@ -549,8 +634,10 @@ export function useMapMyLocation(
       clearWalkWatch();
     };
   }, [
+    activeRouteLegIndex,
     walking,
     walkingPaused,
+    routeExperienceSource,
     updateHeadingFromPosition,
     showGeoErrorModal,
     updateMyPosition,

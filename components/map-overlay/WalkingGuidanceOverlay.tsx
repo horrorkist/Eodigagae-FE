@@ -9,6 +9,7 @@ import {
 } from "@/components/icons/definitions.generated";
 import type { RouteGuidanceStep } from "@/domain/route/types";
 import type { LatLng } from "@/types/mapEvents";
+import { walkDebug } from "@/lib/walkDebug";
 import {
   buildRouteProgressGuidanceSteps,
   getWalkingGuidanceSteps,
@@ -96,6 +97,23 @@ export default function WalkingGuidanceOverlay({
     currentIndex != null && resolvedSteps[currentIndex + 1]
       ? String(currentIndex + 2)
       : null;
+
+  useEffect(() => {
+    if (currentStep == null) return;
+    walkDebug("route:guidance:changed", {
+      currentStepIndex: currentIndex,
+      currentStepTitle: currentStep.title,
+      nextStepTitle: nextStep?.title ?? null,
+      progressMode,
+      routeProgressM,
+    });
+  }, [
+    currentIndex,
+    currentStep,
+    nextStep,
+    progressMode,
+    routeProgressM,
+  ]);
 
   if (!currentStep) return null;
 

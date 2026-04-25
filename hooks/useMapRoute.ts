@@ -15,7 +15,6 @@ import { modalPresets } from "@/lib/modalPresets";
 import { walkDebug } from "@/lib/walkDebug";
 import { requestWalkStop } from "@/lib/walkSession";
 import {
-  ROUTE_ARRIVAL_PROMPT_DISTANCE_M,
   ROUTE_ARRIVAL_ROUND_TRIP_ENDPOINT_DISTANCE_M,
   ROUTE_OFF_ROUTE_DISTANCE_M,
   ROUTE_REROUTE_PROMPT_DISTANCE_M,
@@ -106,10 +105,38 @@ export function useMapRoute(
     routeExperienceSource === "dog-recommend" && routeLegs.length > 0
       ? routeLegs[Math.min(activeRouteLegIndex, routeLegs.length - 1)] ?? null
       : null;
-  const trackedPath =
-    walking && routeExperienceSource === "dog-recommend" && activeDogRecommendLeg
-      ? activeDogRecommendLeg.path
-      : route?.path ?? [];
+  const trackedPath = useMemo(
+    () =>
+      walking &&
+      routeExperienceSource === "dog-recommend" &&
+      activeDogRecommendLeg
+        ? activeDogRecommendLeg.path
+        : route?.path ?? [],
+    [activeDogRecommendLeg, route?.path, routeExperienceSource, walking],
+  );
+
+  const buildCursorPayload = useCallback(
+    (
+      cursor: TrackingCursor | null,
+      extra?: Record<string, unknown>,
+    ): Record<string, unknown> => ({
+      myPos,
+      activeRouteLegIndex,
+      routeExperienceSource,
+      distanceAlongRouteM: cursor?.distanceAlongRouteM ?? null,
+      remainingDistanceM:
+        trackingModelRef.current && cursor
+          ? Math.max(
+              0,
+              trackingModelRef.current.totalDistanceM - cursor.distanceAlongRouteM,
+            )
+          : null,
+      snapDistM: cursor?.snapDistM ?? null,
+      segmentIndex: cursor?.segmentIndex ?? null,
+      ...(extra ?? {}),
+    }),
+    [activeRouteLegIndex, myPos, routeExperienceSource],
+  );
 
   const clearGuidanceMarkers = useCallback(() => {
     clearGuidanceMarkersNaver(guidanceMarkersRef);
@@ -179,6 +206,15 @@ export function useMapRoute(
         return false;
       }
 
+      walkDebug(
+        "route:leg:changed",
+        buildCursorPayload(lastConfirmedCursorRef.current, {
+          previousLegIndex: activeRouteLegIndex,
+          nextLegIndex: activeRouteLegIndex + 1,
+          reason: "advance-threshold-met",
+          distanceToLegEndM,
+        }),
+      );
       setActiveRouteLegIndex(activeRouteLegIndex + 1);
       setWalkingGuidanceProgressM(null);
       resetRouteTracking();
@@ -188,6 +224,7 @@ export function useMapRoute(
     [
       activeDogRecommendLeg,
       activeRouteLegIndex,
+      buildCursorPayload,
       myPos,
       resetOffRoutePromptState,
       resetRouteTracking,
@@ -217,6 +254,15 @@ export function useMapRoute(
         offRoutePromptShownRef.current = false;
         return false;
       }
+      if (!wasOffRouteRef.current) {
+        walkDebug(
+          "route:off-route:detected",
+          buildCursorPayload(lastConfirmedCursorRef.current, {
+            snapDistM,
+            reason: "off-route-threshold-exceeded",
+          }),
+        );
+      }
       if (!shouldObserveForPrompt) {
         return false;
       }
@@ -242,6 +288,13 @@ export function useMapRoute(
       offRoutePromptShownRef.current = true;
       offRouteDetectionCountRef.current = 0;
       lastOffRoutePromptAtRef.current = now;
+      walkDebug(
+        "route:off-route:prompted",
+        buildCursorPayload(lastConfirmedCursorRef.current, {
+          snapDistM,
+          stopLabel,
+        }),
+      );
       openModal({
         ...modalPresets.offRoute({ distanceM: snapDistM, stopLabel }),
         onConfirm: () => {
@@ -250,7 +303,13 @@ export function useMapRoute(
       });
       return true;
     },
-    [isModalOpen, openModal, routeExperienceSource, routeLoading],
+    [
+      buildCursorPayload,
+      isModalOpen,
+      openModal,
+      routeExperienceSource,
+      routeLoading,
+    ],
   );
 
   const maybePromptArrival = useCallback(
@@ -305,6 +364,15 @@ export function useMapRoute(
 
       const isPoiRoute = routeExperienceSource === "poi-route";
       arrivalPromptShownRef.current = true;
+      walkDebug(
+        "route:arrival:prompted",
+        buildCursorPayload(lastConfirmedCursorRef.current, {
+          remainingDistanceM,
+          progressRatio,
+          isRoundTrip,
+          isPoiRoute,
+        }),
+      );
       openModal({
         ...modalPresets.arrival({ isPoiRoute }),
         onConfirm: () => {
@@ -312,15 +380,32 @@ export function useMapRoute(
         },
         onCancel: () => {
           arrivalPromptSuppressedUntilExitRef.current = true;
+          walkDebug(
+            "route:arrival:suppressed",
+            buildCursorPayload(lastConfirmedCursorRef.current, {
+              reason: "cancel",
+              remainingDistanceM,
+              progressRatio,
+            }),
+          );
         },
         onDismiss: () => {
           arrivalPromptSuppressedUntilExitRef.current = true;
+          walkDebug(
+            "route:arrival:suppressed",
+            buildCursorPayload(lastConfirmedCursorRef.current, {
+              reason: "dismiss",
+              remainingDistanceM,
+              progressRatio,
+            }),
+          );
         },
       });
       return true;
     },
     [
       activeRouteLegIndex,
+      buildCursorPayload,
       isModalOpen,
       openModal,
       routeExperienceSource,
@@ -330,6 +415,13 @@ export function useMapRoute(
   );
 
   const clearRouteVisuals = useCallback(() => {
+    if (lastDrawnPathRef.current?.length) {
+      walkDebug("route:polyline:cleared", {
+        pathPointCount: lastDrawnPathRef.current.length,
+        activeRouteLegIndex,
+        routeExperienceSource,
+      });
+    }
     clearRouteVisualsNaver({
       routeBorderRef,
       routeLineRef,
@@ -338,10 +430,18 @@ export function useMapRoute(
       lastMarkerVisibleRef,
       resetRouteTracking,
     });
-  }, [resetRouteTracking]);
+  }, [
+    activeRouteLegIndex,
+    resetRouteTracking,
+    routeExperienceSource,
+  ]);
 
   const drawRouteLine = useCallback(
-    (path: [number, number][], visualStyle: RouteVisualStyle) => {
+    (
+      path: [number, number][],
+      visualStyle: RouteVisualStyle,
+      debugEvent: "route:polyline:full-rendered" | "route:polyline:remaining-rendered",
+    ) => {
       if (!mapRef.current || !window.naver?.maps) return;
 
       drawRouteLineNaver({
@@ -359,14 +459,22 @@ export function useMapRoute(
         guidanceMarkerHardMax,
         guidanceMarkerSizePx,
       });
+      walkDebug(debugEvent, {
+        pathPointCount: path.length,
+        activeRouteLegIndex,
+        routeExperienceSource,
+        showGuidanceMarkers: visualStyle.showGuidanceMarkers,
+      });
     },
     [
+      activeRouteLegIndex,
       borderStrokeWeight,
       guidanceMarkerHardMax,
       guidanceMarkerSizePx,
       guidanceMarkerSpacingPx,
       lineStrokeWeight,
       mapRef,
+      routeExperienceSource,
     ],
   );
 
@@ -468,7 +576,7 @@ export function useMapRoute(
     if (!activeDogRecommendLeg || trackedPath.length < 2) return;
 
     lastRenderedCursorRef.current = null;
-    drawRouteLine(trackedPath, fullRouteStyle);
+    drawRouteLine(trackedPath, fullRouteStyle, "route:polyline:full-rendered");
   }, [
     activeDogRecommendLeg,
     drawRoute,
@@ -492,7 +600,11 @@ export function useMapRoute(
     const drawFullRoute = () => {
       lastRenderedCursorRef.current = null;
       resetOffRoutePromptState();
-      drawRouteLine(trackedPath, fullRouteStyle);
+      drawRouteLine(
+        trackedPath,
+        fullRouteStyle,
+        "route:polyline:full-rendered",
+      );
     };
 
     if (!walking || !myPos || trackedPath.length < 2) {
@@ -521,6 +633,15 @@ export function useMapRoute(
       pendingCandidateRef.current,
     );
     pendingCandidateRef.current = resolution.pendingCandidate;
+    if (resolution.ambiguous) {
+      walkDebug(
+        "route:tracking:ambiguous",
+        buildCursorPayload(lastConfirmedCursorRef.current, {
+          leadingCandidateSegmentIndex:
+            resolution.leadingCandidate?.segment.index ?? null,
+        }),
+      );
+    }
     if (!resolution.confirmedCursor) {
       setWalkingGuidanceProgressM(null);
       drawFullRoute();
@@ -529,6 +650,11 @@ export function useMapRoute(
 
     lastConfirmedCursorRef.current = resolution.confirmedCursor;
     const activeCursor = resolution.confirmedCursor;
+    walkDebug("route:tracking:cursor-updated", {
+      ...buildCursorPayload(activeCursor),
+      confidence: activeCursor.confidence,
+      overlapOccurrenceIndex: activeCursor.overlapOccurrenceIndex,
+    });
 
     if (routeExperienceSource === "dog-recommend") {
       setWalkingGuidanceProgressM(activeCursor.distanceAlongRouteM);
@@ -621,6 +747,10 @@ export function useMapRoute(
         cursor: activeCursor,
       })
     ) {
+      walkDebug("route:polyline:redraw-skipped", {
+        ...buildCursorPayload(activeCursor),
+        isOffRoute,
+      });
       return;
     }
 
@@ -639,13 +769,23 @@ export function useMapRoute(
       // Near the destination the remaining path can collapse to just a few
       // meters. Keep the active-route rendering instead of snapping back to
       // the full route while guidance is still ongoing.
-      drawRouteLine(remainingPath, activeRouteStyle);
+      drawRouteLine(
+        remainingPath,
+        activeRouteStyle,
+        "route:polyline:remaining-rendered",
+      );
       return;
     }
 
-    drawRouteLine(remainingPath, activeRouteStyle);
+    drawRouteLine(
+      remainingPath,
+      activeRouteStyle,
+      "route:polyline:remaining-rendered",
+    );
   }, [
     activeRouteStyle,
+    activeRouteLegIndex,
+    buildCursorPayload,
     route,
     drawRoute,
     fullRouteStyle,

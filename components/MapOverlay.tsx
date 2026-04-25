@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMapStore } from "@/stores/mapStore";
 import { useUiChromeStore } from "@/stores/uiChrome";
 import { useMapControlStore } from "@/stores/mapControlStore";
@@ -15,10 +15,17 @@ import WalkingOverlay from "@/components/map-overlay/WalkingOverlay";
 import WalkingGuidanceOverlay from "@/components/map-overlay/WalkingGuidanceOverlay";
 import StartPointCenterMarker from "@/components/map-overlay/StartPointCenterMarker";
 import StartPointPromptSheet from "@/components/map-overlay/StartPointPromptSheet";
+import WalkDebugPanel from "@/components/WalkDebugPanel";
 import {
   BOTTOM_CHROME_HEIGHT_PX,
   FLOATING_CONTROLS_BASE_BOTTOM_WITH_CHROME_PX,
 } from "@/lib/bottomChromeMetrics";
+import {
+  isWalkDebugPanelVisible,
+  setWalkDebugPanelVisible,
+  subscribeWalkDebugUpdates,
+  walkDebug,
+} from "@/lib/walkDebug";
 import { requestWalkStop } from "@/lib/walkSession";
 
 function formatElapsed(totalSec: number) {
@@ -147,6 +154,11 @@ export default function MapOverlay({
   });
   const [startPointPromptSheetHeightPx, setStartPointPromptSheetHeightPx] =
     useState(0);
+  const showWalkDebugPanel = useSyncExternalStore(
+    subscribeWalkDebugUpdates,
+    isWalkDebugPanelVisible,
+    () => false,
+  );
   const startPointFloatingControlsExtraBottomPx = useMemo(() => {
     const floatingBaseGapPx =
       FLOATING_CONTROLS_BASE_BOTTOM_WITH_CHROME_PX - BOTTOM_CHROME_HEIGHT_PX;
@@ -206,6 +218,17 @@ export default function MapOverlay({
     requestMyLocation();
   }, [requestMyLocation]);
 
+  const handleToggleWalkDebugPanel = useCallback(() => {
+    const nextVisible = !showWalkDebugPanel;
+    setWalkDebugPanelVisible(nextVisible);
+    walkDebug(
+      nextVisible ? "walk:debug-panel:shown" : "walk:debug-panel:hidden",
+      {
+        reason: "toggle-button",
+      },
+    );
+  }, [showWalkDebugPanel]);
+
   useEffect(() => {
     if (!walking || walkingPaused || !walkingStartedAt) return;
 
@@ -232,16 +255,44 @@ export default function MapOverlay({
             }
             guidance={walkingGuidance}
             hidden={isWalkingGuidanceHidden}
-            onToggleHidden={() =>
+            onToggleHidden={() => {
+              const nextHidden =
+                walkingGuidanceUiState.sessionKey ===
+                currentWalkingGuidanceSessionKey
+                  ? !walkingGuidanceUiState.hidden
+                  : true;
+              walkDebug(
+                nextHidden ? "route:guidance:hidden" : "route:guidance:shown",
+                {
+                  reason: "walking-guidance-toggle",
+                },
+              );
               setWalkingGuidanceUiState((current) => ({
                 sessionKey: currentWalkingGuidanceSessionKey,
                 hidden:
                   current.sessionKey === currentWalkingGuidanceSessionKey
                     ? !current.hidden
                     : true,
-              }))
-            }
+              }));
+            }}
           />
+        ) : null}
+        {showWalkDebugPanel ? (
+          <div
+            className="pointer-events-none absolute left-0 right-0 px-3"
+            style={{ top: "calc(var(--safe-top) + 112px)" }}
+          >
+            <div className="pointer-events-auto mx-auto max-h-[50vh] max-w-[420px] overflow-auto">
+              <WalkDebugPanel
+                onClose={() => {
+                  setWalkDebugPanelVisible(false);
+                  walkDebug("walk:debug-panel:hidden", {
+                    reason: "close-button",
+                  });
+                }}
+              />
+            </div>
+          </div>
         ) : null}
         <FloatingControlsOverlay
           isBottomChromeVisible={false}
@@ -269,6 +320,20 @@ export default function MapOverlay({
                 </div>
               </div>
             )
+          }
+          rightSlot={
+            <button
+              type="button"
+              onClick={handleToggleWalkDebugPanel}
+              className={[
+                "rounded-full px-3 py-2 text-xs font-semibold shadow-lg shadow-black/15 transition-colors",
+                showWalkDebugPanel
+                  ? "bg-dg-green-500 text-white"
+                  : "bg-white text-dg-black",
+              ].join(" ")}
+            >
+              {showWalkDebugPanel ? "디버그 닫기" : "디버그"}
+            </button>
           }
           onRequestMyLocation={onRequestMyLocation}
         />

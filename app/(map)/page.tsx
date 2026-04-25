@@ -8,7 +8,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import BottomSheet, {
@@ -35,11 +34,7 @@ import { useModalStore } from "@/stores/modal";
 import { useEmit } from "@/hooks/useEventBus";
 import { fromHomePoiListItem, fromTmapPoi } from "@/lib/focusedPoi";
 import { mergeAndSortHomePois } from "@/lib/homePoiNormalizer";
-import WalkDebugPanel from "@/components/WalkDebugPanel";
-import {
-  isWalkDebugPanelVisible,
-  subscribeWalkDebugUpdates,
-} from "@/lib/walkDebug";
+import { walkDebug } from "@/lib/walkDebug";
 import CoachmarkTour from "@/components/CoachmarkTour";
 import HomePetPoiLayerBridge from "@/components/map-shell/HomePetPoiLayerBridge";
 import HomeFacilitiesPoiLayerBridge from "@/components/map-shell/HomeFacilitiesPoiLayerBridge";
@@ -100,11 +95,6 @@ function MapPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emit = useEmit();
-  const showWalkDebugPanel = useSyncExternalStore(
-    subscribeWalkDebugUpdates,
-    isWalkDebugPanelVisible,
-    () => false,
-  );
   const { mapRef, sdkReady } = useMapRuntime();
 
   const myPos = useMapStore((s) => s.myPos);
@@ -419,8 +409,16 @@ function MapPageContent() {
         routeError: null,
         drawRoute: true,
       });
+      walkDebug("route:applied", {
+        source: recommendation.source,
+        routeExperienceSource: routePlanningSource,
+        routeId: recommendation.id,
+        pathPointCount: recommendation.route.path.length,
+        distanceM: recommendation.route.summary?.distance ?? null,
+        durationMs: recommendation.route.summary?.duration ?? null,
+      });
     },
-    [setActiveRouteLegIndex, setPickedPos, setRouteState],
+    [routePlanningSource, setActiveRouteLegIndex, setPickedPos, setRouteState],
   );
 
   const invalidateRoutePlanningRequests = useCallback(() => {
@@ -569,6 +567,10 @@ function MapPageContent() {
       startRouteRecommendLoading();
       clearFocusedPoi();
       closeBottomSheet();
+      walkDebug("route:cleared", {
+        reason: "start-poi-route-planning",
+        routeExperienceSource: "poi-route",
+      });
       setRouteState({
         route: null,
         routeRawResponse: null,
@@ -704,6 +706,10 @@ function MapPageContent() {
   const returnToHomeAfterWalkingStop = useCallback(() => {
     invalidateRoutePlanningRequests();
     setPickedPos(null);
+    walkDebug("route:cleared", {
+      reason: "walking-stopped",
+      routeExperienceSource: routePlanningSource,
+    });
     setRouteState({
       route: null,
       routeRawResponse: null,
@@ -748,6 +754,10 @@ function MapPageContent() {
   const handleRouteEdit = useCallback(() => {
     invalidateRoutePlanningRequests();
     setPickedPos(null);
+    walkDebug("route:cleared", {
+      reason: "route-edit",
+      routeExperienceSource: routePlanningSource,
+    });
     setRouteState({
       route: null,
       routeRawResponse: null,
@@ -790,6 +800,10 @@ function MapPageContent() {
   const handleRouteLoadingCancel = useCallback(() => {
     invalidateRoutePlanningRequests();
     clearRouteRecommendations();
+    walkDebug("route:cleared", {
+      reason: "route-loading-cancel",
+      routeExperienceSource: routePlanningSource,
+    });
     setRouteState({
       route: null,
       routeRawResponse: null,
@@ -1279,13 +1293,6 @@ function MapPageContent() {
                 <RouteTabContent
                   onRouteRecommendRequested={handleRouteRecommendRequested}
                 />
-              )}
-
-              {showWalkDebugPanel && (
-                <>
-                  <div className="border border-blue-200 bg-blue-50 rounded-md p-3 text-sm"></div>
-                  <WalkDebugPanel />
-                </>
               )}
             </div>
           )}
