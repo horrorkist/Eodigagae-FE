@@ -20,6 +20,7 @@ import {
   appIconPenToSquare,
   appIconPlus,
   appIconPuppy,
+  appIconPuppy2,
   appIconTrashbin,
 } from "@/components/icons/definitions.generated";
 import PetProfileModal from "@/components/my-page/PetProfileModal";
@@ -411,7 +412,7 @@ export default function MyPage() {
               >
                 <div className="flex items-center gap-2 font-medium text-dg-black">
                   <RowIcon
-                    icon={appIconPuppy}
+                    icon={appIconPuppy2}
                     iconClassName="text-dg-orange-500"
                   />
                   <span>반려동물 정보 삭제</span>

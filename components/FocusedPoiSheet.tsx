@@ -11,6 +11,7 @@ import {
   appIconCopy,
   appIconImagePlaceholder,
   appIconMapPin,
+  appIconPaw,
   appIconPuppy,
   appIconTrashbin,
   appIconTel,
@@ -37,7 +38,7 @@ function estimateWalkMinutes(distanceM: number | null) {
 function getSourceIcon(source: FocusedPoi["source"]): AppIconDefinition {
   if (source === "fountain") return appIconWaterdrop;
   if (source === "trash-bin") return appIconTrashbin;
-  if (source === "tmap") return appIconMapPin;
+  if (source === "tmap") return appIconPaw;
   return appIconPuppy;
 }
 
