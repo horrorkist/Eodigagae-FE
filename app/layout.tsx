@@ -32,7 +32,7 @@ export const viewport = {
   maximumScale: 1,
   viewportFit: "cover", // iOS safe-area
   userScalable: false,
-  themeColor: "#0bdc00",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
