@@ -32,7 +32,11 @@ import {
   buildRouteMarkerHTML,
   resolveRouteMarkers,
 } from "@/lib/routeMarker";
-import { startWalkDebugSession, walkDebug } from "@/lib/walkDebug";
+import {
+  setWalkDebugRouteSnapshot,
+  startWalkDebugSession,
+  walkDebug,
+} from "@/lib/walkDebug";
 import { modalPresets } from "@/lib/modalPresets";
 import { useEmit, useOn } from "@/hooks/useEventBus";
 import type { LatLng } from "@/types/mapEvents";
@@ -431,6 +435,7 @@ export function useMapMyLocation(
       startedAt,
       routeExperienceSource,
     });
+    setWalkDebugRouteSnapshot(route ?? null);
     walkDebug("walk:session:start", {
       startedAt,
       myPos,

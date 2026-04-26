@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import { useShallow } from "zustand/shallow";
 import { useMapStore } from "@/stores/mapStore";
-import { walkDebug } from "@/lib/walkDebug";
+import { setWalkDebugRouteSnapshot, walkDebug } from "@/lib/walkDebug";
 import {
   fetchTmapWalkRoute,
   type TmapPedestrianSearchOption,
@@ -58,6 +58,7 @@ export function useRouteActions() {
           distanceM: result.route.summary?.distance ?? null,
           durationMs: result.route.summary?.duration ?? null,
         });
+        setWalkDebugRouteSnapshot(result.route);
         walkDebug("route:applied", {
           source: "tmap-pedestrian",
           myPos,

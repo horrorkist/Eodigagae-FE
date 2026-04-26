@@ -6,7 +6,9 @@ import {
   clearWalkDebugHistory,
   finishWalkDebugSession,
   getWalkDebugHistory,
+  getWalkDebugRouteSnapshot,
   getWalkDebugSession,
+  setWalkDebugRouteSnapshot,
   startWalkDebugSession,
   walkDebug,
 } from "../lib/walkDebug.ts";
@@ -96,6 +98,16 @@ test("walkDebug persists active session logs into sessionStorage", () => {
     startedAt: "2026-04-26T10:00:00.000Z",
     routeExperienceSource: "dog-recommend",
   });
+  setWalkDebugRouteSnapshot({
+    path: [
+      [127, 37.5],
+      [127.001, 37.501],
+    ],
+    summary: {
+      distance: 1200,
+      duration: 900000,
+    },
+  });
   walkDebug("walk:session:start", { distanceM: 0 });
   walkDebug("walk:location:accepted", { distanceAddedM: 12 });
   finishWalkDebugSession({
@@ -112,7 +124,9 @@ test("walkDebug persists active session logs into sessionStorage", () => {
   const parsed = JSON.parse(stored);
   assert.equal(parsed.session.routeExperienceSource, "dog-recommend");
   assert.equal(parsed.session.endedAt, "2026-04-26T10:30:00.000Z");
+  assert.equal(parsed.route.path.length, 2);
   assert.equal(parsed.logs.length, 2);
+  assert.equal(getWalkDebugRouteSnapshot()?.summary?.distance, 1200);
 
   sandbox.restore();
 });
@@ -127,6 +141,15 @@ test("buildWalkDebugExportPayload restores logs from sessionStorage", () => {
           startedAt: "2026-04-26T10:00:00.000Z",
           endedAt: "2026-04-26T10:05:00.000Z",
           routeExperienceSource: "poi-route",
+        },
+        route: {
+          path: [
+            [127, 37.5],
+            [127.002, 37.501],
+          ],
+          summary: {
+            distance: 1800,
+          },
         },
         logs: [
           {
@@ -144,6 +167,7 @@ test("buildWalkDebugExportPayload restores logs from sessionStorage", () => {
 
   assert.equal(payload.session?.sessionId, "session-1");
   assert.equal(payload.session?.routeExperienceSource, "poi-route");
+  assert.equal(payload.route?.summary?.distance, 1800);
   assert.equal(payload.logs.length, 1);
   assert.equal(payload.logs[0].event, "route:request:start");
 

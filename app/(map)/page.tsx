@@ -34,7 +34,7 @@ import { useModalStore } from "@/stores/modal";
 import { useEmit } from "@/hooks/useEventBus";
 import { fromHomePoiListItem, fromTmapPoi } from "@/lib/focusedPoi";
 import { mergeAndSortHomePois } from "@/lib/homePoiNormalizer";
-import { walkDebug } from "@/lib/walkDebug";
+import { setWalkDebugRouteSnapshot, walkDebug } from "@/lib/walkDebug";
 import CoachmarkTour from "@/components/CoachmarkTour";
 import HomePetPoiLayerBridge from "@/components/map-shell/HomePetPoiLayerBridge";
 import HomeFacilitiesPoiLayerBridge from "@/components/map-shell/HomeFacilitiesPoiLayerBridge";
@@ -409,6 +409,7 @@ function MapPageContent() {
         routeError: null,
         drawRoute: true,
       });
+      setWalkDebugRouteSnapshot(recommendation.route);
       walkDebug("route:applied", {
         source: recommendation.source,
         routeExperienceSource: routePlanningSource,

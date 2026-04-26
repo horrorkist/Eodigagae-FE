@@ -1,5 +1,7 @@
 "use client";
 
+import type { RouteResult } from "../domain/route/types.ts";
+
 const WALK_DEBUG_QUERY_KEY = "walkDebug";
 const WALK_DEBUG_STORAGE_KEY = "walkDebug";
 const WALK_DEBUG_PANEL_VISIBLE_STORAGE_KEY = "walkDebugPanelVisible";
@@ -25,12 +27,14 @@ export type WalkDebugSessionMeta = {
 
 type WalkDebugSessionRecord = {
   session: WalkDebugSessionMeta | null;
+  route: RouteResult | null;
   logs: WalkDebugEntry[];
 };
 
 export type WalkDebugExportPayload = {
   exportedAt: string;
   session: WalkDebugSessionMeta | null;
+  route: RouteResult | null;
   count: number;
   logs: WalkDebugEntry[];
 };
@@ -39,6 +43,7 @@ declare global {
   interface Window {
     __walkDebugHistory?: WalkDebugEntry[];
     __walkDebugSession?: WalkDebugSessionMeta | null;
+    __walkDebugRoute?: RouteResult | null;
   }
 }
 
@@ -57,6 +62,10 @@ function readSessionStorageRecord(): WalkDebugSessionRecord | null {
     const parsed = JSON.parse(raw) as Partial<WalkDebugSessionRecord>;
     return {
       session: parsed.session ?? null,
+      route:
+        parsed.route && typeof parsed.route === "object"
+          ? (parsed.route as RouteResult)
+          : null,
       logs: Array.isArray(parsed.logs) ? parsed.logs : [],
     };
   } catch {
@@ -93,15 +102,18 @@ function hydrateWalkDebugState() {
     return {
       history: storageWindow.__walkDebugHistory,
       session: storageWindow.__walkDebugSession,
+      route: storageWindow.__walkDebugRoute ?? null,
     };
   }
 
   const stored = readSessionStorageRecord();
   storageWindow.__walkDebugHistory = stored?.logs ?? [];
   storageWindow.__walkDebugSession = stored?.session ?? null;
+  storageWindow.__walkDebugRoute = stored?.route ?? null;
   return {
     history: storageWindow.__walkDebugHistory,
     session: storageWindow.__walkDebugSession,
+    route: storageWindow.__walkDebugRoute,
   };
 }
 
@@ -121,9 +133,21 @@ function setSessionRef(session: WalkDebugSessionMeta | null) {
   storageWindow.__walkDebugSession = session;
 }
 
+function getRouteRef() {
+  const hydrated = hydrateWalkDebugState();
+  return hydrated?.route ?? null;
+}
+
+function setRouteRef(route: RouteResult | null) {
+  const storageWindow = getStorageWindow();
+  if (!storageWindow) return;
+  storageWindow.__walkDebugRoute = route;
+}
+
 function syncWalkDebugState() {
   writeSessionStorageRecord({
     session: getSessionRef(),
+    route: getRouteRef(),
     logs: getWalkDebugHistory(),
   });
 }
@@ -193,6 +217,10 @@ export function getWalkDebugSession() {
   return getSessionRef();
 }
 
+export function getWalkDebugRouteSnapshot() {
+  return getRouteRef();
+}
+
 export function hasWalkDebugLogs() {
   return getWalkDebugHistory().length > 0;
 }
@@ -232,6 +260,7 @@ export function clearWalkDebugHistory() {
   if (!history) return;
   history.splice(0, history.length);
   setSessionRef(null);
+  setRouteRef(null);
   syncWalkDebugState();
   dispatchWalkDebugUpdate();
 }
@@ -292,6 +321,7 @@ export function startWalkDebugSession(params?: {
   history?.splice(0, history.length);
   const nextSession = buildSessionMeta(params);
   setSessionRef(nextSession);
+  setRouteRef(null);
   syncWalkDebugState();
   dispatchWalkDebugUpdate();
   return nextSession;
@@ -321,9 +351,17 @@ export function buildWalkDebugExportPayload(): WalkDebugExportPayload {
   return {
     exportedAt: new Date().toISOString(),
     session: getWalkDebugSession(),
+    route: getWalkDebugRouteSnapshot(),
     count: history.length,
     logs: history,
   };
+}
+
+export function setWalkDebugRouteSnapshot(route: RouteResult | null) {
+  if (!isWalkDebugEnabled()) return;
+  setRouteRef(route);
+  syncWalkDebugState();
+  dispatchWalkDebugUpdate();
 }
 
 export function downloadWalkDebugHistory() {
